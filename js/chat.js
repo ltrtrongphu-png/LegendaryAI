@@ -91,6 +91,11 @@
   }
 
   function updateModeLabel() {
+    if (settings.mode === 'legendary') {
+      chatModeLabel.textContent = 'Legendary Engine · ' + (settings.engineModel === 'custom' ? 'Custom Model' : 'Legendary-6');
+      if (chatDot) chatDot.classList.add('live');
+      return;
+    }
     var live = settings.mode === 'live';
     chatModeLabel.textContent = live ? 'Chế độ AI thật (' + (settings.provider === 'openai' ? 'OpenAI-compatible' : 'Anthropic-compatible') + ')' : 'Chế độ mô phỏng';
     if (chatDot) chatDot.classList.toggle('live', live);

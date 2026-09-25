@@ -59,7 +59,7 @@
       var parsed = raw ? JSON.parse(raw) : null;
       return Object.assign({
         mode: 'demo',
-        engineModel: 'legendary-6',
+        engineModel: 'auto',
         provider: 'anthropic',
         endpoint: '',
         key: '',
@@ -81,7 +81,7 @@
 
   function applySettingsToForm() {
     modeSelect.value = settings.mode || 'demo';
-    if (engineModelSelect) engineModelSelect.value = settings.engineModel || 'legendary-6';
+    if (engineModelSelect) engineModelSelect.value = settings.engineModel || 'auto';
     providerSelect.value = settings.provider || 'anthropic';
     apiEndpoint.value = settings.endpoint || DEFAULT_ENDPOINTS[settings.provider || 'anthropic'];
     apiKey.value = settings.key || '';

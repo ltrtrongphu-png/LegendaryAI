@@ -415,3 +415,12 @@ table.compare-table{width:100%; border-collapse:collapse; min-width:640px;}
   .modal .row2{grid-template-columns:1fr;}
   #backToTop{right:16px; bottom:16px;}
 }
+
+/* LegendaryAI production auth/payment additions */
+.oauth-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0;}
+.oauth-btn{display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;}
+.auth-divider{display:flex;align-items:center;gap:12px;color:var(--text-muted);font-size:.78rem;margin:8px 0 14px;}
+.auth-divider::before,.auth-divider::after{content:'';height:1px;background:var(--line);flex:1;}
+.auth-divider span{white-space:nowrap;}
+.payment-return-note{position:fixed;right:20px;bottom:20px;z-index:200;background:var(--bg-elevated);border:1px solid var(--line-strong);box-shadow:var(--shadow-glow);padding:14px 18px;border-radius:8px;max-width:420px;font-size:.88rem;}
+@media (max-width:640px){.oauth-buttons{grid-template-columns:1fr;}}

@@ -12,7 +12,7 @@
 
       var result = await sb.functions.invoke('ai-chat', {
         body: {
-          model: options.model || 'legendary-6',
+          model: options.model || 'auto',
           messages: options.messages || [],
           system: options.system || '',
           temperature: options.temperature ?? 0.35,

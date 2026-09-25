@@ -174,6 +174,18 @@ Deno.serve(async (req) => {
     content: m.content ?? m.text ?? "",
   }));
 
+  const hasVisionInput = normalizedMessages.some((m: any) =>
+    Array.isArray(m.content) && m.content.some((part: any) => part?.type === "image_url" || part?.type === "image")
+  );
+  if (hasVisionInput && !profile.vision_enabled) {
+    await supabase.rpc("refund_tokens", { p_amount: reservation });
+    return json({
+      error: "Vision không khả dụng với gói hiện tại. Hãy nâng lên Pro hoặc Legendary.",
+      code: "VISION_NOT_AVAILABLE",
+      model: selectedModel.display_name,
+    }, 403);
+  }
+
   const providerMessages = [
     { role: "system", content: system + "\n\n" + featureContext },
     ...normalizedMessages,

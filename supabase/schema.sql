@@ -206,6 +206,13 @@ create table if not exists public.ai_models (
   updated_at timestamptz not null default now()
 );
 
+alter table public.ai_models add column if not exists tier text not null default 'free';
+alter table public.ai_models add column if not exists base_url_env text;
+alter table public.ai_models add column if not exists api_key_env text;
+alter table public.ai_models add column if not exists context_window integer not null default 32768;
+alter table public.ai_models add column if not exists max_output_tokens integer not null default 4096;
+alter table public.ai_models add column if not exists capabilities jsonb not null default '[]'::jsonb;
+
 alter table public.ai_models enable row level security;
 drop policy if exists "ai models public enabled read" on public.ai_models;
 create policy "ai models public enabled read" on public.ai_models
@@ -267,8 +274,8 @@ values
   'custom',
   'Custom Model',
   'system',
-  'YOUR_CUSTOM_MODEL',
   'openai-compatible',
+  'YOUR_CUSTOM_MODEL',
   'AI_CUSTOM_API_URL',
   'AI_CUSTOM_API_KEY',
   131072,

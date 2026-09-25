@@ -125,3 +125,13 @@ Không đánh dấu đơn hàng hoặc nâng cấp tài khoản từ frontend. C
 ### Lưu ý
 
 Repo hiện vẫn là frontend tĩnh nên **backend Supabase phải được cấu hình/deploy** trước khi đăng nhập OAuth, đồng bộ cloud và thanh toán thật hoạt động. API AI hiện tại trong `js/chat.js` vẫn hỗ trợ endpoint tương thích Anthropic/OpenAI; nếu public production, nên chuyển API key/model call sang backend proxy và kiểm tra hạn mức bằng `consume_tokens()`.
+
+
+### Legendary Engine / model riêng
+
+Edge Function `ai-chat` là lớp gateway cho model backend. Nó giữ API key ở server và hỗ trợ hai profile:
+
+- `legendary-6`: model chính, lấy URL/key/model từ `AI_API_URL`, `AI_API_KEY`, `AI_MODEL`.
+- `custom`: model riêng, lấy URL/key/model từ `CUSTOM_AI_API_URL`, `CUSTOM_AI_API_KEY`, `CUSTOM_AI_MODEL`.
+
+Bảng `ai_models` cho phép Owner thay `model_id`, endpoint và system prompt cho từng profile. Giao diện gọi chúng là **Legendary-6**; đây là một model profile/engine do bạn cấu hình, không phải tuyên bố về một foundation model mới được huấn luyện trong repo.

@@ -10,6 +10,9 @@ create table if not exists public.profiles (
   role text not null default 'user' check (role in ('user','admin','owner')),
   plan text not null default 'free' check (plan in ('free','pro','legendary')),
   token_limit integer not null default 250000,
+  memory_enabled boolean not null default false,
+  vision_enabled boolean not null default false,
+  web_search_enabled boolean not null default false,
   tokens_used integer not null default 0,
   token_reset_at timestamptz not null default (now() + interval '1 day'),
   created_at timestamptz not null default now(),
@@ -17,6 +20,9 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles add column if not exists role text not null default 'user';
+alter table public.profiles add column if not exists memory_enabled boolean not null default false;
+alter table public.profiles add column if not exists vision_enabled boolean not null default false;
+alter table public.profiles add column if not exists web_search_enabled boolean not null default false;
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check check (role in ('user','admin','owner'));
 
@@ -185,9 +191,15 @@ create table if not exists public.ai_models (
   id uuid primary key default gen_random_uuid(),
   key text unique not null,
   display_name text not null,
+  tier text not null default 'free' check (tier in ('free','pro','legendary','system')),
   provider text not null check (provider in ('openai-compatible','anthropic-compatible')),
   model_id text not null,
   base_url text,
+  base_url_env text,
+  api_key_env text,
+  context_window integer not null default 32768,
+  max_output_tokens integer not null default 4096,
+  capabilities jsonb not null default '[]'::jsonb,
   system_prompt text not null default '',
   enabled boolean not null default true,
   created_at timestamptz not null default now(),
@@ -209,11 +221,72 @@ create policy "ai models owner write" on public.ai_models
     select 1 from public.profiles p where p.id = auth.uid() and p.role = 'owner'
   ));
 
-insert into public.ai_models (key, display_name, provider, model_id, system_prompt)
+insert into public.ai_models
+  (key, display_name, tier, provider, model_id, base_url_env, api_key_env, context_window, max_output_tokens, capabilities, system_prompt)
 values
-('legendary-6', 'Legendary-6', 'openai-compatible', 'YOUR_PRIMARY_MODEL', 'You are Legendary-6, a high-reliability general AI assistant. Reason carefully, verify assumptions, produce correct code, and state uncertainty explicitly. Prefer structured answers, practical steps, and safe defaults.'),
-('custom', 'Custom Model', 'openai-compatible', 'YOUR_CUSTOM_MODEL', 'You are the custom LegendaryAI model. Follow system instructions, preserve context, and be precise.')
-on conflict (key) do nothing;
+(
+  'legendary-lite-1',
+  'LegendaryLite-1',
+  'free',
+  'openai-compatible',
+  'YOUR_FREE_MODEL',
+  'AI_FREE_API_URL',
+  'AI_FREE_API_KEY',
+  32768,
+  4096,
+  '["chat","code","writing","files"]'::jsonb,
+  'You are LegendaryLite-1, the Free-tier assistant of LegendaryAI. Be concise, accurate, helpful, and efficient.'
+),
+(
+  'legendary-pro-1',
+  'LegendaryPro-1',
+  'pro',
+  'openai-compatible',
+  'YOUR_PRO_MODEL',
+  'AI_PRO_API_URL',
+  'AI_PRO_API_KEY',
+  65536,
+  8192,
+  '["chat","code","writing","files","vision","memory"]'::jsonb,
+  'You are LegendaryPro-1, the Pro-tier assistant of LegendaryAI. Reason carefully, preserve context, produce production-ready code, and explain trade-offs clearly.'
+),
+(
+  'legendary-ultra-1',
+  'LegendaryUltra-1',
+  'legendary',
+  'openai-compatible',
+  'YOUR_LEGENDARY_MODEL',
+  'AI_LEGENDARY_API_URL',
+  'AI_LEGENDARY_API_KEY',
+  131072,
+  16384,
+  '["chat","code","writing","files","vision","memory","web_search","tools"]'::jsonb,
+  'You are LegendaryUltra-1, the highest-tier assistant of LegendaryAI. Prioritize deep reasoning, robust code, long-context synthesis, tool planning, and explicit uncertainty handling.'
+),
+(
+  'custom',
+  'Custom Model',
+  'system',
+  'YOUR_CUSTOM_MODEL',
+  'openai-compatible',
+  'AI_CUSTOM_API_URL',
+  'AI_CUSTOM_API_KEY',
+  131072,
+  16384,
+  '["chat","code","writing","files","vision","memory","tools"]'::jsonb,
+  'You are a custom model integrated into LegendaryAI. Follow system instructions precisely and preserve context.'
+)
+on conflict (key) do update set
+  display_name = excluded.display_name,
+  tier = excluded.tier,
+  provider = excluded.provider,
+  base_url_env = excluded.base_url_env,
+  api_key_env = excluded.api_key_env,
+  context_window = excluded.context_window,
+  max_output_tokens = excluded.max_output_tokens,
+  capabilities = excluded.capabilities,
+  system_prompt = excluded.system_prompt,
+  updated_at = now();
 
 -- Owner can list users and orders only through the owner-only edge function.
 

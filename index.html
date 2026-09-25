@@ -27,6 +27,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 
 <script type="application/ld+json">
@@ -291,7 +292,7 @@
           <tr><th>Khả năng</th><th>Free</th><th>Pro</th><th>Legendary</th></tr>
         </thead>
         <tbody>
-          <tr><td>Token / ngày</td><td>50.000</td><td>300.000</td><td class="yes">1.000.000</td></tr>
+          <tr><td>Token / ngày</td><td>250.000</td><td>300.000</td><td class="yes">1.000.000</td></tr>
           <tr><td>Trò chuyện &amp; viết mã</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
           <tr><td>Toàn bộ 8 nhóm tính năng</td><td>—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
           <tr><td>Ghi nhớ ngữ cảnh dài</td><td>—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
@@ -332,14 +333,14 @@
     <div class="section-head reveal">
       <p class="section-tag">Gói dùng</p>
       <h2>Chọn gói phù hợp</h2>
-      <p>Bắt đầu miễn phí, nâng cấp khi bạn cần nhiều token hơn.</p>
+      <p>Bắt đầu với 250.000 token/ngày, nâng cấp khi bạn cần nhiều token hơn.</p>
     </div>
     <div class="pricing-grid reveal-stagger">
       <div class="price-card" data-plan-card="free">
         <h3>Free</h3>
         <p class="price">0đ<span>/tháng</span></p>
         <ul>
-          <li>50.000 token / ngày</li>
+          <li>250.000 token / ngày</li>
           <li>Trò chuyện &amp; viết mã cơ bản</li>
           <li>Không lưu lịch sử dài hạn</li>
         </ul>
@@ -379,7 +380,7 @@
     <div class="faq-list reveal">
       <details class="faq-item">
         <summary>Legendary AI có miễn phí không?</summary>
-        <p>Có. Gói Free cấp 50.000 token mỗi ngày, đủ để bạn dùng thử các tính năng cốt lõi trước khi nâng cấp.</p>
+        <p>Có. Gói Free cấp 250.000 token mỗi ngày, đủ để bạn dùng thử các tính năng cốt lõi trước khi nâng cấp.</p>
       </details>
       <details class="faq-item">
         <summary>Hạn mức token được tính như thế nào?</summary>
@@ -477,6 +478,11 @@
       <button type="button" class="auth-tab active" data-tab="login">Đăng nhập</button>
       <button type="button" class="auth-tab" data-tab="register">Đăng ký</button>
     </div>
+    <div class="oauth-buttons">
+      <button type="button" class="btn btn-outline oauth-btn" id="googleAuthBtn">G <span>Tiếp tục với Google</span></button>
+      <button type="button" class="btn btn-outline oauth-btn" id="githubAuthBtn">◉ <span>Tiếp tục với GitHub</span></button>
+    </div>
+    <div class="auth-divider"><span>hoặc</span></div>
     <form id="loginForm" class="auth-form">
       <label>Email
         <input type="email" id="loginEmail" required placeholder="ban@email.com" autocomplete="email">
@@ -500,7 +506,7 @@
       <p class="auth-error" id="registerError" hidden></p>
       <button type="submit" class="btn btn-primary" style="width:100%;">Tạo tài khoản</button>
     </form>
-    <p class="modal-warn">⚠️ Đây là tài khoản demo: thông tin (kể cả mật khẩu) chỉ lưu cục bộ trong trình duyệt của bạn (localStorage), không gửi lên máy chủ nào. Để dùng thật cho nhiều người dùng, cần xây dựng backend xác thực an toàn (mã hoá mật khẩu, phiên đăng nhập, v.v.).</p>
+    <p class="modal-warn">Tài khoản được xác thực bởi Supabase Auth. Mật khẩu không được lưu trong localStorage. Google/GitHub OAuth cần được bật trong Supabase Auth và cấu hình callback URL của website.</p>
   </div>
 </div>
 
@@ -519,24 +525,25 @@
       <span class="momo-badge">MoMo</span>
     </div>
     <div class="momo-qr">
-      <div class="momo-qr-box" aria-hidden="true"><span>QR MoMo</span></div>
-      <p>Quét mã bằng ứng dụng MoMo để thanh toán, hoặc nhập số điện thoại bên dưới.</p>
+      <div class="momo-qr-box" aria-hidden="true"><span>MoMo</span></div>
+      <p>Sau khi tạo đơn, bạn sẽ được chuyển tới trang thanh toán MoMo. Hệ thống chỉ kích hoạt gói sau khi IPN được xác minh.</p>
     </div>
-    <label>Số điện thoại MoMo
-      <input type="tel" id="momoPhone" placeholder="09xxxxxxxx">
-    </label>
+    <p class="modal-note">Thanh toán được tạo ở backend và chuyển sang MoMo. Trạng thái gói chỉ đổi sau khi backend nhận và xác minh IPN từ MoMo.</p>
     <p class="checkout-error" id="checkoutError" hidden></p>
     <p class="checkout-status" id="checkoutStatus" hidden></p>
-    <button class="btn btn-primary" id="confirmPaymentBtn" style="width:100%;">Xác nhận thanh toán (giả lập)</button>
-    <p class="modal-warn">⚠️ Đây là mô phỏng để demo giao diện — <strong>chưa kết nối cổng MoMo thật</strong>. Để nhận thanh toán thật, bạn cần: (1) tài khoản MoMo Business, (2) một backend riêng để gọi API tạo đơn hàng MoMo bằng <code>secretKey</code> (không bao giờ đặt secretKey ở phía trình duyệt), và (3) endpoint nhận IPN callback để xác nhận giao dịch thành công.</p>
+    <button class="btn btn-primary" id="confirmPaymentBtn" style="width:100%;">Tạo thanh toán MoMo</button>
+    <p class="modal-warn">SecretKey MoMo không nằm trong frontend. Hệ thống dùng Edge Functions để tạo đơn và nhận IPN; bạn cần cấu hình các biến môi trường MoMo/Supabase trước khi nhận tiền thật.</p>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+<script src="js/supabase-config.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
 <script src="js/bg3d.js" defer></script>
 <script src="js/main.js" defer></script>
 <script src="js/account.js" defer></script>
+<script src="js/cloud-sync.js" defer></script>
 <script src="js/chat.js" defer></script>
 </body>
 </html>

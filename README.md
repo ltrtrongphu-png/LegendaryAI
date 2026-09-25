@@ -59,7 +59,7 @@ Tài liệu tích hợp chính thức: MoMo Business Portal (business.momo.vn) �
 6. (Tuỳ chọn) Sửa lại `og:image`, `canonical` trong `<head>` của `index.html` cho đúng tên miền thật của bạn.
 
 ## Về khung chat AI
-M��c định trang chạy ở **chế độ mô phỏng**: không gọi bất kỳ API nào, trả lời bằng các câu dựng sẵn theo từ khóa — dùng để demo giao diện miễn phí, không tốn chi phí.
+M��c định trang chạy ở **chế độ mô phỏng**: không gọi bất kỳ API nào, trả lời bằng các câu dựng sẵn theo từ khóa — dùng để demo giao diện miễn phí, không tốn chi phí.
 
 Để chat với một mô hình AI thật:
 1. Bấm nút **"⚙ Cài đặt"** trong khung chat.
@@ -83,3 +83,45 @@ M��c định trang chạy ở **chế độ mô phỏng**: không gọi bất k�
 
 ## Yêu cầu trình duyệt
 Cần trình duyệt hỗ trợ WebGL (hầu hết trình duyệt hiện đại đều có). Nếu WebGL không khả dụng, phần nội dung và chat vẫn hoạt động bình thường, chỉ hiệu ứng nền 3D sẽ không hiển thị. Tính năng streaming cần trình duyệt hỗ trợ `ReadableStream` (mọi trình duyệt hiện đại đều có).
+
+
+## Production upgrade (2026-09)
+
+Nhánh `feature/production-upgrade` bổ sung kiến trúc backend cho LegendaryAI:
+
+- **Supabase Auth + PostgreSQL** thay cho tài khoản demo trong `localStorage`.
+- **Google OAuth + GitHub OAuth** trong màn hình đăng nhập.
+- **Profiles** lưu gói, hạn mức token và mức sử dụng; gói Free mặc định **250.000 token/ngày**.
+- **Lịch sử hội thoại** được đồng bộ theo tài khoản vào PostgreSQL; giao diện vẫn giữ tạo/đổi tên/xoá hội thoại.
+- **MoMo production flow**: frontend gọi Edge Function `momo-create-payment`; secretKey chỉ ở server; Edge Function `momo-ipn` xác minh chữ ký callback trước khi đổi trạng thái đơn và gói.
+- **Logo** mới tại `assets/logo.svg`.
+
+### Cấu hình Supabase
+
+1. Tạo project Supabase.
+2. Chạy toàn bộ `supabase/schema.sql` trong SQL Editor.
+3. Mở Auth → Providers và bật Email, Google và GitHub.
+4. Thêm callback/redirect URL của website vào Supabase Auth.
+5. Điền `url` và `anonKey` vào `js/supabase-config.js`. Chỉ dùng **anon/publishable key** ở frontend; không đưa service-role key vào repo.
+
+### Cấu hình MoMo
+
+Đặt các biến môi trường cho Edge Functions:
+
+- `MOMO_PARTNER_CODE`
+- `MOMO_ACCESS_KEY`
+- `MOMO_SECRET_KEY`
+- `MOMO_ENDPOINT` (test endpoint khi sandbox; production endpoint khi tài khoản được MoMo cấp)
+- `SITE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Deploy hai function:
+
+- `supabase/functions/momo-create-payment`
+- `supabase/functions/momo-ipn`
+
+Không đánh dấu đơn hàng hoặc nâng cấp tài khoản từ frontend. Chỉ IPN đã xác minh mới chuyển đơn sang `paid` và cập nhật `profiles.plan`.
+
+### Lưu ý
+
+Repo hiện vẫn là frontend tĩnh nên **backend Supabase phải được cấu hình/deploy** trước khi đăng nhập OAuth, đồng bộ cloud và thanh toán thật hoạt động. API AI hiện tại trong `js/chat.js` vẫn hỗ trợ endpoint tương thích Anthropic/OpenAI; nếu public production, nên chuyển API key/model call sang backend proxy và kiểm tra hạn mức bằng `consume_tokens()`.

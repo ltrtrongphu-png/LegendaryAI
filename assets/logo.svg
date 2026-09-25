@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title>Legendary AI logo</title><desc>Blue-violet neural orbit surrounding a luminous AI core.</desc>
+<defs>
+  <radialGradient id="bg" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#172B5A"/><stop offset="1" stop-color="#050914"/></radialGradient>
+  <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4FD1FF"/><stop offset=".48" stop-color="#3E7BFA"/><stop offset="1" stop-color="#9B5CFF"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)" stroke="#3E7BFA" stroke-width="8"/>
+<g fill="none" stroke="url(#g)" stroke-width="16" stroke-linecap="round" filter="url(#glow)">
+  <ellipse cx="256" cy="256" rx="172" ry="72" transform="rotate(28 256 256)"/>
+  <ellipse cx="256" cy="256" rx="172" ry="72" transform="rotate(-28 256 256)"/>
+  <ellipse cx="256" cy="256" rx="172" ry="72" transform="rotate(90 256 256)"/>
+</g>
+<circle cx="256" cy="256" r="58" fill="url(#g)" filter="url(#glow)"/>
+<circle cx="256" cy="256" r="22" fill="#F5FBFF"/>
+<circle cx="118" cy="178" r="12" fill="#7EC8FF"/>
+<circle cx="394" cy="178" r="12" fill="#9B5CFF"/>
+<circle cx="138" cy="365" r="12" fill="#4FD1FF"/>
+<circle cx="374" cy="365" r="12" fill="#7EC8FF"/>
+</svg>

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Legendary AI — Trợ lý trí tuệ nhân tạo mạnh mẽ</title>
+<meta name="description" content="Legendary AI: trò chuyện, viết mã, tạo tài liệu, tìm kiếm và phân tích tệp — xử lý tới 1.000.000 token mỗi ngày. Dùng thử miễn phí ngay hôm nay.">
+<meta name="theme-color" content="#050914">
+<link rel="canonical" href="https://legendary-ai.example.com/">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Legendary AI — Trợ lý trí tuệ nhân tạo mạnh mẽ">
+<meta property="og:description" content="Trò chuyện, lập trình, viết tài liệu và tra cứu thông tin trong một trợ lý duy nhất — tới 1.000.000 token/ngày.">
+<meta property="og:url" content="https://legendary-ai.example.com/">
+<meta property="og:site_name" content="Legendary AI">
+<meta property="og:locale" content="vi_VN">
+<meta property="og:image" content="https://legendary-ai.example.com/og-image.png">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Legendary AI — Trợ lý trí tuệ nhân tạo mạnh mẽ">
+<meta name="twitter:description" content="Trò chuyện, lập trình, viết tài liệu và tra cứu thông tin — tới 1.000.000 token/ngày.">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23050914' stroke='%233E7BFA' stroke-width='6'/%3E%3Ccircle cx='50' cy='50' r='18' fill='%233E7BFA'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Legendary AI",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "description": "Trợ lý AI hợp nhất trò chuyện, lập trình, viết tài liệu và tra cứu thông tin, xử lý tới 1.000.000 token mỗi ngày.",
+  "offers": [
+    { "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "VND" },
+    { "@type": "Offer", "name": "Pro", "price": "299000", "priceCurrency": "VND" },
+    { "@type": "Offer", "name": "Legendary", "price": "899000", "priceCurrency": "VND" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">Bỏ qua tới nội dung chính</a>
+
+<div id="bg-canvas-wrap"><canvas id="bg-canvas"></canvas></div>
+<div class="grain"></div>
+
+<header class="site-header">
+  <div class="wrap header-row">
+    <a href="#top" class="brand">
+      <span class="brand-orb"></span>
+      <span class="brand-name">Legendary <em>AI</em></span>
+    </a>
+    <nav class="main-nav" id="mainNav">
+      <a href="#features">Tính năng</a>
+      <a href="#demo">Dùng thử</a>
+      <a href="#capacity">Năng lực</a>
+      <a href="#compare">So sánh</a>
+      <a href="#pricing">Gói dùng</a>
+      <a href="#faq">Hỏi đáp</a>
+    </nav>
+    <div class="header-actions">
+      <button class="theme-toggle" id="themeToggle" aria-label="Đổi giao diện sáng/tối" title="Đổi giao diện">🌙</button>
+      <div class="account-area" id="accountArea"></div>
+      <button class="btn btn-ghost" id="navToggle" aria-label="Mở menu" aria-expanded="false">☰</button>
+      <a href="#demo" class="btn btn-primary">Dùng thử ngay</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <div id="main-content"></div>
+
+  <!-- HERO -->
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <p class="kicker"><span class="kicker-dot"></span> Trợ lý AI thế hệ mới</p>
+      <h1>Tư duy nhanh<br>như <span class="grad">ánh sáng</span>.</h1>
+      <p class="lede">Legendary AI hợp nhất trò chuyện, lập trình, viết tài liệu và tra cứu thông tin vào một trợ lý duy nhất — sẵn sàng xử lý tới <strong>1.000.000 token mỗi ngày</strong> cho công việc của bạn.</p>
+      <div class="hero-cta">
+        <a href="#demo" class="btn btn-primary btn-lg">Trò chuyện ngay</a>
+        <a href="#features" class="btn btn-outline btn-lg">Khám phá tính năng</a>
+      </div>
+      <div class="hero-trust">
+        <div><span class="num">1M</span><span class="lbl">token / ngày</span></div>
+        <div><span class="num">8</span><span class="lbl">nhóm tính năng</span></div>
+        <div><span class="num">24/7</span><span class="lbl">luôn sẵn sàng</span></div>
+      </div>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="orb-ring r1"></div>
+      <div class="orb-ring r2"></div>
+      <div class="orb-badge">⚡ Phản hồi theo thời gian thực</div>
+    </div>
+  </section>
+
+  <!-- LOGOS / STRIP -->
+  <section class="strip wrap">
+    <p>Được xây dựng cho người viết, kỹ sư, nhà nghiên cứu và đội ngũ vận hành</p>
+  </section>
+
+  <!-- STATS -->
+  <section class="stats wrap reveal-stagger">
+    <div class="stats-grid">
+      <div><div class="stat-num" data-count="1000000" data-suffix="+">0</div><p class="stat-lbl">Token xử lý / ngày</p></div>
+      <div><div class="stat-num" data-count="8">0</div><p class="stat-lbl">Nhóm tính năng lõi</p></div>
+      <div><div class="stat-num" data-count="99" data-suffix=".9%">0</div><p class="stat-lbl">Thời gian hoạt động</p></div>
+      <div><div class="stat-num" data-count="24" data-suffix="/7">0</div><p class="stat-lbl">Sẵn sàng phục vụ</p></div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="features wrap">
+    <div class="section-head reveal">
+      <p class="section-tag">Tính năng</p>
+      <h2>Một trợ lý, tám thế mạnh</h2>
+      <p>Mỗi ô dưới đây là một năng lực lõi của Legendary AI — không phụ trội, không phô trương.</p>
+    </div>
+    <div class="feature-grid reveal-stagger">
+      <article class="feature-cell">
+        <div class="fc-icon">◈</div>
+        <h3>Trò chuyện &amp; suy luận sâu</h3>
+        <p>Đặt câu hỏi nhiều lớp, nhận lại lập luận mạch lạc và có căn cứ, không trả lời hời hợt.</p>
+      </article>
+      <article class="feature-cell">
+        <div class="fc-icon">⌁</div>
+        <h3>Viết &amp; sửa mã nguồn</h3>
+        <p>Từ debug một hàm nhỏ đến phác thảo kiến trúc hệ thống, hỗ trợ hàng chục ngôn ngữ lập trình.</p>
+      </article>
+      <article class="feature-cell">
+        <div class="fc-icon">▤</div>
+        <h3>Tạo tài liệu tức thì</h3>
+        <p>Soạn báo cáo, hợp đồng, bài viết hoàn chỉnh — đúng giọng văn, đúng cấu trúc bạn cần.</p>
+      </article>
+      <article class="feature-cell">
+        <div class="fc-icon">⌘</div>
+        <h3>Tìm kiếm &amp; tổng hợp</h3>
+        <p>Tra cứu thông tin mới, đối chiếu nhiều nguồn và tóm tắt gọn gàng, có trích dẫn rõ ràng.</p>
+      </article>
+      <article class="feature-cell">
+        <div class="fc-icon">◫</div>
+        <h3>Phân tích ảnh &amp; tệp</h3>
+        <p>Đọc hiểu ảnh chụp, PDF, bảng tính — trích xuất đúng phần nội dung bạn đang tìm.</p>
+      </article>
+      <article class="feature-cell">
+        <div class="fc-icon">∞</div>
+        <h3>Ghi nhớ ngữ cảnh</h3>
+        <p>Duy trì mạch hội thoại xuyên suốt phiên làm việc dài, không lặp lại từ đầu.</p>
+      </article>
+      <article class="feature-cell">
+        <div class="fc-icon">⚙</div>
+        <h3>Tác vụ tự động</h3>
+        <p>Kết nối công cụ, gọi API, hoàn thành chuỗi việc nhiều bước mà không cần giám sát từng thao tác.</p>
+      </article>
+      <article class="feature-cell">
+        <div class="fc-icon">◆</div>
+        <h3>Bảo mật theo thiết kế</h3>
+        <p>Dữ liệu cuộc trò chuyện được mã hoá khi truyền tải và không bị dùng để huấn luyện công khai.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- CAPACITY -->
+  <section id="capacity" class="capacity wrap">
+    <div class="capacity-panel reveal">
+      <div class="capacity-text">
+        <p class="section-tag">Năng lực</p>
+        <h2>Năng lực xử lý ở quy mô lớn</h2>
+        <p>Legendary AI được cấp hạn mức <strong>1.000.000 token mỗi ngày</strong> cho mỗi tài khoản — đủ cho hàng trăm cuộc hội thoại dài, hàng chục tài liệu hoặc một khối lượng lớn tác vụ lập trình, mỗi ngày.</p>
+        <div class="capacity-badges">
+          <span>Không giới hạn số cuộc trò chuyện</span>
+          <span>Reset hạn mức mỗi 24 giờ</span>
+          <span>Ưu tiên băng thông cho gói Legendary</span>
+        </div>
+      </div>
+      <div class="capacity-meter">
+        <svg viewBox="0 0 200 200" class="meter-svg">
+          <circle cx="100" cy="100" r="86" class="meter-track"/>
+          <circle cx="100" cy="100" r="86" class="meter-fill" id="meterFill"/>
+        </svg>
+        <div class="meter-label"><span>1,000,000</span>token / ngày</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEMO CHAT -->
+  <section id="demo" class="demo wrap">
+    <div class="section-head reveal">
+      <p class="section-tag">Dùng thử</p>
+      <h2>Trò chuyện trực tiếp</h2>
+      <p>Bản demo chạy ở <strong>chế độ mô phỏng</strong> theo mặc định. Mở phần cài đặt để gắn API key của riêng bạn nếu muốn gọi mô hình thật, kèm phản hồi trực tiếp theo từng chữ, nhiều hội thoại song song và đính kèm ảnh/tệp — giống trải nghiệm của các trợ lý AI hàng đầu.</p>
+    </div>
+    <div class="chat-app reveal" id="chatApp">
+      <aside class="chat-sidebar" id="chatSidebar">
+        <button type="button" class="chat-new-btn" id="newChatBtn">+ Trò chuyện mới</button>
+        <div class="chat-conv-list" id="convList"></div>
+        <p class="chat-sidebar-note">Lịch sử chat lưu cục bộ trong trình duyệt của bạn, không gửi lên máy chủ nào.</p>
+      </aside>
+      <div class="chat-shell" id="chatShell">
+        <div class="chat-topbar">
+          <div class="chat-topbar-left">
+            <button type="button" id="sidebarToggle" class="btn btn-ghost btn-sm chat-icon-btn" aria-label="Danh sách hội thoại" aria-expanded="false" title="Danh sách hội thoại">☰</button>
+            <span class="chat-dot" id="chatDot"></span>
+            <span id="chatModeLabel">Chế độ mô phỏng</span>
+          </div>
+          <div class="chat-topbar-right">
+            <button id="clearChatBtn" class="btn btn-ghost btn-sm" title="Xoá tin nhắn trong hội thoại này">🗑 Xoá</button>
+            <button type="button" id="expandChatBtn" class="btn btn-ghost btn-sm chat-icon-btn" aria-label="Phóng to toàn màn hình" title="Phóng to toàn màn hình">⤢</button>
+            <button id="settingsBtn" class="btn btn-ghost btn-sm">⚙ Cài đặt</button>
+          </div>
+        </div>
+        <div class="chat-window" id="chatWindow" role="log" aria-live="polite"></div>
+        <div class="chat-attach-preview" id="attachPreview" hidden></div>
+        <div class="chat-suggestions" id="chatSuggestions">
+          <button type="button" data-suggest="Giúp tôi debug một đoạn mã JavaScript">Debug mã JS</button>
+          <button type="button" data-suggest="Viết giúp tôi một email xin nghỉ phép lịch sự">Soạn email</button>
+          <button type="button" data-suggest="Tóm tắt ưu nhược điểm của các gói dùng của Legendary AI">So sánh gói dùng</button>
+        </div>
+        <form id="chatForm" class="chat-input-row">
+          <input type="file" id="fileInput" accept="image/*,.txt,.md,.csv,.json,.log" multiple hidden>
+          <button type="button" class="btn btn-ghost chat-icon-btn" id="attachBtn" title="Đính kèm ảnh/tệp" aria-label="Đính kèm ảnh hoặc tệp">📎</button>
+          <textarea id="chatInput" rows="1" placeholder="Nhập câu hỏi của bạn… (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
+          <button type="submit" class="btn btn-primary" id="sendBtn">Gửi</button>
+          <button type="button" class="btn btn-outline" id="stopBtn" hidden>Dừng</button>
+        </form>
+        <div class="chat-meta">
+          <span id="chatCharCount">0 ký tự</span>
+          <span id="chatStreamStatus"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div class="modal-backdrop" id="settingsBackdrop">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="modal-head">
+          <h3 id="settingsTitle">Cài đặt kết nối AI</h3>
+          <button class="btn btn-ghost btn-sm" id="closeSettings" aria-label="Đóng">✕</button>
+        </div>
+        <p class="modal-note">Mặc định trang chạy ở chế độ mô phỏng (không gọi API, không tốn chi phí). Để chat với mô hình thật, nhập API key bên dưới — key chỉ lưu trong trình duyệt của bạn (localStorage), không gửi đi đâu khác ngoài nhà cung cấp mô hình.</p>
+        <label>Chế độ
+          <select id="modeSelect">
+            <option value="demo">Mô phỏng (offline)</option>
+            <option value="live">Gọi API thật</option>
+          </select>
+        </label>
+        <label>Nhà cung cấp / định dạng API
+          <select id="providerSelect">
+            <option value="anthropic">Anthropic-compatible (/v1/messages)</option>
+            <option value="openai">OpenAI-compatible (/chat/completions)</option>
+          </select>
+        </label>
+        <label>API endpoint
+          <input type="text" id="apiEndpoint" placeholder="https://api.anthropic.com/v1/messages">
+        </label>
+        <div class="row2">
+          <label>API key
+            <input type="password" id="apiKey" placeholder="sk-...">
+          </label>
+          <label>Model
+            <input type="text" id="apiModel" placeholder="ví dụ: claude-sonnet-5">
+          </label>
+        </div>
+        <label>Chỉ dẫn hệ thống (tuỳ chọn)
+          <input type="text" id="systemPrompt" placeholder="Ví dụ: Trả lời ngắn gọn, bằng tiếng Việt">
+        </label>
+        <label class="modal-check"><input type="checkbox" id="streamToggle" checked> Bật phản hồi trực tiếp (streaming)</label>
+        <p class="modal-warn">⚠️ Gọi API trực tiếp từ trình duyệt sẽ lộ API key cho bất kỳ ai xem mã nguồn trang. Chỉ dùng cho mục đích cá nhân/demo. Với sản phẩm thật, hãy đặt key trên một máy chủ trung gian (backend proxy).</p>
+        <button class="btn btn-primary" id="saveSettings">Lưu cài đặt</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARE -->
+  <section id="compare" class="compare wrap">
+    <div class="section-head reveal">
+      <p class="section-tag">So sánh</p>
+      <h2>Vì sao chọn Legendary AI</h2>
+      <p>So sánh nhanh giữa các gói để chọn mức phù hợp với khối lượng công việc của bạn.</p>
+    </div>
+    <div class="compare-table-wrap reveal">
+      <table class="compare-table">
+        <thead>
+          <tr><th>Khả năng</th><th>Free</th><th>Pro</th><th>Legendary</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Token / ngày</td><td>50.000</td><td>300.000</td><td class="yes">1.000.000</td></tr>
+          <tr><td>Trò chuyện &amp; viết mã</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Toàn bộ 8 nhóm tính năng</td><td>—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Ghi nhớ ngữ cảnh dài</td><td>—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Tác vụ tự động nhiều bước</td><td>—</td><td>Giới hạn</td><td class="yes">Không giới hạn</td></tr>
+          <tr><td>Hỗ trợ ưu tiên 24/7</td><td>—</td><td>—</td><td class="yes">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- TESTIMONIALS -->
+  <section class="testimonials wrap">
+    <div class="section-head reveal">
+      <p class="section-tag">Người dùng nói gì</p>
+      <h2>Được tin dùng mỗi ngày</h2>
+    </div>
+    <div class="testi-grid reveal-stagger">
+      <article class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-quote">"Tốc độ phản hồi và độ chính xác khi debug giúp nhóm mình tiết kiệm rất nhiều thời gian mỗi tuần."</p>
+        <div class="testi-person"><span class="testi-avatar"></span><div><div class="testi-name">Minh Anh</div><div class="testi-role">Kỹ sư phần mềm</div></div></div>
+      </article>
+      <article class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-quote">"Soạn báo cáo và tài liệu nội bộ nhanh hơn hẳn, đúng giọng văn công ty ngay từ lần đầu."</p>
+        <div class="testi-person"><span class="testi-avatar"></span><div><div class="testi-name">Thu Hà</div><div class="testi-role">Quản lý vận hành</div></div></div>
+      </article>
+      <article class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-quote">"Hạn mức 1 triệu token mỗi ngày là đủ dùng thoải mái cho cả đội nghiên cứu của mình."</p>
+        <div class="testi-person"><span class="testi-avatar"></span><div><div class="testi-name">Quốc Bảo</div><div class="testi-role">Nhà nghiên cứu dữ liệu</div></div></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section id="pricing" class="pricing wrap">
+    <div class="section-head reveal">
+      <p class="section-tag">Gói dùng</p>
+      <h2>Chọn gói phù hợp</h2>
+      <p>Bắt đầu miễn phí, nâng cấp khi bạn cần nhiều token hơn.</p>
+    </div>
+    <div class="pricing-grid reveal-stagger">
+      <div class="price-card" data-plan-card="free">
+        <h3>Free</h3>
+        <p class="price">0đ<span>/tháng</span></p>
+        <ul>
+          <li>50.000 token / ngày</li>
+          <li>Trò chuyện &amp; viết mã cơ bản</li>
+          <li>Không lưu lịch sử dài hạn</li>
+        </ul>
+        <button type="button" class="btn btn-outline plan-select-btn" data-plan="free" data-label="Bắt đầu">Bắt đầu</button>
+      </div>
+      <div class="price-card is-featured" data-plan-card="pro">
+        <p class="price-tag">Phổ biến nhất</p>
+        <h3>Pro</h3>
+        <p class="price">299.000đ<span>/tháng</span></p>
+        <ul>
+          <li>300.000 token / ngày</li>
+          <li>Toàn bộ 8 nhóm tính năng</li>
+          <li>Ghi nhớ ngữ cảnh dài</li>
+        </ul>
+        <button type="button" class="btn btn-primary plan-select-btn" data-plan="pro" data-label="Chọn Pro">Chọn Pro</button>
+      </div>
+      <div class="price-card" data-plan-card="legendary">
+        <h3>Legendary</h3>
+        <p class="price">899.000đ<span>/tháng</span></p>
+        <ul>
+          <li>1.000.000 token / ngày</li>
+          <li>Tác vụ tự động không giới hạn bước</li>
+          <li>Hỗ trợ ưu tiên 24/7</li>
+        </ul>
+        <button type="button" class="btn btn-outline plan-select-btn" data-plan="legendary" data-label="Chọn Legendary">Chọn Legendary</button>
+      </div>
+    </div>
+    <p class="pricing-note">Có thể huỷ bất kỳ lúc nào. Giá đã bao gồm thuế theo quy định hiện hành.</p>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="faq wrap">
+    <div class="section-head reveal">
+      <p class="section-tag">Hỏi đáp</p>
+      <h2>Câu hỏi thường gặp</h2>
+    </div>
+    <div class="faq-list reveal">
+      <details class="faq-item">
+        <summary>Legendary AI có miễn phí không?</summary>
+        <p>Có. Gói Free cấp 50.000 token mỗi ngày, đủ để bạn dùng thử các tính năng cốt lõi trước khi nâng cấp.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Hạn mức token được tính như thế nào?</summary>
+        <p>Mỗi tài khoản có một hạn mức token cố định, reset lại mỗi 24 giờ. Cả tin nhắn bạn gửi và phản hồi nhận về đều được tính vào hạn mức.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Tôi có thể dùng mô hình AI của riêng mình không?</summary>
+        <p>Có. Trong phần "Cài đặt" của khung chat demo, bạn có thể bật "Gọi API thật" và nhập endpoint, API key, tên model tương thích Anthropic hoặc OpenAI của riêng bạn.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Dữ liệu trò chuyện của tôi có an toàn không?</summary>
+        <p>Dữ liệu được mã hoá khi truyền tải và không dùng để huấn luyện công khai. Khi dùng API key riêng ở chế độ demo, key chỉ lưu cục bộ trong trình duyệt của bạn.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Tôi có thể huỷ hoặc đổi gói bất kỳ lúc nào không?</summary>
+        <p>Có, bạn có thể nâng cấp, hạ cấp hoặc huỷ gói bất kỳ lúc nào mà không bị ràng buộc hợp đồng dài hạn.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Khung chat có hỗ trợ nhiều hội thoại và đính kèm ảnh/tệp không?</summary>
+        <p>Có. Bạn có thể mở nhiều hội thoại song song ở thanh bên, đổi tên/xoá từng hội thoại, đính kèm ảnh hoặc tệp văn bản vào tin nhắn, tạo lại phản hồi cuối cùng và phóng to khung chat toàn màn hình — toàn bộ lịch sử lưu cục bộ trong trình duyệt của bạn.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- CTA BAND -->
+  <section class="cta-band wrap">
+    <div class="cta-band-inner reveal">
+      <h2>Sẵn sàng bắt đầu với Legendary AI?</h2>
+      <p>Dùng thử miễn phí ngay hôm nay, không cần thẻ thanh toán.</p>
+      <div class="cta-band-actions">
+        <a href="#demo" class="btn btn-primary btn-lg">Trò chuyện ngay</a>
+        <a href="#pricing" class="btn btn-outline btn-lg">Xem bảng giá</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#top" class="brand">
+          <span class="brand-orb"></span>
+          <span class="brand-name">Legendary <em>AI</em></span>
+        </a>
+        <p>Trợ lý AI hợp nhất trò chuyện, lập trình, viết tài liệu và tra cứu thông tin — tới 1.000.000 token mỗi ngày.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Sản phẩm</h4>
+        <ul>
+          <li><a href="#features">Tính năng</a></li>
+          <li><a href="#demo">Dùng thử</a></li>
+          <li><a href="#pricing">Gói dùng</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Tài nguyên</h4>
+        <ul>
+          <li><a href="#compare">So sánh</a></li>
+          <li><a href="#faq">Hỏi đáp</a></li>
+          <li><a href="#capacity">Năng lực</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Công ty</h4>
+        <ul>
+          <li><a href="#top">Giới thiệu</a></li>
+          <li><a href="#top">Liên hệ</a></li>
+          <li><a href="#top">Điều khoản</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-row">
+      <p>© 2026 Legendary AI. Trang demo — không liên kết với bất kỳ nhà cung cấp mô hình AI cụ thể nào.</p>
+      <div class="footer-socials" aria-hidden="true">
+        <a href="#top">𝕏</a>
+        <a href="#top">in</a>
+        <a href="#top">gh</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<button id="backToTop" aria-label="Lên đầu trang" title="Lên đầu trang">↑</button>
+
+<!-- AUTH MODAL (đăng nhập / đăng ký) -->
+<div class="modal-backdrop" id="authBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal-head">
+      <h3 id="authTitle">Đăng nhập</h3>
+      <button class="btn btn-ghost btn-sm" id="closeAuth" aria-label="Đóng">✕</button>
+    </div>
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-tab="login">Đăng nhập</button>
+      <button type="button" class="auth-tab" data-tab="register">Đăng ký</button>
+    </div>
+    <form id="loginForm" class="auth-form">
+      <label>Email
+        <input type="email" id="loginEmail" required placeholder="ban@email.com" autocomplete="email">
+      </label>
+      <label>Mật khẩu
+        <input type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
+      </label>
+      <p class="auth-error" id="loginError" hidden></p>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Đăng nhập</button>
+    </form>
+    <form id="registerForm" class="auth-form" hidden>
+      <label>Họ tên
+        <input type="text" id="registerName" required placeholder="Tên của bạn" autocomplete="name">
+      </label>
+      <label>Email
+        <input type="email" id="registerEmail" required placeholder="ban@email.com" autocomplete="email">
+      </label>
+      <label>Mật khẩu
+        <input type="password" id="registerPassword" required placeholder="Tối thiểu 6 ký tự" autocomplete="new-password">
+      </label>
+      <p class="auth-error" id="registerError" hidden></p>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Tạo tài khoản</button>
+    </form>
+    <p class="modal-warn">⚠️ Đây là tài khoản demo: thông tin (kể cả mật khẩu) chỉ lưu cục bộ trong trình duyệt của bạn (localStorage), không gửi lên máy chủ nào. Để dùng thật cho nhiều người dùng, cần xây dựng backend xác thực an toàn (mã hoá mật khẩu, phiên đăng nhập, v.v.).</p>
+  </div>
+</div>
+
+<!-- CHECKOUT MODAL (mô phỏng thanh toán MoMo) -->
+<div class="modal-backdrop" id="checkoutBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">
+    <div class="modal-head">
+      <h3 id="checkoutTitle">Thanh toán qua MoMo</h3>
+      <button class="btn btn-ghost btn-sm" id="closeCheckout" aria-label="Đóng">✕</button>
+    </div>
+    <div class="checkout-summary">
+      <div>
+        <p class="co-plan-name" id="checkoutPlanName">Gói Pro</p>
+        <p class="co-plan-price" id="checkoutPlanPrice">299.000đ / tháng</p>
+      </div>
+      <span class="momo-badge">MoMo</span>
+    </div>
+    <div class="momo-qr">
+      <div class="momo-qr-box" aria-hidden="true"><span>QR MoMo</span></div>
+      <p>Quét mã bằng ứng dụng MoMo để thanh toán, hoặc nhập số điện thoại bên dưới.</p>
+    </div>
+    <label>Số điện thoại MoMo
+      <input type="tel" id="momoPhone" placeholder="09xxxxxxxx">
+    </label>
+    <p class="checkout-error" id="checkoutError" hidden></p>
+    <p class="checkout-status" id="checkoutStatus" hidden></p>
+    <button class="btn btn-primary" id="confirmPaymentBtn" style="width:100%;">Xác nhận thanh toán (giả lập)</button>
+    <p class="modal-warn">⚠️ Đây là mô phỏng để demo giao diện — <strong>chưa kết nối cổng MoMo thật</strong>. Để nhận thanh toán thật, bạn cần: (1) tài khoản MoMo Business, (2) một backend riêng để gọi API tạo đơn hàng MoMo bằng <code>secretKey</code> (không bao giờ đặt secretKey ở phía trình duyệt), và (3) endpoint nhận IPN callback để xác nhận giao dịch thành công.</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+<script src="js/bg3d.js" defer></script>
+<script src="js/main.js" defer></script>
+<script src="js/account.js" defer></script>
+<script src="js/chat.js" defer></script>
+</body>
+</html>

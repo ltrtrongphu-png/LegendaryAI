@@ -64,14 +64,29 @@ Deno.serve(async (req) => {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   if (!messages.length) return json({ error: "messages is required" }, 400);
 
-  const modelKey = typeof body.model === "string" && MODEL_ALIASES[body.model] ? body.model : "legendary-6";
-  const alias = MODEL_ALIASES[modelKey];
-  const apiUrl = Deno.env.get(alias.envUrl);
-  const apiKey = Deno.env.get(alias.envKey);
-  const model = Deno.env.get(alias.envModel);
+  const modelKey = typeof body.model === "string" && body.model.trim() ? body.model.trim() : "legendary-6";
+  let alias = MODEL_ALIASES[modelKey] || MODEL_ALIASES["legendary-6"];
+  let apiUrl = Deno.env.get(alias.envUrl) || "";
+  let apiKey = Deno.env.get(alias.envKey) || "";
+  let model = Deno.env.get(alias.envModel) || "";
+
+  const { data: registryModel } = await supabase
+    .from("ai_models")
+    .select("key,provider,model_id,base_url,system_prompt,enabled")
+    .eq("key", modelKey)
+    .eq("enabled", true)
+    .maybeSingle();
+
+  let registrySystem = "";
+  if (registryModel) {
+    model = registryModel.model_id;
+    if (registryModel.base_url) apiUrl = registryModel.base_url;
+    registrySystem = registryModel.system_prompt || "";
+    if (registryModel.provider === "anthropic-compatible") alias = { ...alias, provider: "anthropic" };
+  }
 
   if (!apiUrl || !apiKey || !model || model.startsWith("YOUR_")) {
-    return json({ error: "AI backend chưa được cấu hình. Thiết lập AI_API_URL, AI_API_KEY và AI_MODEL trên Edge Function." }, 503);
+    return json({ error: "AI backend chưa được cấu hình. Thiết lập model + API key trên Supabase Edge Function." }, 503);
   }
 
   const lastUser = [...messages].reverse().find((m) => m && m.role === "user");
@@ -88,7 +103,9 @@ Deno.serve(async (req) => {
     tokensUsed: profile.tokens_used,
   }, 429);
 
-  const system = typeof body.system === "string" && body.system.trim() ? body.system.trim() : SYSTEM_DEFAULT;
+  const system = typeof body.system === "string" && body.system.trim()
+    ? body.system.trim()
+    : (registrySystem || SYSTEM_DEFAULT);
   const maxTokens = Math.min(Number(body.max_tokens) || 4096, 8192);
   const providerMessages = [{ role: "system", content: system }, ...messages.map((m: any) => ({
     role: m.role === "ai" ? "assistant" : m.role,

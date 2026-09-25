@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
 
   const [users, paid, orders, chats] = await Promise.all([
     admin.from("profiles").select("id,plan,role,created_at", { count: "exact", head: true }),
-    admin.from("orders").select("id", { count: "exact", head: true }).eq("status", "paid"),
+    admin.from("orders").select("id,amount", { count: "exact" }).eq("status", "paid"),
     admin.from("orders").select("amount,status,plan,created_at").order("created_at", { ascending: false }).limit(20),
     admin.from("conversations").select("id", { count: "exact", head: true }),
   ]);

@@ -58,6 +58,9 @@ Deno.serve(async (req) => {
     await supabase.from("profiles").update({
       plan: order.plan,
       token_limit: limits[order.plan] || 250000,
+      memory_enabled: true,
+      vision_enabled: true,
+      web_search_enabled: order.plan === "legendary",
       tokens_used: 0,
       token_reset_at: new Date(Date.now() + 86400000).toISOString(),
       updated_at: new Date().toISOString(),

@@ -16,6 +16,10 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+alter table public.profiles add column if not exists role text not null default 'user';
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check check (role in ('user','admin','owner'));
+
 create table if not exists public.conversations (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -212,3 +216,11 @@ values
 on conflict (key) do nothing;
 
 -- Owner can list users and orders only through the owner-only edge function.
+
+
+-- Least-privilege Data API grants.
+grant select on public.profiles to authenticated;
+grant select, insert, update, delete on public.conversations to authenticated;
+grant select, insert, update, delete on public.messages to authenticated;
+grant select on public.orders to authenticated;
+grant select, insert, update, delete on public.ai_models to authenticated;

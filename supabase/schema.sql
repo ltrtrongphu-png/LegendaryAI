@@ -304,3 +304,56 @@ grant select, insert, update, delete on public.conversations to authenticated;
 grant select, insert, update, delete on public.messages to authenticated;
 grant select on public.orders to authenticated;
 grant select, insert, update, delete on public.ai_models to authenticated;
+
+
+create table if not exists public.ai_memories (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  memory text not null,
+  source text,
+  importance integer not null default 5 check (importance between 1 and 10),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists ai_memories_user_idx
+  on public.ai_memories(user_id, importance desc, updated_at desc);
+
+alter table public.ai_memories enable row level security;
+drop policy if exists "ai memories own rows" on public.ai_memories;
+create policy "ai memories own rows" on public.ai_memories
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.ai_memories to authenticated;
+
+create table if not exists public.ai_usage_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  model_key text,
+  provider_model text,
+  plan text,
+  input_tokens integer not null default 0,
+  output_tokens integer not null default 0,
+  reserved_tokens integer not null default 0,
+  request_ms integer,
+  status text not null default 'success' check (status in ('success','error')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ai_usage_user_created_idx
+  on public.ai_usage_logs(user_id, created_at desc);
+
+alter table public.ai_usage_logs enable row level security;
+drop policy if exists "ai usage own read" on public.ai_usage_logs;
+create policy "ai usage own read" on public.ai_usage_logs
+  for select using (auth.uid() = user_id);
+
+grant select on public.ai_usage_logs to authenticated;
+
+-- Keep plan capabilities consistent with the account tier.
+update public.profiles
+set
+  vision_enabled = (plan in ('pro','legendary') or role = 'owner'),
+  memory_enabled = (plan in ('pro','legendary') or role = 'owner'),
+  web_search_enabled = (plan = 'legendary' or role = 'owner')
+where true;

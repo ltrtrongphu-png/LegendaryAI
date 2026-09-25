@@ -104,12 +104,15 @@ begin
     new_role := 'owner';
   end if;
 
-  insert into public.profiles (id, display_name, avatar_url, role)
+  insert into public.profiles (id, display_name, avatar_url, role, memory_enabled, vision_enabled, web_search_enabled)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
     new.raw_user_meta_data->>'avatar_url',
-    new_role
+    new_role,
+    false,
+    new_role = 'owner',
+    new_role = 'owner'
   )
   on conflict (id) do update set
     display_name = coalesce(excluded.display_name, public.profiles.display_name),

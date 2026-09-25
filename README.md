@@ -153,3 +153,14 @@ For the main engine, configure these Supabase Edge Function secrets:
 - CUSTOM_AI_MODEL (optional)
 
 Use an OpenAI-compatible endpoint for the simplest custom-model integration.
+
+### Model tiers
+
+| Gói | Model sản phẩm | Context | Output tối đa | Capability |
+|---|---|---:|---:|---|
+| Free | LegendaryLite-1 | 32K | 4K | chat, code, writing, files |
+| Pro | LegendaryPro-1 | 64K | 8K | + vision, memory |
+| Legendary | LegendaryUltra-1 | 128K | 16K | + web-ready, tools |
+| Owner | Custom Model | 128K | 16K | Owner-configurable |
+
+Các tên trên là **product/model profiles** trong Legendary Engine. Model foundation thật được cấu hình bằng environment variables và có thể thay đổi mà không sửa frontend.

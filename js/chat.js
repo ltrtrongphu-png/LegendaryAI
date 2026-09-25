@@ -33,6 +33,7 @@
   var apiModel = document.getElementById('apiModel');
   var systemPrompt = document.getElementById('systemPrompt');
   var streamToggle = document.getElementById('streamToggle');
+  var engineModelSelect = document.getElementById('engineModelSelect');
 
   var SETTINGS_KEY = 'legendaryai_settings';
   var CONV_KEY = 'legendaryai_conversations_v2';
@@ -58,6 +59,7 @@
       var parsed = raw ? JSON.parse(raw) : null;
       return Object.assign({
         mode: 'demo',
+        engineModel: 'legendary-6',
         provider: 'anthropic',
         endpoint: '',
         key: '',
@@ -66,7 +68,7 @@
         stream: true
       }, parsed || {});
     } catch (e) {
-      return { mode: 'demo', provider: 'anthropic', endpoint: '', key: '', model: DEFAULT_MODELS.anthropic, system: '', stream: true };
+      return { mode: 'demo', engineModel: 'legendary-6', provider: 'anthropic', endpoint: '', key: '', model: DEFAULT_MODELS.anthropic, system: '', stream: true };
     }
   }
   function saveSettingsToStorage(s) {
@@ -79,6 +81,7 @@
 
   function applySettingsToForm() {
     modeSelect.value = settings.mode || 'demo';
+    if (engineModelSelect) engineModelSelect.value = settings.engineModel || 'legendary-6';
     providerSelect.value = settings.provider || 'anthropic';
     apiEndpoint.value = settings.endpoint || DEFAULT_ENDPOINTS[settings.provider || 'anthropic'];
     apiKey.value = settings.key || '';
@@ -125,6 +128,7 @@
   saveSettings.addEventListener('click', function () {
     settings = {
       mode: modeSelect.value,
+      engineModel: engineModelSelect ? engineModelSelect.value : 'legendary-6',
       provider: providerSelect.value,
       endpoint: apiEndpoint.value.trim() || DEFAULT_ENDPOINTS[providerSelect.value],
       key: apiKey.value.trim(),
@@ -785,8 +789,43 @@
       });
   }
 
+  
+  function callLegendaryEngine(conv) {
+    var typing = addTypingBubble();
+    toggleBusyUI(true);
+    if (streamStatus) streamStatus.textContent = 'Legendary Engine đang suy luận…';
+
+    var messages = conv.messages.map(function (m) {
+      return {
+        role: m.role === 'ai' ? 'assistant' : 'user',
+        content: buildMessageContent(m, 'openai')
+      };
+    });
+
+    window.LegendaryAIEngine.chat({
+      model: settings.engineModel || 'legendary-6',
+      messages: messages,
+      system: settings.system || '',
+      temperature: 0.35,
+      max_tokens: 4096
+    }).then(function (result) {
+      typing.raw = result.text || '';
+      finalizeAiBubble(typing);
+      toggleBusyUI(false);
+      if (streamStatus) streamStatus.textContent = '';
+    }).catch(function (err) {
+      setErrorBubble(typing, 'Legendary Engine: ' + (err && err.message ? err.message : err));
+      toggleBusyUI(false);
+      if (streamStatus) streamStatus.textContent = '';
+    });
+  }
+
   function triggerAssistantResponse() {
     var conv = getActiveConv();
+    if (settings.mode === 'legendary' && window.LegendaryAIEngine) {
+      callLegendaryEngine(conv);
+      return;
+    }
     if (settings.mode === 'live' && settings.key) {
       callLiveAPI(conv);
       return;

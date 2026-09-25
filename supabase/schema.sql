@@ -63,8 +63,12 @@ alter table public.messages enable row level security;
 alter table public.orders enable row level security;
 
 drop policy if exists "profiles own row" on public.profiles;
-create policy "profiles own row" on public.profiles
-  for all using (auth.uid() = id) with check (auth.uid() = id);
+drop policy if exists "profiles own select" on public.profiles;
+create policy "profiles own select" on public.profiles
+  for select using (auth.uid() = id);
+
+-- Profiles are created by the auth trigger and plan/token_limit are server-controlled.
+-- Do not grant client insert/update/delete access to profiles.
 
 drop policy if exists "conversations own rows" on public.conversations;
 create policy "conversations own rows" on public.conversations

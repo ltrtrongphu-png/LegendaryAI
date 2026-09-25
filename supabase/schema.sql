@@ -360,3 +360,25 @@ set
   memory_enabled = (plan in ('pro','legendary') or role = 'owner'),
   web_search_enabled = (plan = 'legendary' or role = 'owner')
 where true;
+
+
+create or replace function public.refund_tokens(p_amount integer)
+returns boolean
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null or p_amount <= 0 then return false; end if;
+  update public.profiles
+     set tokens_used = greatest(tokens_used - p_amount, 0),
+         updated_at = now()
+   where id = uid
+     and token_reset_at > now();
+  return found;
+end;
+$$;
+
+revoke all on function public.refund_tokens(integer) from public;
+grant execute on function public.refund_tokens(integer) to authenticated;

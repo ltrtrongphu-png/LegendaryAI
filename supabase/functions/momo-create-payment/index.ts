@@ -1,13 +1,27 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { hmacSha256, base64Json, jsonResponse } from "../_shared/momo.ts";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": Deno.env.get("SITE_URL") || "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function cors(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
+}
+
 const PLAN = {
   pro: { amount: 299000, name: "Legendary AI Pro" },
   legendary: { amount: 899000, name: "Legendary AI Legendary" },
 } as const;
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return cors({ error: "Method not allowed" }, 405);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -18,18 +32,18 @@ Deno.serve(async (req) => {
   const momoEndpoint = Deno.env.get("MOMO_ENDPOINT") || "https://test-payment.momo.vn/v2/gateway/api/create";
 
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
+  if (!authHeader) return cors({ error: "Unauthorized" }, 401);
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     global: { headers: { Authorization: authHeader } },
   });
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) return jsonResponse({ error: "Unauthorized" }, 401);
+  if (userError || !user) return cors({ error: "Unauthorized" }, 401);
 
   const body = await req.json().catch(() => ({}));
   const planKey = body.plan as keyof typeof PLAN;
   const plan = PLAN[planKey];
-  if (!plan) return jsonResponse({ error: "Invalid plan" }, 400);
+  if (!plan) return cors({ error: "Invalid plan" }, 400);
 
   const orderId = "LAI_" + crypto.randomUUID().replaceAll("-", "").slice(0, 30);
   const requestId = crypto.randomUUID().replaceAll("-", "").slice(0, 32);
@@ -43,7 +57,7 @@ Deno.serve(async (req) => {
     provider_request_id: requestId,
     status: "pending",
   });
-  if (insertError) return jsonResponse({ error: insertError.message }, 500);
+  if (insertError) return cors({ error: insertError.message }, 500);
 
   const redirectUrl = siteUrl + "/?payment=" + encodeURIComponent(orderId);
   const ipnUrl = supabaseUrl + "/functions/v1/momo-ipn";
@@ -90,10 +104,10 @@ Deno.serve(async (req) => {
       provider_result_code: result.resultCode ?? -1,
       provider_message: result.message ?? "MoMo request failed",
     }).eq("provider_order_id", orderId);
-    return jsonResponse({ error: result.message || "MoMo payment creation failed" }, 502);
+    return cors({ error: result.message || "MoMo payment creation failed" }, 502);
   }
 
-  return jsonResponse({
+  return cors({
     orderId,
     payUrl: result.payUrl,
     qrCodeUrl: result.qrCodeUrl || null,

@@ -16,7 +16,7 @@ create table if not exists public.profiles (
 );
 
 create table if not exists public.conversations (
-  id uuid primary key default gen_random_uuid(),
+  id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null default 'Cuộc trò chuyện mới',
   created_at timestamptz not null default now(),
@@ -24,8 +24,8 @@ create table if not exists public.conversations (
 );
 
 create table if not exists public.messages (
-  id uuid primary key default gen_random_uuid(),
-  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  id text primary key,
+  conversation_id text not null references public.conversations(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   role text not null check (role in ('user','ai','assistant','system')),
   content text not null default '',

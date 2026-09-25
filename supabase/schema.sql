@@ -7,6 +7,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   avatar_url text,
+  role text not null default 'user' check (role in ('user','admin','owner')),
   plan text not null default 'free' check (plan in ('free','pro','legendary')),
   token_limit integer not null default 250000,
   tokens_used integer not null default 0,
@@ -86,18 +87,34 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
-as $$
+as $
+declare new_role text := 'user';
 begin
-  insert into public.profiles (id, display_name, avatar_url)
+  if lower(coalesce(new.email, '')) = 'ltrtrongphu@gmail.com' then
+    new_role := 'owner';
+  end if;
+
+  insert into public.profiles (id, display_name, avatar_url, role)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    new.raw_user_meta_data->>'avatar_url'
+    new.raw_user_meta_data->>'avatar_url',
+    new_role
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update set
+    display_name = coalesce(excluded.display_name, public.profiles.display_name),
+    avatar_url = coalesce(excluded.avatar_url, public.profiles.avatar_url);
+
   return new;
 end;
-$$;
+$;
+
+-- Grant Owner to the existing account, if it already exists.
+update public.profiles p
+set role = 'owner', updated_at = now()
+from auth.users u
+where p.id = u.id
+  and lower(coalesce(u.email, '')) = 'ltrtrongphu@gmail.com';
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -157,3 +174,41 @@ $$;
 
 revoke all on function public.consume_tokens(integer) from public;
 grant execute on function public.consume_tokens(integer) to authenticated;
+
+
+-- Optional model registry for Owner-controlled model profiles.
+create table if not exists public.ai_models (
+  id uuid primary key default gen_random_uuid(),
+  key text unique not null,
+  display_name text not null,
+  provider text not null check (provider in ('openai-compatible','anthropic-compatible')),
+  model_id text not null,
+  base_url text,
+  system_prompt text not null default '',
+  enabled boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.ai_models enable row level security;
+drop policy if exists "ai models public enabled read" on public.ai_models;
+create policy "ai models public enabled read" on public.ai_models
+  for select using (enabled = true or exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role = 'owner'
+  ));
+drop policy if exists "ai models owner write" on public.ai_models;
+create policy "ai models owner write" on public.ai_models
+  for all using (exists (
+    select 1 from public.profiles p where p.id = auth.uid() and p.role = 'owner'
+  )) with check (exists (
+    select 1 from public.profiles p where p.id = auth.uid() and p.role = 'owner'
+  ));
+
+insert into public.ai_models (key, display_name, provider, model_id, system_prompt)
+values
+('legendary-6', 'Legendary-6', 'openai-compatible', 'YOUR_PRIMARY_MODEL', 'You are Legendary-6, a high-reliability general AI assistant. Reason carefully, verify assumptions, produce correct code, and state uncertainty explicitly. Prefer structured answers, practical steps, and safe defaults.'),
+('custom', 'Custom Model', 'openai-compatible', 'YOUR_CUSTOM_MODEL', 'You are the custom LegendaryAI model. Follow system instructions, preserve context, and be precise.')
+on conflict (key) do nothing;
+
+-- Owner can list users and orders only through the owner-only edge function.

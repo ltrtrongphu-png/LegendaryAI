@@ -56,7 +56,7 @@
 <header class="site-header">
   <div class="wrap header-row">
     <a href="#top" class="brand">
-      <span class="brand-orb"></span>
+      <img class="brand-logo" src="assets/logo.svg" alt="" width="30" height="30">
       <span class="brand-name">Legendary <em>AI</em></span>
     </a>
     <nav class="main-nav" id="mainNav">
@@ -169,6 +169,22 @@
   </section>
 
   <!-- CAPACITY -->
+  <section class="engine-showcase wrap">
+    <div class="engine-panel reveal">
+      <div>
+        <p class="section-tag">LEGENDARY ENGINE</p>
+        <h2>AI core có thể thay model theo nhu cầu.</h2>
+        <p>LegendaryAI tách giao diện khỏi model backend: có thể chạy model chính, model nhanh hoặc model riêng của bạn. API key được giữ ở server, còn tài khoản và hạn mức được kiểm soát bằng backend.</p>
+      </div>
+      <div class="engine-cards">
+        <div class="engine-card"><strong>Legendary-6</strong><span>General reasoning · code · writing</span></div>
+        <div class="engine-card"><strong>Custom Model</strong><span>Model riêng qua OpenAI-compatible API</span></div>
+        <div class="engine-card"><strong>250K Free</strong><span>Hạn mức/ngày từ database</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAPACITY -->
   <section id="capacity" class="capacity wrap">
     <div class="capacity-panel reveal">
       <div class="capacity-text">
@@ -196,7 +212,7 @@
     <div class="section-head reveal">
       <p class="section-tag">Dùng thử</p>
       <h2>Trò chuyện trực tiếp</h2>
-      <p>Bản demo chạy ở <strong>chế độ mô phỏng</strong> theo mặc định. Mở phần cài đặt để gắn API key của riêng bạn nếu muốn gọi mô hình thật, kèm phản hồi trực tiếp theo từng chữ, nhiều hội thoại song song và đính kèm ảnh/tệp — giống trải nghiệm của các trợ lý AI hàng đầu.</p>
+      <p>Bản demo có thể chạy offline, hoặc dùng <strong>Legendary Engine</strong> để gọi model phía server theo mặc định. Mở phần cài đặt để gắn API key của riêng bạn nếu muốn gọi mô hình thật, kèm phản hồi trực tiếp theo từng chữ, nhiều hội thoại song song và đính kèm ảnh/tệp — giống trải nghiệm của các trợ lý AI hàng đầu.</p>
     </div>
     <div class="chat-app reveal" id="chatApp">
       <aside class="chat-sidebar" id="chatSidebar">
@@ -249,7 +265,14 @@
         <label>Chế độ
           <select id="modeSelect">
             <option value="demo">Mô phỏng (offline)</option>
-            <option value="live">Gọi API thật</option>
+            <option value="legendary">Legendary Engine</option>
+            <option value="live">API riêng (trực tiếp)</option>
+          </select>
+        </label>
+        <label>Model Engine
+          <select id="engineModelSelect">
+            <option value="legendary-6">Legendary-6</option>
+            <option value="custom">Custom Model</option>
           </select>
         </label>
         <label>Nhà cung cấp / định dạng API
@@ -544,6 +567,7 @@
 <script src="js/main.js" defer></script>
 <script src="js/account.js" defer></script>
 <script src="js/cloud-sync.js" defer></script>
+<script src="js/ai-engine.js" defer></script>
 <script src="js/chat.js" defer></script>
 </body>
 </html>

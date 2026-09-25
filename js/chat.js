@@ -78,6 +78,39 @@
   var settings = loadSettings();
   applySettingsToForm();
   updateModeLabel();
+  syncEngineModelAccess();
+
+  async function syncEngineModelAccess() {
+    if (!engineModelSelect) return;
+    var profile = null;
+    try {
+      profile = window.LegendaryBackend && window.LegendaryBackend.enabled
+        ? await window.LegendaryBackend.getProfile()
+        : null;
+    } catch (e) { profile = null; }
+
+    var plan = profile ? profile.plan : null;
+    var role = profile ? profile.role : null;
+    var options = engineModelSelect.options;
+    for (var i = 0; i < options.length; i++) {
+      var key = options[i].value;
+      var allowed = true;
+      if (key === 'auto') allowed = !!profile;
+      else if (key === 'legendary-lite-1') allowed = true;
+      else if (key === 'legendary-pro-1') allowed = role === 'owner' || plan === 'pro' || plan === 'legendary';
+      else if (key === 'legendary-ultra-1') allowed = role === 'owner' || plan === 'legendary';
+      else if (key === 'custom') allowed = role === 'owner';
+      options[i].disabled = !allowed;
+    }
+
+    var desired = settings.engineModel || 'auto';
+    if (!profile) desired = 'auto';
+    if (desired !== 'auto') {
+      var desiredOption = engineModelSelect.querySelector('option[value="' + desired + '"]');
+      if (!desiredOption || desiredOption.disabled) desired = 'auto';
+    }
+    engineModelSelect.value = desired;
+  }
 
   function applySettingsToForm() {
     modeSelect.value = settings.mode || 'demo';
@@ -143,6 +176,7 @@
     };
     saveSettingsToStorage(settings);
     updateModeLabel();
+    syncEngineModelAccess();
     settingsBackdrop.classList.remove('open');
   });
 
@@ -980,4 +1014,5 @@
   // ---------------------------------------------------------------------
   renderSidebar();
   renderMessages();
+  window.addEventListener('legendary:auth-changed', syncEngineModelAccess);
 })();

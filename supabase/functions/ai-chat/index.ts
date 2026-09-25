@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
 
   if (profileError || !profile) return json({ error: "Profile not found." }, 404);
 
+  const requestStarted = Date.now();
   const body = await req.json().catch(() => ({}));
   const messages = Array.isArray(body.messages) ? body.messages : [];
   if (!messages.length) return json({ error: "messages is required" }, 400);
@@ -145,11 +146,27 @@ Deno.serve(async (req) => {
       ? body.system.trim()
       : (selectedModel.system_prompt || SYSTEM_DEFAULT);
 
+  let memoryContext = "";
+  if (profile.memory_enabled) {
+    const { data: memories } = await supabase
+      .from("ai_memories")
+      .select("memory,importance")
+      .eq("user_id", user.id)
+      .order("importance", { ascending: false })
+      .order("updated_at", { ascending: false })
+      .limit(12);
+    if (memories?.length) {
+      memoryContext = "\nRelevant user memory (use only when applicable):\n" +
+        memories.map((m: any) => "- " + String(m.memory)).join("\n");
+    }
+  }
+
   const featureContext = [
     `Enabled capabilities: ${capabilities.join(", ") || "chat"}.`,
     profile.memory_enabled ? "User memory is enabled; preserve useful long-term preferences supplied by the backend." : "",
     profile.vision_enabled ? "Vision is enabled for this account tier." : "",
     profile.web_search_enabled ? "Web search is enabled when a backend tool is available." : "",
+    memoryContext,
   ].filter(Boolean).join(" ");
 
   const normalizedMessages = messages.map((m: any) => ({
@@ -186,6 +203,16 @@ Deno.serve(async (req) => {
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
+    await supabase.rpc("refund_tokens", { p_amount: reservation });
+    await supabase.from("ai_usage_logs").insert({
+      user_id: user.id,
+      model_key: selectedModel.key,
+      provider_model: modelId,
+      plan: profile.plan,
+      reserved_tokens: reservation,
+      request_ms: Date.now() - requestStarted,
+      status: "error",
+    });
     return json({
       error: data?.error?.message || data?.message || "Model provider error",
       providerStatus: response.status,
@@ -204,7 +231,31 @@ Deno.serve(async (req) => {
     text = data.output_text;
   }
 
-  if (!text.trim()) return json({ error: "Model returned an empty response." }, 502);
+  if (!text.trim()) {
+    await supabase.rpc("refund_tokens", { p_amount: reservation });
+    await supabase.from("ai_usage_logs").insert({
+      user_id: user.id,
+      model_key: selectedModel.key,
+      provider_model: modelId,
+      plan: profile.plan,
+      reserved_tokens: reservation,
+      request_ms: Date.now() - requestStarted,
+      status: "error",
+    });
+    return json({ error: "Model returned an empty response." }, 502);
+  }
+
+  await supabase.from("ai_usage_logs").insert({
+    user_id: user.id,
+    model_key: selectedModel.key,
+    provider_model: modelId,
+    plan: profile.plan,
+    input_tokens: Number(data?.usage?.prompt_tokens || data?.usage?.input_tokens || estimatedInputTokens),
+    output_tokens: Number(data?.usage?.completion_tokens || data?.usage?.output_tokens || estimateTokens(text)),
+    reserved_tokens: reservation,
+    request_ms: Date.now() - requestStarted,
+    status: "success",
+  });
 
   return json({
     model: selectedModel.key,

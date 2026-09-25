@@ -135,3 +135,21 @@ Edge Function `ai-chat` là lớp gateway cho model backend. Nó giữ API key �
 - `custom`: model riêng, lấy URL/key/model từ `CUSTOM_AI_API_URL`, `CUSTOM_AI_API_KEY`, `CUSTOM_AI_MODEL`.
 
 Bảng `ai_models` cho phép Owner thay `model_id`, endpoint và system prompt cho từng profile. Giao diện gọi chúng là **Legendary-6**; đây là một model profile/engine do bạn cấu hình, không phải tuyên bố về một foundation model mới được huấn luyện trong repo.
+
+
+### Owner
+
+The database migration automatically assigns the Owner role to ltrtrongphu@gmail.com on signup and also upgrades the existing matching account when the SQL migration is run. Owner-only server operations are checked against the protected profiles.role field.
+
+### AI backend secrets
+
+For the main engine, configure these Supabase Edge Function secrets:
+
+- AI_API_URL
+- AI_API_KEY
+- AI_MODEL
+- CUSTOM_AI_API_URL (optional)
+- CUSTOM_AI_API_KEY (optional)
+- CUSTOM_AI_MODEL (optional)
+
+Use an OpenAI-compatible endpoint for the simplest custom-model integration.

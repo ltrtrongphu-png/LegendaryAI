@@ -209,6 +209,8 @@ create table if not exists public.ai_models (
   updated_at timestamptz not null default now()
 );
 
+alter table public.ai_models drop constraint if exists ai_models_provider_check;
+alter table public.ai_models add constraint ai_models_provider_check check (provider in ('local','openai-compatible','anthropic-compatible'));
 alter table public.ai_models add column if not exists tier text not null default 'free';
 alter table public.ai_models add column if not exists base_url_env text;
 alter table public.ai_models add column if not exists api_key_env text;
@@ -238,10 +240,10 @@ values
   'legendary-lite-1',
   'LegendaryLite-1',
   'free',
-  'openai-compatible',
-  'YOUR_FREE_MODEL',
-  'AI_FREE_API_URL',
-  'AI_FREE_API_KEY',
+  'local',
+  'legendary-lite-local',
+  null,
+  null,
   32768,
   4096,
   '["chat","code","writing","files"]'::jsonb,
@@ -251,10 +253,10 @@ values
   'legendary-pro-1',
   'LegendaryPro-1',
   'pro',
-  'openai-compatible',
-  'YOUR_PRO_MODEL',
-  'AI_PRO_API_URL',
-  'AI_PRO_API_KEY',
+  'local',
+  'legendary-pro-local',
+  null,
+  null,
   65536,
   8192,
   '["chat","code","writing","files","vision","memory"]'::jsonb,
@@ -264,10 +266,10 @@ values
   'legendary-ultra-1',
   'LegendaryUltra-1',
   'legendary',
-  'openai-compatible',
-  'YOUR_LEGENDARY_MODEL',
-  'AI_LEGENDARY_API_URL',
-  'AI_LEGENDARY_API_KEY',
+  'local',
+  'legendary-ultra-local',
+  null,
+  null,
   131072,
   16384,
   '["chat","code","writing","files","vision","memory","web_search","tools"]'::jsonb,
@@ -277,10 +279,10 @@ values
   'custom',
   'Custom Model',
   'system',
-  'openai-compatible',
-  'YOUR_CUSTOM_MODEL',
-  'AI_CUSTOM_API_URL',
-  'AI_CUSTOM_API_KEY',
+  'local',
+  'legendary-custom-local',
+  null,
+  null,
   131072,
   16384,
   '["chat","code","writing","files","vision","memory","tools"]'::jsonb,
@@ -295,6 +297,8 @@ on conflict (key) do update set
   context_window = excluded.context_window,
   max_output_tokens = excluded.max_output_tokens,
   capabilities = excluded.capabilities,
+  model_id = excluded.model_id,
+  base_url = excluded.base_url,
   system_prompt = excluded.system_prompt,
   updated_at = now();
 

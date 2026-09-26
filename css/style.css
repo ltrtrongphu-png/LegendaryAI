@@ -462,3 +462,8 @@ table.compare-table{width:100%; border-collapse:collapse; min-width:640px;}
 .auth-success{color:var(--good);font-size:.8rem;margin:10px 0 0;line-height:1.45}
 .chat-app .chat-topbar-right .btn-outline{border-color:var(--accent-2);color:var(--text)}
 @media (max-width:640px){.chat-auth-state{display:none}.chat-topbar-right{width:100%;justify-content:flex-end}}
+
+.external-ai-disabled{display:flex;flex-direction:column;gap:5px;padding:12px 14px;margin:4px 0 12px;border:1px solid var(--line-strong);border-radius:10px;background:var(--bg-elevated);}
+.external-ai-disabled strong{font-size:.85rem;}
+.external-ai-disabled span{font-size:.76rem;color:var(--text-muted);line-height:1.45;}
+.external-ai-field{display:none!important;}

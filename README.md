@@ -1,166 +1,155 @@
-# Legendary AI — Website 3D (bản nâng cấp)
+Legendary AI — Website + AI Chat tích hợp
 
-Website tĩnh (HTML/CSS/JS thuần) gồm: hero 3D bằng Three.js, thống kê động, lưới 8 tính năng, khối "năng lực 1.000.000 token/ngày", khung chat trực tiếp (có streaming), bảng so sánh gói, testimonials, FAQ, CTA band và bảng giá.
+Legendary AI là website HTML/CSS/JS thuần với trải nghiệm chat kiểu các trợ lý AI hiện nay: nhiều hội thoại, Markdown/code, đính kèm tệp/ảnh, đăng ký/đăng nhập, lịch sử theo tài khoản và Legendary Engine gọi model qua Supabase Edge Function.
 
-## Điểm mới so với bản trước
-- **Giao diện sáng/tối**: nút bật/tắt ở header, tự nhớ lựa chọn (localStorage) và theo `prefers-color-scheme` lần đầu.
-- **Hiệu ứng cuộn (scroll-reveal)** và **đếm số động** cho khối thống kê.
-- **Scroll-spy**: mục menu đang xem được gạch chân tự động.
-- **Khung chat kiểu ClaudeAI** (nâng cấp lớn nhất của bản này):
-  - **Nhiều hội thoại song song** ở thanh bên: tạo mới, đổi tên (nhấp đúp vào tiêu đề), xoá — mỗi hội thoại lưu riêng trong `localStorage`.
-  - **Đính kèm ảnh và tệp văn bản** (`.txt`, `.md`, `.csv`, `.json`, `.log`…) vào tin nhắn; ảnh được gửi dưới dạng nội dung đa phương thức (multimodal) tới API thật nếu model hỗ trợ.
-  - **Tạo lại phản hồi** (regenerate) cho câu trả lời cuối cùng, **sao chép** toàn bộ tin nhắn hoặc **sao chép riêng từng khối mã**.
-  - **Markdown đầy đủ hơn**: tiêu đề, danh sách, blockquote, bảng, khối mã có nhãn ngôn ngữ + tô sáng cú pháp (highlight.js).
-  - **Chế độ toàn màn hình** cho khung chat (nút ⤢ hoặc phím Esc để thoát).
-  - Phản hồi trực tiếp theo thời gian thực (**streaming**) khi gọi API thật.
-  - Hỗ trợ cả định dạng **Anthropic-compatible** (`/v1/messages`) lẫn **OpenAI-compatible** (`/chat/completions`).
-  - Có thể đặt **chỉ dẫn hệ thống** (system prompt) riêng, nút **Dừng** phản hồi đang chạy.
-  - Gợi ý câu hỏi nhanh (chat suggestions), đếm ký tự đang gõ.
-- **Tài khoản người dùng (demo)**: đăng ký / đăng nhập, menu tài khoản ở header hiển thị gói hiện tại, đăng xuất. Dữ liệu tài khoản lưu trong `localStorage` của trình duyệt — **không phải hệ thống xác thực thật**, xem cảnh báo bên dưới.
-- **Mua gói Pro/Legendary + "thanh toán MoMo" (mô phỏng)**: bấm chọn gói ở bảng giá → nếu chưa đăng nhập sẽ được yêu cầu đăng nhập/đăng ký trước → mở màn hình thanh toán kiểu MoMo (QR giả lập + nhập số điện thoại) → xác nhận sẽ giả lập giao dịch thành công và nâng cấp gói của tài khoản. **Chưa kết nối cổng MoMo thật**, xem phần "Về tài khoản & thanh toán MoMo" bên dưới để tích hợp thật.
-- Thêm section **So sánh gói**, **Đánh giá người dùng (testimonials)**, **FAQ** (accordion), **CTA band**, nút **lên đầu trang**, footer nhiều cột.
-- Meta SEO đầy đủ hơn: Open Graph, Twitter Card, JSON-LD `SoftwareApplication`, canonical URL.
-- Trợ năng (a11y): skip-link, `aria-live` cho khung chat, `aria-expanded` cho menu/nav/sidebar/tài khoản, focus-visible rõ ràng, chỉ mở 1 mục FAQ tại một thời điểm.
-- Hiệu năng: script `defer`, tạm dừng vòng lặp render 3D khi tab ẩn để tiết kiệm CPU/pin.
+Những gì đã tích hợp
 
-## Cấu trúc thư mục
-```
-legendary-ai/
+Chat AI ngay trên website: người dùng không cần mở một website AI khác và không cần dán API key vào trình duyệt.
+
+Legendary Engine mặc định: sau khi đăng nhập, hệ thống tự chọn model theo gói Free/Pro/Legendary.
+
+API key an toàn hơn: key của model nằm trong Supabase Edge Function, không nằm trong localStorage hay frontend.
+
+Đăng ký + đăng nhập bằng email/mật khẩu ngay trên website.
+
+Google/GitHub OAuth nếu bật trong Supabase Auth.
+
+Đồng bộ lịch sử chat theo tài khoản vào PostgreSQL; vẫn có cache local để giao diện phản hồi nhanh.
+
+Nhiều cuộc trò chuyện: tạo mới, đổi tên, xoá, regenerate, copy câu trả lời/code.
+
+Đính kèm ảnh/tệp; vision được kiểm soát theo gói.
+
+Hạn mức token theo tài khoản, reset tự động và kiểm soát bằng RPC phía database.
+
+Owner dashboard + model registry để quản lý model/backend.
+
+MoMo dùng Edge Functions, secret key không đặt trong frontend.
+
+Cấu trúc chính
+
+LegendaryAI-main/
 ├── index.html
-├── css/style.css
-├── js/bg3d.js      -> hiệu ứng 3D nền (quả cầu hạt kiểu mạng nơ-ron), tự tạm dừng khi tab ẩn
-├── js/main.js       -> menu mobile, theme sáng/tối, scroll-spy, reveal, đếm số, back-to-top, FAQ
-├── js/account.js     -> đăng ký/đăng nhập demo (localStorage), menu tài khoản, chọn gói +
-│                        mô phỏng thanh toán MoMo, cập nhật gói hiện tại lên bảng giá
-└── js/chat.js        -> logic khung chat: nhiều hội thoại, đính kèm ảnh/tệp, markdown+code
-                          highlight, tạo lại phản hồi, toàn màn hình, chế độ mô phỏng/AI thật
+├── css/
+│   └── style.css
+├── assets/
+│   └── logo.svg
+├── js/
+│   ├── account.js
+│   ├── ai-engine.js
+│   ├── bg3d.js
+│   ├── chat.js
+│   ├── cloud-sync.js
+│   ├── main.js
+│   └── supabase-config.js
+└── supabase/
+    ├── schema.sql
+    └── functions/
+        ├── ai-chat/index.ts
+        ├── owner-stats/index.ts
+        ├── momo-create-payment/index.ts
+        ├── momo-ipn/index.ts
+        └── _shared/momo.ts
 
-## Về tài khoản & thanh toán MoMo
+Cấu hình để AI thật hoạt động
 
-Phần đăng ký/đăng nhập và mua gói hiện là **mô phỏng phía trình duyệt**, phù hợp để demo giao diện nhưng **không an toàn và không xử lý tiền thật**:
-- Tài khoản (tên, email, mật khẩu đã băm sơ bộ) chỉ lưu trong `localStorage` — ai mở DevTools trên máy họ cũng xem được, và dữ liệu mất nếu xoá cache trình duyệt.
-- Nút "Xác nhận thanh toán" chỉ đợi 1.5 giây rồi tự đánh dấu thành công, không gọi tới MoMo thật.
+1. Supabase
 
-Để triển khai thật, bạn cần xây dựng một **backend** (Node.js, PHP, v.v.) làm những việc mà một trang tĩnh không thể làm an toàn:
-1. **Đăng ký tài khoản MoMo Business** để lấy `partnerCode`, `accessKey`, `secretKey`.
-2. Endpoint phía server nhận yêu cầu thanh toán từ trang web, gọi API tạo đơn hàng của MoMo (`/v2/gateway/api/create`) bằng `secretKey` — **secretKey không bao giờ được đặt trong mã JavaScript chạy ở trình duyệt**.
-3. Endpoint nhận **IPN callback** từ MoMo để xác nhận giao dịch đã thanh toán thật, sau đó mới cập nhật gói của người dùng trong cơ sở dữ liệu thật (không phải `localStorage`).
-4. Hệ thống xác thực người dùng thật (mã hoá mật khẩu bằng bcrypt/argon2, phiên đăng nhập bằng JWT hoặc session cookie, v.v.) thay cho đoạn `js/account.js` hiện tại.
+Tạo project trên Supabase.
 
-Tài liệu tích hợp chính thức: MoMo Business Portal (business.momo.vn) → mục "Tích hợp thanh toán" / "API Documentation".
-```
+Chạy toàn bộ file:
 
-## Cách đưa lên vibehost.com
-1. Đăng nhập bảng quản trị hosting của bạn trên vibehost.com.
-2. Vào phần quản lý file (File Manager) hoặc dùng FTP.
-3. Tải **toàn bộ nội dung bên trong thư mục `legendary-ai/`** (không phải bản thân thư mục) lên thư mục gốc web (thường là `public_html` hoặc `www`).
-4. Đảm bảo `index.html` nằm ngay trong thư mục gốc đó.
-5. Mở tên miền của bạn — trang sẽ chạy ngay, không cần cài đặt máy chủ hay cơ sở dữ liệu.
-6. (Tuỳ chọn) Sửa lại `og:image`, `canonical` trong `<head>` của `index.html` cho đúng tên miền thật của bạn.
+supabase/schema.sql
 
-## Về khung chat AI
-M��c định trang chạy ở **chế độ mô phỏng**: không gọi bất kỳ API nào, trả lời bằng các câu dựng sẵn theo từ khóa — dùng để demo giao diện miễn phí, không tốn chi phí.
+trong SQL Editor.
 
-Để chat với một mô hình AI thật:
-1. Bấm nút **"⚙ Cài đặt"** trong khung chat.
-2. Chọn chế độ **"Gọi API thật"**.
-3. Chọn **định dạng API**: Anthropic-compatible (`/v1/messages`) hoặc OpenAI-compatible (`/chat/completions`).
-4. Nhập:
-   - **API endpoint** (đã điền sẵn giá trị mặc định theo định dạng bạn chọn).
-   - **API key** của riêng bạn.
-   - **Model**: tên model bạn có quyền dùng.
-   - (Tuỳ chọn) **Chỉ dẫn hệ thống**.
-5. Bật/tắt **"Phản hồi trực tiếp (streaming)"** tuỳ ý.
-6. Lưu cài đặt — key chỉ được lưu trong `localStorage` của trình duyệt bạn, không gửi lên bất kỳ máy chủ nào ngoài chính nhà cung cấp mô hình.
+Vào Authentication → Providers và bật Email. Có thể bật thêm Google/GitHub.
 
-⚠️ **Lưu ý bảo mật quan trọng**: gọi API trực tiếp từ trình duyệt (client-side) nghĩa là API key nằm trong mã chạy phía người dùng — bất kỳ ai mở DevTools trên trình duyệt của chính họ đều có thể thấy key mà họ tự nhập. Cách này phù hợp để **bạn tự dùng cá nhân hoặc demo nội bộ**. Nếu muốn công khai cho nhiều người dùng, bạn cần dựng một máy chủ trung gian (backend) giữ key an toàn và để website chỉ gọi vào máy chủ đó.
+Thêm URL website vào Redirect URLs.
 
-## Tuỳ biến nhanh
-- Đổi màu thương hiệu: sửa các biến trong `:root` (và `:root[data-theme="light"]`) ở đầu file `css/style.css` (`--accent`, `--accent-2`, `--bg`...).
-- Đổi nội dung tính năng/giá/testimonials/FAQ: sửa trực tiếp trong `index.html`.
-- Đổi mật độ hạt 3D hoặc tốc độ xoay: sửa `js/bg3d.js` (`particleCount`, hệ số nhân trong hàm `animate`).
-- Đổi số liệu ở khối thống kê: sửa thuộc tính `data-count` / `data-suffix` trên các phần tử `.stat-num`.
+Sửa:
 
-## Yêu cầu trình duyệt
-Cần trình duyệt hỗ trợ WebGL (hầu hết trình duyệt hiện đại đều có). Nếu WebGL không khả dụng, phần nội dung và chat vẫn hoạt động bình thường, chỉ hiệu ứng nền 3D sẽ không hiển thị. Tính năng streaming cần trình duyệt hỗ trợ `ReadableStream` (mọi trình duyệt hiện đại đều có).
+js/supabase-config.js
 
+thành URL project và anon/publishable key của bạn.
 
-## Production upgrade (2026-09)
+Chỉ đưa anon/publishable key vào frontend. Không đưa service_role key vào js/supabase-config.js.
 
-Nhánh `feature/production-upgrade` bổ sung kiến trúc backend cho LegendaryAI:
+2. Model AI
 
-- **Supabase Auth + PostgreSQL** thay cho tài khoản demo trong `localStorage`.
-- **Google OAuth + GitHub OAuth** trong màn hình đăng nhập.
-- **Profiles** lưu gói, hạn mức token và mức sử dụng; gói Free mặc định **250.000 token/ngày**.
-- **Lịch sử hội thoại** được đồng bộ theo tài khoản vào PostgreSQL; giao diện vẫn giữ tạo/đổi tên/xoá hội thoại.
-- **MoMo production flow**: frontend gọi Edge Function `momo-create-payment`; secretKey chỉ ở server; Edge Function `momo-ipn` xác minh chữ ký callback trước khi đổi trạng thái đơn và gói.
-- **Logo** mới tại `assets/logo.svg`.
+AI thật chạy qua:
 
-### Cấu hình Supabase
+supabase/functions/ai-chat/index.ts
 
-1. Tạo project Supabase.
-2. Chạy toàn bộ `supabase/schema.sql` trong SQL Editor.
-3. Mở Auth → Providers và bật Email, Google và GitHub.
-4. Thêm callback/redirect URL của website vào Supabase Auth.
-5. Điền `url` và `anonKey` vào `js/supabase-config.js`. Chỉ dùng **anon/publishable key** ở frontend; không đưa service-role key vào repo.
+Frontend chỉ gọi function ai-chat.
 
-### Cấu hình MoMo
+Cấu hình các secret ở Supabase Edge Functions:
 
-Đặt các biến môi trường cho Edge Functions:
+SUPABASE_SERVICE_ROLE_KEY
+SITE_URL
+AI_FREE_API_URL
+AI_FREE_API_KEY
+AI_PRO_API_URL
+AI_PRO_API_KEY
+AI_LEGENDARY_API_URL
+AI_LEGENDARY_API_KEY
 
-- `MOMO_PARTNER_CODE`
-- `MOMO_ACCESS_KEY`
-- `MOMO_SECRET_KEY`
-- `MOMO_ENDPOINT` (test endpoint khi sandbox; production endpoint khi tài khoản được MoMo cấp)
-- `SITE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+Nếu muốn dùng model khác, sửa model registry trong:
 
-Deploy hai function:
+supabase/schema.sql
 
-- `supabase/functions/momo-create-payment`
-- `supabase/functions/momo-ipn`
+hoặc chỉnh các bản ghi trong bảng public.ai_models bằng Owner.
 
-Không đánh dấu đơn hàng hoặc nâng cấp tài khoản từ frontend. Chỉ IPN đã xác minh mới chuyển đơn sang `paid` và cập nhật `profiles.plan`.
+Các model mặc định là product profiles, không phải tên của một foundation model do repo tự huấn luyện:
 
-### Lưu ý
+Free      → legendary-lite-1
+Pro       → legendary-pro-1
+Legendary → legendary-ultra-1
+Owner     → custom
 
-Repo hiện vẫn là frontend tĩnh nên **backend Supabase phải được cấu hình/deploy** trước khi đăng nhập OAuth, đồng bộ cloud và thanh toán thật hoạt động. API AI hiện tại trong `js/chat.js` vẫn hỗ trợ endpoint tương thích Anthropic/OpenAI; nếu public production, nên chuyển API key/model call sang backend proxy và kiểm tra hạn mức bằng `consume_tokens()`.
+Endpoint model nên tương thích OpenAI Chat Completions để dùng trực tiếp với gateway hiện tại.
 
+3. Deploy Edge Functions
 
-### Legendary Engine / model riêng
+Sau khi cấu hình Supabase CLI, deploy:
 
-Edge Function `ai-chat` là lớp gateway cho model backend. Nó giữ API key ở server và hỗ trợ hai profile:
+supabase/functions/ai-chat
+supabase/functions/owner-stats
+supabase/functions/momo-create-payment
+supabase/functions/momo-ipn
 
-- `legendary-6`: model chính, lấy URL/key/model từ `AI_API_URL`, `AI_API_KEY`, `AI_MODEL`.
-- `custom`: model riêng, lấy URL/key/model từ `CUSTOM_AI_API_URL`, `CUSTOM_AI_API_KEY`, `CUSTOM_AI_MODEL`.
+Quan trọng: không nhúng API key của model hoặc MoMo vào frontend.
 
-Bảng `ai_models` cho phép Owner thay `model_id`, endpoint và system prompt cho từng profile. Giao diện gọi chúng là **Legendary-6**; đây là một model profile/engine do bạn cấu hình, không phải tuyên bố về một foundation model mới được huấn luyện trong repo.
+Luồng người dùng mới
 
+Website
+  ↓
+Đăng ký / Đăng nhập
+  ↓
+Supabase Auth
+  ↓
+Chat Legendary AI
+  ↓
+Supabase Edge Function: ai-chat
+  ↓
+Model backend (OpenAI-compatible)
+  ↓
+Trả câu trả lời về website
 
-### Owner
+Người dùng chỉ tương tác với Legendary AI trên website. API key của model được giữ ở server.
 
-The database migration automatically assigns the Owner role to ltrtrongphu@gmail.com on signup and also upgrades the existing matching account when the SQL migration is run. Owner-only server operations are checked against the protected profiles.role field.
+File đã được nâng cấp
 
-### AI backend secrets
+index.html — tích hợp trạng thái tài khoản ngay trong khung chat, đổi phần mô tả sang Legendary Engine, thêm UX đăng nhập và thông báo đăng ký.
 
-For the main engine, configure these Supabase Edge Function secrets:
+js/chat.js — Legendary Engine trở thành chế độ chat mặc định, yêu cầu đăng nhập trước khi gửi AI thật, tự hiển thị model/gói và nút tài khoản ngay trong chat.
 
-- AI_API_URL
-- AI_API_KEY
-- AI_MODEL
-- CUSTOM_AI_API_URL (optional)
-- CUSTOM_AI_API_KEY (optional)
-- CUSTOM_AI_MODEL (optional)
+js/account.js — cải thiện đăng ký, thêm luồng quên mật khẩu và sửa Owner dashboard gọi đúng Supabase client.
 
-Use an OpenAI-compatible endpoint for the simplest custom-model integration.
+css/style.css — thêm style cho trạng thái tài khoản và thông báo auth trong chat.
 
-### Model tiers
+README.md — cập nhật hướng dẫn triển khai AI/auth production.
 
-| Gói | Model sản phẩm | Context | Output tối đa | Capability |
-|---|---|---:|---:|---|
-| Free | LegendaryLite-1 | 32K | 4K | chat, code, writing, files |
-| Pro | LegendaryPro-1 | 64K | 8K | + vision, memory |
-| Legendary | LegendaryUltra-1 | 128K | 16K | + web-ready, tools |
-| Owner | Custom Model | 128K | 16K | Owner-configurable |
+Lưu ý
 
-Các tên trên là **product/model profiles** trong Legendary Engine. Model foundation thật được cấu hình bằng environment variables và có thể thay đổi mà không sửa frontend.
+Repo không thể tự biết URL/anon key của project Supabase hoặc API key model của bạn. Vì vậy sau khi copy các file lên hosting, bạn vẫn cần cấu hình các secret ở Supabase. Đây là phần bắt buộc để đăng ký/đăng nhập và AI thật hoạt động an toàn.

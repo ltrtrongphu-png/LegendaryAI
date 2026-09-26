@@ -37,6 +37,11 @@
   var registerForm = document.getElementById('registerForm');
   var loginError = document.getElementById('loginError');
   var registerError = document.getElementById('registerError');
+  var registerSuccess = document.getElementById('registerSuccess');
+  var forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+  var resetForm = document.getElementById('resetForm');
+  var resetError = document.getElementById('resetError');
+  var resetSuccess = document.getElementById('resetSuccess');
   var googleBtn = document.getElementById('googleAuthBtn');
   var githubBtn = document.getElementById('githubAuthBtn');
 
@@ -73,9 +78,13 @@
     authTabs.forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-tab') === tab); });
     loginForm.hidden = tab !== 'login';
     registerForm.hidden = tab !== 'register';
+    if (resetForm) resetForm.hidden = true;
     authTitle.textContent = tab === 'login' ? 'Đăng nhập' : 'Đăng ký';
     setError(loginError, null);
     setError(registerError, null);
+    setError(registerSuccess, null);
+    setError(resetError, null);
+    setError(resetSuccess, null);
   }
 
   function openAuthModal(tab) {
@@ -105,6 +114,41 @@
   if (googleBtn) googleBtn.addEventListener('click', function () { signInOAuth('google'); });
   if (githubBtn) githubBtn.addEventListener('click', function () { signInOAuth('github'); });
 
+  if (forgotPasswordBtn) forgotPasswordBtn.addEventListener('click', async function () {
+    var error = configured();
+    if (error) return setError(loginError, error);
+    var email = document.getElementById('loginEmail').value.trim().toLowerCase();
+    if (!email) return setError(loginError, 'Hãy nhập email trước khi yêu cầu đặt lại mật khẩu.');
+    forgotPasswordBtn.disabled = true;
+    forgotPasswordBtn.textContent = 'Đang gửi…';
+    var r = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname + '?reset=1'
+    });
+    forgotPasswordBtn.disabled = false;
+    forgotPasswordBtn.textContent = 'Quên mật khẩu?';
+    if (r.error) return setError(loginError, r.error.message);
+    setError(loginError, null);
+    alert('Đã gửi email đặt lại mật khẩu. Hãy kiểm tra hộp thư của bạn.');
+  });
+
+  if (resetForm) resetForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var error = configured();
+    if (error) return setError(resetError, error);
+    var password = document.getElementById('resetPassword').value;
+    if (password.length < 6) return setError(resetError, 'Mật khẩu mới phải có ít nhất 6 ký tự.');
+    var r = await supabase.auth.updateUser({ password: password });
+    if (r.error) return setError(resetError, r.error.message);
+    setError(resetError, null);
+    setError(resetSuccess, 'Đổi mật khẩu thành công. Bạn có thể tiếp tục sử dụng Legendary AI.');
+    document.getElementById('resetPassword').value = '';
+    setTimeout(function () {
+      if (resetForm) resetForm.hidden = true;
+      setAuthTab('login');
+      history.replaceState({}, document.title, window.location.pathname);
+    }, 1200);
+  });
+
   if (loginForm) loginForm.addEventListener('submit', async function (e) {
     e.preventDefault();
     var error = configured();
@@ -133,13 +177,14 @@
       options: { data: { full_name: name } }
     });
     if (r.error) return setError(registerError, r.error.message);
-    closeAuthModal();
     registerForm.reset();
     if (r.data.session) {
+      closeAuthModal();
       await renderAccountArea();
       window.dispatchEvent(new CustomEvent('legendary:auth-changed'));
     } else {
-      alert('Đăng ký thành công. Hãy kiểm tra email để xác nhận tài khoản.');
+      setError(registerError, null);
+      setError(registerSuccess, 'Đăng ký thành công. Hãy kiểm tra email để xác nhận tài khoản, sau đó quay lại đăng nhập.');
     }
   });
 
@@ -150,7 +195,7 @@
     document.body.appendChild(note);
     note.querySelector('.owner-close').addEventListener('click', function(){ note.remove(); });
     try {
-      var result = await sb.functions.invoke('owner-stats', {
+      var result = await supabase.functions.invoke('owner-stats', {
         headers: { Authorization: 'Bearer ' + await window.LegendaryBackend.getAccessToken() }
       });
       if (result.error || !result.data) throw new Error((result.data && result.data.error) || result.error.message || 'Không tải được dashboard.');
@@ -350,6 +395,21 @@
     logoutUser: signOut,
     openAuth: openAuthModal
   };
+
+  if (new URLSearchParams(location.search).get('reset') === '1' && resetForm) {
+    setTimeout(async function () {
+      if (!supabase) return;
+      var user = await LegendaryBackend.getUser();
+      if (user) {
+        setAuthTab('login');
+        loginForm.hidden = true;
+        registerForm.hidden = true;
+        resetForm.hidden = false;
+        authTitle.textContent = 'Đặt lại mật khẩu';
+        authBackdrop.classList.add('open');
+      }
+    }, 250);
+  }
 
   // Resume a checkout redirect with a small status notice. Payment status is always
   // authoritative from the MoMo IPN -> backend -> database flow.

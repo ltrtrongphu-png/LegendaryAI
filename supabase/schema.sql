@@ -195,7 +195,7 @@ create table if not exists public.ai_models (
   key text unique not null,
   display_name text not null,
   tier text not null default 'free' check (tier in ('free','pro','legendary','system')),
-  provider text not null check (provider in ('openai-compatible','anthropic-compatible')),
+  provider text not null check (provider in ('local','openai-compatible','anthropic-compatible')),
   model_id text not null,
   base_url text,
   base_url_env text,

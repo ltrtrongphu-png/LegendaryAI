@@ -59,7 +59,7 @@
       var raw = localStorage.getItem(SETTINGS_KEY);
       var parsed = raw ? JSON.parse(raw) : null;
       return Object.assign({
-        mode: 'demo',
+        mode: 'legendary',
         engineModel: 'auto',
         provider: 'anthropic',
         endpoint: '',
@@ -70,8 +70,8 @@
       }, parsed || {});
     } catch (e) {
       return {
-        mode: 'demo',
-        engineModel: 'legendary-6',
+        mode: 'legendary',
+        engineModel: 'auto',
         provider: 'anthropic',
         endpoint: '',
         key: '',
@@ -169,9 +169,11 @@
     if (settings.mode === 'legendary') {
       chatModeLabel.textContent =
         'Legendary Engine · ' +
-        (settings.engineModel === 'custom'
-          ? 'Custom Model'
-          : 'Legendary-6');
+        (settings.engineModel === 'auto'
+          ? 'Auto · Local Sandbox'
+          : settings.engineModel === 'custom'
+            ? 'Custom Local'
+            : settings.engineModel);
 
       if (chatDot) chatDot.classList.add('live');
       return;
@@ -1283,7 +1285,7 @@
       }
     }
 
-    return 'Đây là bản demo chạy ở chế độ mô phỏng nên câu trả lời được dựng sẵn. Mở "⚙ Cài đặt" và bật "Gọi API thật" với key của riêng bạn để trò chuyện với mô hình AI thật, có streaming theo thời gian thực, nhiều hội thoại và đính kèm ảnh/tệp.';
+    return 'LegendaryAI đang chạy Local Sandbox nên không gọi Claude, ChatGPT hoặc API AI bên ngoài. Chế độ này dùng để kiểm tra hệ thống mà không cần API key thật.';
   }
 
   // ---------------------------------------------------------------------
@@ -1700,7 +1702,7 @@
     window.LegendaryAIEngine.chat({
       model:
         settings.engineModel ||
-        'legendary-6',
+        'auto',
       messages: messages,
       system: settings.system || '',
       temperature: 0.35,

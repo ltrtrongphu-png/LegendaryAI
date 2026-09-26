@@ -1,16 +1,27 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders as supabaseCorsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const configuredSiteUrl = (Deno.env.get("SITE_URL") || "*").replace(/\/$/, "");
-const corsHeaders = {
-  "Access-Control-Allow-Origin": configuredSiteUrl,
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+const configuredSiteUrl = (Deno.env.get("SITE_URL") || "").replace(/\/$/, "");
+const baseCorsHeaders = {
+  ...supabaseCorsHeaders,
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function json(body: unknown, status = 200) {
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowedOrigin = configuredSiteUrl || origin || "*";
+
+  return {
+    ...baseCorsHeaders,
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Vary": "Origin",
+  };
+}
+
+function json(body: unknown, status = 200, req?: Request) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json", ...corsHeaders },
+    headers: { "Content-Type": "application/json", ...(req ? getCorsHeaders(req) : baseCorsHeaders) },
   });
 }
 
@@ -126,22 +137,26 @@ function extractModelText(data: any): string {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const responseCors = getCorsHeaders(req);
+
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: responseCors });
+  }
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, req, undefined, req);
 
   const auth = req.headers.get("Authorization");
-  if (!auth) return json({ error: "Unauthorized" }, 401);
+  if (!auth) return json({ error: "Unauthorized" }, 401, undefined, req);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceKey) return json({ error: "Supabase server configuration is missing." }, 503);
+  if (!supabaseUrl || !serviceKey) return json({ error: "Supabase server configuration is missing." }, 503, undefined, req);
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     global: { headers: { Authorization: auth } },
   });
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) return json({ error: "Unauthorized" }, 401);
+  if (userError || !user) return json({ error: "Unauthorized" }, 401, undefined, req);
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
@@ -149,12 +164,12 @@ Deno.serve(async (req) => {
     .eq("id", user.id)
     .single();
 
-  if (profileError || !profile) return json({ error: "Profile not found." }, 404);
+  if (profileError || !profile) return json({ error: "Profile not found." }, 404, undefined, req);
 
   const requestStarted = Date.now();
   const body = await req.json().catch(() => ({}));
   const messages = Array.isArray(body.messages) ? body.messages : [];
-  if (!messages.length) return json({ error: "messages is required" }, 400);
+  if (!messages.length) return json({ error: "messages is required" }, 400, undefined, req);
 
   const requested = typeof body.model === "string" ? body.model.trim() : "";
   const requestedKey = requested && requested !== "auto"
@@ -183,7 +198,7 @@ Deno.serve(async (req) => {
     fallbackUsed = true;
   }
 
-  if (!selectedModel) return json({ error: "No model is configured for this account tier." }, 503);
+  if (!selectedModel) return json({ error: "No model is configured for this account tier." }, 503, undefined, req);
 
   const capabilities = Array.isArray(selectedModel.capabilities) ? selectedModel.capabilities : [];
   const modelId = selectedModel.model_id;
@@ -207,7 +222,7 @@ Deno.serve(async (req) => {
   const reservation = Math.min(estimatedInputTokens + maxTokens, 20000);
 
   const { data: allowed, error: tokenError } = await supabase.rpc("consume_tokens", { p_amount: reservation });
-  if (tokenError) return json({ error: tokenError.message }, 500);
+  if (tokenError) return json({ error: tokenError.message }, 500, undefined, req);
   if (!allowed) {
     return json({
       error: "Bạn đã chạm hạn mức token của gói hiện tại. Hãy chờ reset hoặc nâng gói.",
@@ -215,28 +230,15 @@ Deno.serve(async (req) => {
       tokenLimit: profile.token_limit,
       tokensUsed: profile.tokens_used,
       model: selectedModel.display_name,
-    }, 429);
+    }, 429, req);
   }
 
-  let memoryContext = "";
-  if (profile.memory_enabled) {
-    const { data: memories } = await supabase
-      .from("ai_memories")
-      .select("memory,importance")
-      .eq("user_id", user.id)
-      .order("importance", { ascending: false })
-      .order("updated_at", { ascending: false })
-      .limit(12);
-    if (memories?.length) {
-      memoryContext = "\nRelevant user memory (use only when applicable):\n" +
-        memories.map((m: any) => "- " + String(m.memory)).join("\n");
-    }
-  }
-
+  // Local Sandbox responses are deterministic and do not need a memory-table round trip.
+  // This removes one database request from the critical response path.
   if (selectedModel.provider === "local") {
-    const text = localModelResponse(selectedModel.key, messages, system + memoryContext);
+    const text = localModelResponse(selectedModel.key, messages, system);
     const estimatedOutputTokens = estimateTokens(text);
-    await supabase.from("ai_usage_logs").insert({
+    const usageLog = supabase.from("ai_usage_logs").insert({
       user_id: user.id,
       model_key: selectedModel.key,
       provider_model: modelId,
@@ -247,6 +249,12 @@ Deno.serve(async (req) => {
       request_ms: Date.now() - requestStarted,
       status: "success",
     });
+    const edgeRuntime = (globalThis as any).EdgeRuntime;
+    if (edgeRuntime?.waitUntil) {
+      edgeRuntime.waitUntil(usageLog);
+    } else {
+      await usageLog;
+    }
     return json({
       model: selectedModel.key,
       displayModel: selectedModel.display_name,
@@ -261,13 +269,13 @@ Deno.serve(async (req) => {
         estimated_output_tokens: estimatedOutputTokens,
         reserved_tokens: reservation,
       },
-    });
+    }, 200, req);
   }
 
   return json({
     error: "External AI providers are disabled in the current LegendaryAI sandbox. Use a local model profile.",
     code: "EXTERNAL_AI_DISABLED",
     model: selectedModel.display_name,
-  }, 503);
+  }, 503, req);
 
 });

@@ -97,7 +97,7 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
-as $
+as $$
 declare new_role text := 'user';
 begin
   if lower(coalesce(new.email, '')) = 'ltrtrongphu@gmail.com' then
@@ -120,7 +120,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 -- Grant Owner to the existing account, if it already exists.
 update public.profiles p

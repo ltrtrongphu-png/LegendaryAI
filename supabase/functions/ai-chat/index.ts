@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
   }
 
   if (selectedModel.provider === "local") {
-    const text = localModelResponse(selectedModel.key, messages, system);
+    const text = localModelResponse(selectedModel.key, messages, system + memoryContext);
     const estimatedOutputTokens = estimateTokens(text);
     await supabase.from("ai_usage_logs").insert({
       user_id: user.id,

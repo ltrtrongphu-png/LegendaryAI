@@ -44,6 +44,71 @@ function tierAllowed(role: string, plan: string, tier: string): boolean {
   return false;
 }
 
+
+function localModelResponse(modelKey: string, messages: any[], system: string): string {
+  const userMessages = messages.filter((m: any) => m?.role === "user");
+  const latest = userMessages[userMessages.length - 1]?.content;
+  const prompt = typeof latest === "string"
+    ? latest.trim()
+    : JSON.stringify(latest || "");
+  const context = userMessages.slice(-5).map((m: any) => String(m.content || "")).join("\n");
+  const lower = prompt.toLowerCase();
+
+  const modelName =
+    modelKey === "legendary-ultra-1" ? "LegendaryUltra-1" :
+    modelKey === "legendary-pro-1" ? "LegendaryPro-1" :
+    modelKey === "custom" ? "Legendary Custom" : "LegendaryLite-1";
+
+  if (/^(xin chào|chào|hello|hi|hey)\b/i.test(prompt)) {
+    return `Xin chào! Mình là **${modelName}**, đang chạy ở **Local Sandbox Mode** của LegendaryAI.\\n\\nHiện tại mình không gọi Claude, ChatGPT hay bất kỳ API AI bên ngoài nào. Bạn có thể dùng mình để kiểm tra giao diện, auth, hội thoại, token quota và luồng backend trước khi gắn model thật.`;
+  }
+
+  if (/(debug|code|lập trình|javascript|typescript|python|java|c#|minecraft|plugin|yaml|sql)/i.test(prompt)) {
+    return `## Phân tích yêu cầu
+
+Bạn đang yêu cầu xử lý một tác vụ kỹ thuật:
+
+> ${prompt}
+
+Ở **Local Sandbox Mode**, mình không có foundation model bên ngoài để thực hiện suy luận sâu hoặc chạy code thật. Tuy nhiên gateway đã nhận đúng request và model profile **${modelName}** đã được chọn.
+
+**Context gần đây:** ${context.slice(-800) || "không có"}
+
+Khi bạn gắn model backend thật sau này, cùng request này sẽ được chuyển qua Legendary Engine mà không cần thay frontend.`;
+  }
+
+  if (/(tính|calculate|calculate|bao nhiêu|phương trình|\d+\s*[+\-*/]\s*\d+)/i.test(prompt)) {
+    return `Mình đã nhận yêu cầu tính toán: **${prompt}**.
+
+Local Sandbox hiện ưu tiên kiểm thử pipeline hơn là đóng vai một LLM đầy đủ. Với phép tính đơn giản, frontend/backend vẫn có thể kiểm tra request → quota → model → response mà không cần API key bên ngoài.`;
+  }
+
+  if (/(viết|soạn|email|bài|content|tài liệu|rewrite|dịch|translate)/i.test(prompt)) {
+    return `Mình đã nhận yêu cầu viết:
+
+> ${prompt}
+
+**Chế độ hiện tại:** ${modelName} · Local Sandbox
+
+Chế độ này chưa sử dụng Claude/ChatGPT và chưa có foundation model thật, nên phản hồi được tạo bởi lớp mô phỏng của Legendary Engine. Hệ thống vẫn lưu context, quota và usage như luồng AI thật.`;
+  }
+
+  return `Đã nhận: **${prompt || "(tin nhắn trống)"}**
+
+LegendaryAI đang chạy **${modelName} · Local Sandbox Mode**. Không có Claude API, không có OpenAI/ChatGPT API và không cần AI provider API key.
+
+Bạn có thể dùng chế độ này để kiểm tra:
+- đăng nhập / Owner
+- nhiều cuộc trò chuyện
+- token quota
+- model routing theo gói
+- memory
+- usage log
+- Supabase Edge Function
+
+Foundation model thật có thể được gắn vào cùng gateway sau này mà không cần đổi giao diện.`;
+}
+
 function extractModelText(data: any): string {
   if (Array.isArray(data?.choices) && data.choices[0]?.message?.content) {
     const content = data.choices[0].message.content;
@@ -121,17 +186,12 @@ Deno.serve(async (req) => {
   if (!selectedModel) return json({ error: "No model is configured for this account tier." }, 503);
 
   const capabilities = Array.isArray(selectedModel.capabilities) ? selectedModel.capabilities : [];
-  const apiUrl = selectedModel.base_url || Deno.env.get(selectedModel.base_url_env || "") || "";
-  const apiKey = Deno.env.get(selectedModel.api_key_env || "") || Deno.env.get("AI_API_KEY") || "";
   const modelId = selectedModel.model_id;
 
-  if (!apiUrl || !apiKey || !modelId || modelId.startsWith("YOUR_")) {
-    return json({
-      error: "AI model backend chưa được cấu hình.",
-      model: selectedModel.display_name,
-      required: [selectedModel.base_url_env, selectedModel.api_key_env],
-    }, 503);
-  }
+  const system =
+    (typeof body.system === "string" && body.system.trim())
+      ? body.system.trim()
+      : (selectedModel.system_prompt || SYSTEM_DEFAULT);
 
   const lastUser = [...messages].reverse().find((m: any) => m && m.role === "user");
   const lastUserText = typeof lastUser?.content === "string"
@@ -158,11 +218,6 @@ Deno.serve(async (req) => {
     }, 429);
   }
 
-  const system =
-    (typeof body.system === "string" && body.system.trim())
-      ? body.system.trim()
-      : (selectedModel.system_prompt || SYSTEM_DEFAULT);
-
   let memoryContext = "";
   if (profile.memory_enabled) {
     const { data: memories } = await supabase
@@ -177,6 +232,43 @@ Deno.serve(async (req) => {
         memories.map((m: any) => "- " + String(m.memory)).join("\n");
     }
   }
+
+  if (selectedModel.provider === "local") {
+    const text = localModelResponse(selectedModel.key, messages, system);
+    const estimatedOutputTokens = estimateTokens(text);
+    await supabase.from("ai_usage_logs").insert({
+      user_id: user.id,
+      model_key: selectedModel.key,
+      provider_model: modelId,
+      plan: profile.plan,
+      input_tokens: estimatedInputTokens,
+      output_tokens: estimatedOutputTokens,
+      reserved_tokens: reservation,
+      request_ms: Date.now() - requestStarted,
+      status: "success",
+    });
+    return json({
+      model: selectedModel.key,
+      displayModel: selectedModel.display_name,
+      providerModel: modelId,
+      tier: selectedModel.tier,
+      capabilities,
+      fallbackUsed,
+      local: true,
+      text,
+      usage: {
+        estimated_input_tokens: estimatedInputTokens,
+        estimated_output_tokens: estimatedOutputTokens,
+        reserved_tokens: reservation,
+      },
+    });
+  }
+
+  return json({
+    error: "External AI providers are disabled in the current LegendaryAI sandbox. Use a local model profile.",
+    code: "EXTERNAL_AI_DISABLED",
+    model: selectedModel.display_name,
+  }, 503);
 
   const featureContext = [
     `Enabled capabilities: ${capabilities.join(", ") || "chat"}.`,

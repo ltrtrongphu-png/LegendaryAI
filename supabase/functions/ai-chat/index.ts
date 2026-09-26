@@ -1,7 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const configuredSiteUrl = (Deno.env.get("SITE_URL") || "*").replace(/\/$/, "");
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("SITE_URL") || "*",
+  "Access-Control-Allow-Origin": configuredSiteUrl,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -41,6 +42,22 @@ function tierAllowed(role: string, plan: string, tier: string): boolean {
   if (tier === "pro") return plan === "pro" || plan === "legendary";
   if (tier === "legendary") return plan === "legendary";
   return false;
+}
+
+function extractModelText(data: any): string {
+  if (Array.isArray(data?.choices) && data.choices[0]?.message?.content) {
+    const content = data.choices[0].message.content;
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+      return content.map((part: any) => typeof part === "string" ? part : part?.text || "").join("");
+    }
+  }
+  if (typeof data?.choices?.[0]?.text === "string") return data.choices[0].text;
+  if (Array.isArray(data?.content)) {
+    return data.content.map((part: any) => part?.text || "").join("");
+  }
+  if (typeof data?.output_text === "string") return data.output_text;
+  return "";
 }
 
 Deno.serve(async (req) => {
@@ -232,16 +249,7 @@ Deno.serve(async (req) => {
     }, 502);
   }
 
-  let text = "";
-  if (Array.isArray(data?.choices) && data.choices[0]?.message?.content) {
-    text = String(data.choices[0].message.content);
-  } else if (typeof data?.choices?.[0]?.text === "string") {
-    text = data.choices[0].text;
-  } else if (Array.isArray(data?.content)) {
-    text = data.content.map((x: any) => x?.text || "").join("");
-  } else if (typeof data?.output_text === "string") {
-    text = data.output_text;
-  }
+  const text = extractModelText(data);
 
   if (!text.trim()) {
     await supabase.rpc("refund_tokens", { p_amount: reservation });

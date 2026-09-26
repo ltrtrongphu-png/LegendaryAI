@@ -153,3 +153,23 @@ README.md — cập nhật hướng dẫn triển khai AI/auth production.
 Lưu ý
 
 Repo không thể tự biết URL/anon key của project Supabase hoặc API key model của bạn. Vì vậy sau khi copy các file lên hosting, bạn vẫn cần cấu hình các secret ở Supabase. Đây là phần bắt buộc để đăng ký/đăng nhập và AI thật hoạt động an toàn.
+
+### Temporary Local Sandbox Mode
+
+Hiện tại LegendaryAI chạy **Local Sandbox Models**, không gọi Claude/ChatGPT/OpenAI/Anthropic và không cần AI provider API key.
+
+| Gói | Model | Backend |
+|---|---|---|
+| Free | LegendaryLite-1 | Local Sandbox |
+| Pro | LegendaryPro-1 | Local Sandbox |
+| Legendary | LegendaryUltra-1 | Local Sandbox |
+| Owner | Custom Local | Local Sandbox |
+
+Local Sandbox chỉ phục vụ kiểm thử sản phẩm/end-to-end. Nó không phải foundation model có năng lực tương đương Claude hoặc ChatGPT. Khi hệ thống production sẵn sàng, có thể thay provider local bằng model backend thật mà không đổi frontend.
+
+Supabase project hiện tại:
+https://ampddcztjvejwjirqoer.supabase.co
+
+Publishable key được đặt trong js/supabase-config.js. Không đặt service-role key hoặc secret AI/MoMo vào frontend.
+
+Tạm thời không cấu hình Claude API, OpenAI/ChatGPT API, Anthropic API hoặc bất kỳ AI provider API key thật nào.

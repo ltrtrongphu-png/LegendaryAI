@@ -453,3 +453,12 @@ table.compare-table{width:100%; border-collapse:collapse; min-width:640px;}
 .capability-card span{font-size:.78rem;color:var(--text-muted);}
 @media(max-width:800px){.capability-grid{grid-template-columns:1fr 1fr;}}
 @media(max-width:540px){.capability-grid{grid-template-columns:1fr;}}
+
+/* Integrated AI/auth UX */
+.chat-auth-state{font-size:.72rem;color:var(--text-muted);padding-left:2px;opacity:.9}
+.chat-auth-state::before{content:'•';color:var(--good);margin-right:5px}
+.auth-link-btn{display:block;width:100%;margin-top:10px;border:0;background:none;color:var(--accent-2);font:inherit;font-size:.8rem;cursor:pointer;text-align:center}
+.auth-link-btn:hover{text-decoration:underline}
+.auth-success{color:var(--good);font-size:.8rem;margin:10px 0 0;line-height:1.45}
+.chat-app .chat-topbar-right .btn-outline{border-color:var(--accent-2);color:var(--text)}
+@media (max-width:640px){.chat-auth-state{display:none}.chat-topbar-right{width:100%;justify-content:flex-end}}

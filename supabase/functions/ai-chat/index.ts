@@ -142,14 +142,14 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: responseCors });
   }
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, req, undefined, req);
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, req);
 
   const auth = req.headers.get("Authorization");
-  if (!auth) return json({ error: "Unauthorized" }, 401, undefined, req);
+  if (!auth) return json({ error: "Unauthorized" }, 401, req);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceKey) return json({ error: "Supabase server configuration is missing." }, 503, undefined, req);
+  if (!supabaseUrl || !serviceKey) return json({ error: "Supabase server configuration is missing." }, 503, req);
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     global: { headers: { Authorization: auth } },
@@ -164,12 +164,12 @@ Deno.serve(async (req) => {
     .eq("id", user.id)
     .single();
 
-  if (profileError || !profile) return json({ error: "Profile not found." }, 404, undefined, req);
+  if (profileError || !profile) return json({ error: "Profile not found." }, 404, req);
 
   const requestStarted = Date.now();
   const body = await req.json().catch(() => ({}));
   const messages = Array.isArray(body.messages) ? body.messages : [];
-  if (!messages.length) return json({ error: "messages is required" }, 400, undefined, req);
+  if (!messages.length) return json({ error: "messages is required" }, 400, req);
 
   const requested = typeof body.model === "string" ? body.model.trim() : "";
   const requestedKey = requested && requested !== "auto"
@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
     fallbackUsed = true;
   }
 
-  if (!selectedModel) return json({ error: "No model is configured for this account tier." }, 503, undefined, req);
+  if (!selectedModel) return json({ error: "No model is configured for this account tier." }, 503, req);
 
   const capabilities = Array.isArray(selectedModel.capabilities) ? selectedModel.capabilities : [];
   const modelId = selectedModel.model_id;
@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
   const reservation = Math.min(estimatedInputTokens + maxTokens, 20000);
 
   const { data: allowed, error: tokenError } = await supabase.rpc("consume_tokens", { p_amount: reservation });
-  if (tokenError) return json({ error: tokenError.message }, 500, undefined, req);
+  if (tokenError) return json({ error: tokenError.message }, 500, req);
   if (!allowed) {
     return json({
       error: "Bạn đã chạm hạn mức token của gói hiện tại. Hãy chờ reset hoặc nâng gói.",

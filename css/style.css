@@ -192,7 +192,9 @@ main{position:relative; z-index:2;}
 .capacity-badges span{font-size:.78rem; border:1px solid var(--line-strong); border-radius:20px; padding:5px 12px; color:var(--text-muted);}
 
 /* demo chat */
-.demo{padding:0 24px 96px; position:relative;}
+.demo{padding:56px 24px 72px; position:relative;}
+.demo .section-head{margin-bottom:28px;}
+.chat-app{scroll-margin-top:90px;}
 .chat-app{max-width:960px; margin:0 auto; display:flex; border:1px solid var(--line-strong); border-radius:var(--radius); overflow:hidden; background:rgba(11,21,48,0.6); backdrop-filter:blur(6px); box-shadow:var(--shadow-glow); height:560px;}
 :root[data-theme="light"] .chat-app{background:rgba(255,255,255,0.75);}
 
@@ -263,8 +265,8 @@ main{position:relative; z-index:2;}
 .chat-attach-preview .att-chip .att-name{max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .chat-attach-preview .att-chip .att-remove{background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.85rem; line-height:1;}
 .chat-attach-preview .att-chip .att-remove:hover{color:#FF9F9F;}
-.chat-suggestions{display:flex; gap:8px; flex-wrap:wrap; padding:10px 14px 0;}
-.chat-suggestions button{font-size:.78rem; padding:6px 12px; border-radius:20px; border:1px solid var(--line-strong); background:transparent; color:var(--text-muted); cursor:pointer; transition:all .15s ease;}
+.chat-suggestions{display:flex; gap:7px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; padding:8px 14px 6px; border-top:1px solid var(--line); scrollbar-width:thin; scrollbar-color:var(--line-strong) transparent;}
+.chat-suggestions button{flex:0 0 auto; font-size:.76rem; line-height:1; padding:7px 11px; border-radius:18px; border:1px solid var(--line-strong); background:var(--surface); color:var(--text-muted); cursor:pointer; transition:all .15s ease; white-space:nowrap;}
 .chat-suggestions button:hover{color:var(--accent-2); border-color:var(--accent-2);}
 .chat-input-row{display:flex; gap:8px; padding:12px 14px; border-top:1px solid var(--line); align-items:flex-end;}
 .chat-input-row textarea{flex:1; resize:none; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); color:var(--text); padding:10px 12px; font-family:var(--font-body); font-size:.92rem; max-height:140px;}
@@ -473,3 +475,12 @@ table.compare-table{width:100%; border-collapse:collapse; min-width:640px;}
 .generated-image-wrap{display:flex;flex-direction:column;gap:8px;max-width:min(100%,900px)}
 .generated-image{display:block;width:auto;max-width:100%;height:auto;max-height:70vh;border-radius:16px;border:1px solid rgba(120,140,180,.22);box-shadow:0 12px 40px rgba(0,0,0,.18)}
 .generated-image-meta{font-size:12px;opacity:.65}
+
+/* Keep the quick-action strip compact so it never visually covers chat content. */
+.chat-window{min-height:220px;}
+.chat-input-row{background:var(--bg-elevated);}
+@media (max-width:760px){
+  .demo{padding:42px 14px 56px;}
+  .chat-app{height:600px;}
+  .chat-suggestions{padding-left:10px;padding-right:10px;}
+}

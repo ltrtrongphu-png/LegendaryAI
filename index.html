@@ -274,7 +274,7 @@
           <h3 id="settingsTitle">Cài đặt kết nối AI</h3>
           <button class="btn btn-ghost btn-sm" id="closeSettings" aria-label="Đóng">✕</button>
         </div>
-        <p class="modal-note">Legendary Engine là đường AI duy nhất của website. External AI bên thứ ba đang tạm ngừng. Các model mạnh mới được thiết kế theo hướng self-hosted, không đưa API key AI vào trình duyệt.</p>
+        <p class="modal-note">Legendary Engine xử lý chat. Tạo ảnh dùng Image Provider · GPT Image 2 qua Supabase Edge Function; API key chỉ nằm ở server, không đưa vào trình duyệt.</p>
         <label>Chế độ
           <select id="modeSelect">
             <option value="legendary">Legendary Engine · Native Core</option>
@@ -293,7 +293,7 @@
             <option value="legendary-vision-109b">Legendary Vision 109B · Self-hosted Vision</option>
           </select>
         </label>
-        <div class="external-ai-disabled"><strong>Legendary Engine Only</strong><span>Claude / ChatGPT / OpenAI / Anthropic và API AI ngoài đang tạm ngừng. Mọi yêu cầu chat đi qua Legendary Engine.</span></div>
+        <div class="external-ai-disabled"><strong>Image Provider · GPT Image 2</strong><span>Chat vẫn đi qua Legendary Engine. Khi bạn yêu cầu tạo ảnh, website gọi Image Provider qua backend an toàn.</span></div>
         <label>Chỉ dẫn hệ thống (tuỳ chọn)
           <input type="text" id="systemPrompt" placeholder="Ví dụ: Trả lời ngắn gọn, bằng tiếng Việt">
         </label>

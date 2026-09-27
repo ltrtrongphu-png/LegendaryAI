@@ -12,6 +12,13 @@
   async function invokeWithRetry(payload, token) {
     var lastError = null;
     var requestSignal = payload && payload.signal ? payload.signal : undefined;
+    var timeoutId = null;
+    var timeoutController = null;
+    if (!requestSignal) {
+      timeoutController = new AbortController();
+      timeoutId = setTimeout(function () { timeoutController.abort(); }, 110000);
+      requestSignal = timeoutController.signal;
+    }
     var requestBody = Object.assign({}, payload);
     delete requestBody.signal;
     var config = window.LEGENDARY_SUPABASE_CONFIG || {};
@@ -48,6 +55,7 @@
         }
 
         if (response.ok) {
+          if (timeoutId) clearTimeout(timeoutId);
           return { data: data };
         }
 
@@ -60,24 +68,33 @@
           'Edge Function HTTP ' + response.status + ': ' + serverMessage
         );
 
-        // Do not retry authentication, permission, validation, or token-limit
-        // failures. Retry only transient 408/429/5xx responses.
+        // Never automatically retry auth, validation, quota, or rate-limit
+        // failures. Retrying a 429 can amplify the rate-limit instead of helping.
+        if (response.status === 429) {
+          var retryAfter = response.headers.get('Retry-After');
+          if (data && data.retryAfter != null) retryAfter = String(data.retryAfter);
+          lastError.retryAfter = retryAfter ? Number(retryAfter) : null;
+          return { error: lastError, data: data };
+        }
         if (
           response.status !== 408 &&
-          response.status !== 429 &&
-          response.status < 500
+          (response.status < 500 || response.status >= 600)
         ) {
           return { error: lastError, data: data };
         }
       } catch (error) {
         lastError = error;
+        if (error && error.name === 'AbortError') {
+          return { error: error };
+        }
       }
 
       if (attempt === 0) {
-        await sleep(250);
+        await sleep(350);
       }
     }
 
+    if (timeoutId) clearTimeout(timeoutId);
     return {
       error: lastError || new Error('Không thể gọi Legendary Engine.')
     };

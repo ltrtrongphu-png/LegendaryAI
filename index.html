@@ -362,7 +362,7 @@
     <div class="section-head reveal">
       <p class="section-tag">Dùng thử</p>
       <h2>Trò chuyện trực tiếp</h2>
-      <p>Chat sử dụng <strong>Legendary Engine · Native Core</strong>; tạo ảnh được chuyển riêng qua <strong>Image Provider · GPT Image 2</strong>.</p>
+      <p>Chat hỗ trợ context dài, ảnh, file code/text và ZIP. Tạo ảnh là tính năng tùy chọn khi có Image Provider.</p>
     </div>
     <div class="chat-app reveal" id="chatApp">
       <aside class="chat-sidebar" id="chatSidebar">
@@ -399,7 +399,7 @@
           <button type="button" data-suggest="Phân tích đoạn code sau, tìm bug và đề xuất cách sửa: ">Code Review</button>
         </div>
         <form id="chatForm" class="chat-input-row">
-          <input type="file" id="fileInput" accept="image/*,.txt,.md,.csv,.json,.log" multiple hidden>
+          <input type="file" id="fileInput" accept="image/*,.txt,.md,.csv,.json,.jsonl,.log,.js,.jsx,.ts,.tsx,.py,.java,.c,.h,.cpp,.hpp,.cs,.go,.rs,.php,.rb,.swift,.kt,.kts,.html,.htm,.css,.scss,.sass,.xml,.yaml,.yml,.toml,.ini,.env,.sql,.sh,.bat,.ps1,.vue,.svelte,.astro,.graphql,.gql,.zip" multiple hidden>
           <button type="button" class="btn btn-ghost chat-icon-btn" id="attachBtn" title="Đính kèm ảnh/tệp" aria-label="Đính kèm ảnh hoặc tệp">📎</button>
           <textarea id="chatInput" rows="1" placeholder="Nhập câu hỏi của bạn… (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
           <button type="submit" class="btn btn-primary" id="sendBtn">Gửi</button>
@@ -419,7 +419,7 @@
           <h3 id="settingsTitle">Cài đặt kết nối AI</h3>
           <button class="btn btn-ghost btn-sm" id="closeSettings" aria-label="Đóng">✕</button>
         </div>
-        <p class="modal-note">Legendary Engine xử lý chat. Tạo ảnh dùng Image Provider · GPT Image 2 qua Supabase Edge Function; API key chỉ nằm ở server, không đưa vào trình duyệt.</p>
+        <p class="modal-note">Legendary Engine xử lý chat. Ảnh, file code/text và ZIP có thể đính kèm; ZIP sẽ được đọc các file text/code trong trình duyệt. Image Provider chỉ hoạt động khi server có provider key.</p>
         <label>Chế độ
           <select id="modeSelect">
             <option value="legendary">Legendary Engine · Native Core</option>
@@ -443,7 +443,7 @@
           <input type="text" id="systemPrompt" placeholder="Ví dụ: Trả lời ngắn gọn, bằng tiếng Việt">
         </label>
         <label class="modal-check"><input type="checkbox" id="streamToggle" checked> Phản hồi tối ưu (backend response)</label>
-        <p class="modal-warn">✓ Legendary Engine Only. External AI đang tạm ngừng và không có API key AI nào được yêu cầu ở trình duyệt.</p>
+        <p class="modal-warn">✓ Không cần API key AI ở trình duyệt. Chat vẫn chạy Native Core; nếu cấu hình local inference gateway thì có thể dùng model thật mà không cần OpenAI API.</p>
         <button class="btn btn-primary" id="saveSettings">Lưu cài đặt</button>
       </div>
     </div>
@@ -585,6 +585,7 @@
 <script src="/js/supabase-config.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
 <script src="/js/bg3d.js" defer></script>
 <script src="/js/main.js" defer></script>
 <script src="/js/account.js" defer></script>

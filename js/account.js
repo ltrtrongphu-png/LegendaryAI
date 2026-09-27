@@ -28,7 +28,10 @@
     },
     async manualResetTokens() {
       if (!supabase) return { error: { message: 'Supabase chưa sẵn sàng.' } };
-      var r = await supabase.rpc('manual_reset_tokens');
+      var token = await this.getAccessToken();
+      var r = await supabase.functions.invoke('token-reset', {
+        headers: { Authorization: 'Bearer ' + token }
+      });
       if (r.error) return { error: r.error };
       var row = Array.isArray(r.data) ? r.data[0] : r.data;
       return { data: row };

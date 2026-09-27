@@ -44,7 +44,6 @@
   // External AI provider configuration intentionally removed: Legendary Engine only.
 
   // ---------------------------------------------------------------------
-  // Settings (global, shared across conversations)  // ---------------------------------------------------------------------
   // Settings (global, shared across conversations)
   // ---------------------------------------------------------------------
   function loadSettings() {
@@ -201,7 +200,6 @@
   });
 
   // ---------------------------------------------------------------------
-  // Conversations (multi-thread, persisted per browser)  // ---------------------------------------------------------------------
   // Conversations (multi-thread, persisted per browser)
   // ---------------------------------------------------------------------
   function uid() {
@@ -1343,6 +1341,26 @@
 
   // External AI client path removed. All AI requests use Legendary Engine.
 
+  function buildMessageContent(message) {
+    var text = String((message && message.text) || '');
+    var attachments = (message && message.attachments) || [];
+
+    if (!attachments.length) return text;
+
+    var attachmentText = attachments.map(function (a) {
+      if (!a) return '';
+      if (a.kind === 'text' && a.textContent) {
+        return '\\n\\n[File: ' + (a.name || 'attachment') + ']\\n' + a.textContent;
+      }
+      if (a.kind === 'image') {
+        return '\\n\\n[Image attachment: ' + (a.name || 'image') + ']';
+      }
+      return '\\n\\n[Attachment: ' + (a.name || 'file') + ']';
+    }).join('');
+
+    return text + attachmentText;
+  }
+
   function callLegendaryEngine(conv) {
     var typing = addTypingBubble();
 
@@ -1383,7 +1401,17 @@
         toggleBusyUI(false);
 
         if (streamStatus) {
-          streamStatus.textContent = '';
+          var brain = result && result.brain;
+          streamStatus.textContent = brain
+            ? '✓ ' + (result.displayModel || 'Legendary Engine') +
+              ' · ' + (brain.intent || 'general') +
+              (brain.memory ? ' · memory' : '')
+            : '';
+        }
+
+        if (chatModeLabel && result && result.displayModel) {
+          chatModeLabel.textContent =
+            'Legendary Engine · ' + result.displayModel;
         }
       })
       .catch(function (err) {

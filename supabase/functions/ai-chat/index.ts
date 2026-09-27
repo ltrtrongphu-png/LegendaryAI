@@ -252,6 +252,7 @@ Deno.serve(async (req) => {
     return json({ error: "Request body must be valid JSON.", code: "INVALID_JSON" }, 400, req);
   }
 
+  const requestStarted = Date.now();
   const messages = Array.isArray(body.messages) ? body.messages : [];
   if (!messages.length) return json({ error: "messages is required", code: "MESSAGES_REQUIRED" }, 400, req);
 

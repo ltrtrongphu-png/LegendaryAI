@@ -11,6 +11,9 @@
 
   async function invokeWithRetry(payload, token) {
     var lastError = null;
+    var requestSignal = payload && payload.signal ? payload.signal : undefined;
+    var requestBody = Object.assign({}, payload);
+    delete requestBody.signal;
     var config = window.LEGENDARY_SUPABASE_CONFIG || {};
     var baseUrl = String(config.url || '').replace(/\\/$/, '');
     var anonKey = String(config.anonKey || '');
@@ -31,8 +34,8 @@
             'apikey': anonKey,
             'Authorization': 'Bearer ' + token
           },
-          body: JSON.stringify(payload),
-          signal: payload.signal || undefined
+          body: JSON.stringify(requestBody),
+          signal: requestSignal
         });
 
         var raw = await response.text();

@@ -227,43 +227,13 @@ h1,h2,h3,.brand,.stat-num,.price,.engine-card strong{font-family:var(--font-head
 .section-tag{letter-spacing:.08em;}
 
 
-/* 3D LegendaryAI atom logo — keep the real brand mark, no fake AI cube */
+/* LegendaryAI hero — real atom logo only */
 .hero-visual{display:grid;place-items:center;perspective:1200px;}
-.legendary-3d-logo{
-  position:relative;width:390px;height:390px;display:grid;place-items:center;
-  transform-style:preserve-3d;transform:rotateX(8deg) rotateY(-10deg);
-  filter:drop-shadow(0 26px 42px rgba(0,0,0,.18));
-}
-.legendary-3d-logo-img{
-  position:relative;z-index:4;width:235px;height:235px;object-fit:contain;
-  transform:translateZ(55px);
-  filter:drop-shadow(0 16px 18px rgba(20,52,110,.28)) drop-shadow(0 0 28px rgba(62,123,250,.24));
-}
-.logo-depth{
-  position:absolute;width:218px;height:218px;border-radius:48px;
-  background:linear-gradient(145deg,#ffffff,#d9e6ff 45%,#b5caff);
-  border:1px solid rgba(62,123,250,.28);
-  transform:translateZ(0) translate(8px,12px);
-  box-shadow:inset 0 3px 12px rgba(255,255,255,.9),0 24px 42px rgba(43,82,155,.18);
-  opacity:.72;
-}
-.logo-reflection{
-  position:absolute;width:218px;height:218px;border-radius:48px;
-  border:1px solid rgba(255,255,255,.8);
-  transform:translateZ(68px) translate(-4px,-4px);
-  pointer-events:none;
-}
-.logo-orbit{
-  position:absolute;left:50%;top:50%;width:350px;height:112px;
-  margin:-56px 0 0 -175px;border:1.5px solid rgba(62,123,250,.32);
-  border-radius:50%;transform-style:preserve-3d;
-  box-shadow:0 0 24px rgba(62,123,250,.10);
-}
-.logo-orbit-a{transform:rotateX(68deg) rotateZ(16deg) translateZ(72px);}
-.logo-orbit-b{transform:rotateY(66deg) rotateZ(-22deg) translateZ(32px);border-color:rgba(125,160,220,.25);}
-@media (max-width:760px){
-  .legendary-3d-logo{width:270px;height:270px;}
-  .legendary-3d-logo-img{width:175px;height:175px;}
-  .logo-depth,.logo-reflection{width:164px;height:164px;border-radius:36px;}
-  .logo-orbit{width:245px;margin-left:-122px;}
-}
+.legendary-3d-logo{position:relative;width:390px;height:390px;display:grid;place-items:center;transform-style:preserve-3d;transform:rotateX(8deg) rotateY(-10deg);}
+.legendary-3d-logo-img{position:relative;z-index:5;width:285px;height:285px;object-fit:contain;transform:translateZ(35px) rotateY(-2deg);filter:drop-shadow(0 22px 20px rgba(19,48,105,.22)) drop-shadow(0 0 28px rgba(62,123,250,.20));}
+.logo-depth{position:absolute;z-index:1;width:278px;height:278px;border-radius:61px;background:linear-gradient(145deg,rgba(255,255,255,.75),rgba(180,205,255,.42));border:1px solid rgba(62,123,250,.20);transform:translate3d(8px,12px,-8px);box-shadow:0 25px 45px rgba(43,82,155,.14);}
+.logo-reflection{position:absolute;z-index:6;width:285px;height:285px;border-radius:62px;border:1px solid rgba(255,255,255,.35);transform:translateZ(48px);pointer-events:none;}
+.logo-orbit{position:absolute;z-index:2;left:50%;top:50%;width:360px;height:112px;margin:-56px 0 0 -180px;border:1.5px solid rgba(62,123,250,.24);border-radius:50%;transform-style:preserve-3d;pointer-events:none;}
+.logo-orbit-a{transform:rotateX(68deg) rotateZ(16deg) translateZ(55px);}
+.logo-orbit-b{transform:rotateY(66deg) rotateZ(-22deg) translateZ(24px);border-color:rgba(125,160,220,.18);}
+@media (max-width:760px){.legendary-3d-logo{width:280px;height:280px;}.legendary-3d-logo-img{width:200px;height:200px;}.logo-depth,.logo-reflection{width:195px;height:195px;border-radius:43px;}.logo-orbit{width:255px;margin-left:-127px;}}

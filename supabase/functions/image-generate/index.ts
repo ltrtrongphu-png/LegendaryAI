@@ -11,6 +11,7 @@ const imageBuckets = new Map<string, { started:number; count:number }>();
 const IMAGE_WINDOW_MS = 60_000;
 const IMAGE_MAX_REQUESTS = 3;
 const IMAGE_MAX_PROMPT_CHARS = 8000;
+const IMAGE_BUCKET_MAX = 2000;
 
 const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -115,6 +116,12 @@ Deno.serve(async (req) => {
 
   const bucketKey = authData.user.id;
   const now = Date.now();
+  if (imageBuckets.size > IMAGE_BUCKET_MAX) {
+    for (const [key, value] of imageBuckets) {
+      if (now - value.started >= IMAGE_WINDOW_MS) imageBuckets.delete(key);
+      if (imageBuckets.size <= IMAGE_BUCKET_MAX) break;
+    }
+  }
   const bucket = imageBuckets.get(bucketKey);
   if (!bucket || now - bucket.started >= IMAGE_WINDOW_MS) {
     imageBuckets.set(bucketKey, { started: now, count: 1 });

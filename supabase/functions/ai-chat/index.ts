@@ -633,6 +633,12 @@ Deno.serve(async (req) => {
     }
 
     const estimatedOutputTokens = estimateTokens(text);
+    const actualTokens = estimatedInputTokens + estimatedOutputTokens;
+    const { data: tokenStateRows } = await supabase.rpc("finalize_tokens", {
+      p_reserved: reservation,
+      p_actual: actualTokens,
+    });
+    const tokenState = Array.isArray(tokenStateRows) ? tokenStateRows[0] : tokenStateRows;
 
     const usageLog = supabase.from("ai_usage_logs").insert({
       user_id: user.id,
@@ -683,7 +689,12 @@ Deno.serve(async (req) => {
       usage: {
         estimated_input_tokens: estimatedInputTokens,
         estimated_output_tokens: estimatedOutputTokens,
+        actual_tokens: actualTokens,
         reserved_tokens: reservation,
+        tokens_used: Number(tokenState?.tokens_used ?? profile.tokens_used),
+        tokens_remaining: Number(tokenState?.tokens_remaining ?? Math.max(Number(profile.token_limit) - Number(profile.tokens_used), 0)),
+        token_limit: Number(tokenState?.token_limit ?? profile.token_limit),
+        token_reset_at: tokenState?.token_reset_at ?? null,
         request_ms: Date.now() - requestStarted,
       },
     }, 200, req);

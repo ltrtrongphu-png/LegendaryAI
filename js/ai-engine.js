@@ -31,7 +31,8 @@
             'apikey': anonKey,
             'Authorization': 'Bearer ' + token
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          signal: payload.signal || undefined
         });
 
         var raw = await response.text();
@@ -126,7 +127,8 @@
         system: options.system || '',
         temperature: options.temperature ?? 0.35,
         max_tokens: options.max_tokens || 4096,
-        tool: options.tool || ''
+        tool: options.tool || '',
+        signal: options.signal || null
       };
 
       var result = await invokeWithRetry(payload, token);

@@ -220,3 +220,26 @@ Supabase project:
 https://ampddcztjvejwjirqoer.supabase.co
 
 Publishable key nằm trong `js/supabase-config.js`. Không đặt service-role key hoặc secret AI/MoMo vào frontend.
+
+
+## Legendary Engine production notes
+
+### Token windows
+- Free: 150,000 tokens / 6 hours
+- Pro: 2,000,000 tokens / 12 hours
+- Legendary: 6,000,000 tokens / 18 hours
+- Pro manual reset: once per month
+- Legendary/Owner manual reset: once per week
+- Reset countdown starts when the quota is exhausted.
+
+### Native AI tools
+The Edge Function automatically routes prompts into native modes for: calculator, summarize, rewrite, plan, code review, debug, email, translation, extraction, and JSON/structured output.
+
+### Self-hosted models
+High-end Ollama-compatible models are intentionally disabled until a real self-hosted gateway is configured with the Supabase secret LEGENDARY_LOCAL_AI_URL. The application never claims that those models are available when the gateway is absent.
+
+### Web search
+The web_search capability flag is not a fake search implementation. A real search provider/gateway must be configured before enabling it. LegendaryAI does not silently call OpenAI, Anthropic, Claude, or other external AI providers.
+
+### Security
+Token accounting RPCs are restricted and the browser-facing manual reset uses the JWT-protected token-reset Edge Function. RLS policies use initplan-safe (select auth.uid()) expressions and model-owner writes are separated from public model reads.

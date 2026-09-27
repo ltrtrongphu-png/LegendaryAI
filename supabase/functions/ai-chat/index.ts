@@ -75,40 +75,123 @@ function safeMath(input: string): number | null {
   }
 }
 
-function nativeAnswer(model: string, messages: any[]) {
+
+function detectIntent(prompt: string): string {
+  const p = String(prompt || "").trim().toLowerCase();
+  if (/^(hi|hello|xin chào|chào|hey)\b/.test(p)) return "greeting";
+  if (/(tính|calculate|calculator|calc)\b|^\s*[0-9][0-9+\-*/%(). x×÷]*$/.test(p)) return "math";
+  if (/(tóm tắt|tóm lược|summarize|summary|rút ra.*ý chính)/.test(p)) return "summarize";
+  if (/(dịch|translate|translation)\b/.test(p)) return "translate";
+  if (/(viết lại|rewrite|paraphrase|chỉnh sửa|sửa câu)/.test(p)) return "rewrite";
+  if (/(debug|bug|lỗi|error|fix|sửa code|code review|review code)/.test(p) ||
+      /\b(javascript|typescript|python|java|c\+\+|c#|sql|supabase|api|html|css)\b/.test(p)) return "code";
+  if (/(kế hoạch|plan|roadmap|lộ trình|từng bước|steps)/.test(p)) return "plan";
+  if (/(so sánh|compare|khác nhau|difference|ưu.*nhược|trade.?off)/.test(p)) return "compare";
+  if (/(giải thích|explain|tại sao|why|how does|là gì|what is)/.test(p)) return "explain";
+  if (/(ý tưởng|brainstorm|gợi ý|ideas|đề xuất)/.test(p)) return "brainstorm";
+  return "general";
+}
+
+function extractRecentContext(messages: any[], maxChars = 7000): string {
+  const items = messages.slice(-10).map((m: any) => {
+    const role = m?.role === "assistant" || m?.role === "ai" ? "AI" : "User";
+    return role + ": " + textOf(m?.content);
+  }).filter(Boolean).join("\n");
+  return items.slice(-maxChars);
+}
+
+function firstSentences(text: string, count: number): string[] {
+  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return [];
+  return cleaned
+    .split(/(?<=[.!?。！？])\s+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .slice(0, count);
+}
+
+function nativeAnswer(model: string, messages: any[], system = "") {
   const last = [...messages].reverse().find((m: any) => m?.role === "user");
   const prompt = textOf(last?.content).trim();
   if (!prompt) return "Mình đã sẵn sàng. Hãy gửi yêu cầu cụ thể.";
 
+  const intent = detectIntent(prompt);
+  const context = extractRecentContext(messages);
+  const attachmentHint = messages.some((m: any) => Array.isArray(m?.content) && m.content.some((x: any) => x?.type === "image"))
+    ? "\n\n> Có hình ảnh trong ngữ cảnh; Native Core hiện chỉ nhận metadata ảnh, chưa có vision model thật."
+    : "";
+
   const mathInput = prompt.replace(/^(tính|calculate|calc|calculator)[: ]*/i, "").trim();
   const math = safeMath(mathInput);
-  if (math !== null && /[+\-*/%×÷]/.test(mathInput)) {
-    return "## Kết quả\n\n**" + math + "**\n\nĐược tính bằng core toán học nội bộ của LegendaryAI.";
+  if (intent === "math" && math !== null) {
+    return "## Kết quả\n\n**" + math + "**\n\n**Cách xử lý:** biểu thức được kiểm tra bằng core toán học nội bộ của LegendaryAI.\n\n**Model:** " + model;
   }
 
-  if (/^(hi|hello|xin chào|chào|hey)\b/i.test(prompt)) {
-    return "Xin chào! 👋 **Legendary Engine đang online.**\n\nModel: **" + model + "**\nChế độ: Native Legendary Core.";
+  if (intent === "greeting") {
+    return "Xin chào! 👋 **Legendary Engine đang online.**\n\nMình có thể tự nhận diện yêu cầu để chọn luồng xử lý cho **code, toán, tóm tắt, viết lại, lập kế hoạch, so sánh và giải thích**.\n\n**Model:** " + model;
   }
 
-  if (/(code|javascript|typescript|python|sql|supabase|bug|debug|lỗi|error|api)/i.test(prompt)) {
-    return "## Legendary Code Reasoning\n\nMình đã nhận yêu cầu:\n\n> " + prompt +
-      "\n\n### Quy trình\n- Kiểm tra input và state.\n- Kiểm tra request/response và authentication.\n- Kiểm tra log backend.\n- Đưa ra bản sửa nhỏ, an toàn trước khi thay đổi lớn.\n\n**Model:** " + model;
+  if (intent === "summarize") {
+    const source = context || prompt;
+    const sentences = firstSentences(source.replace(/^User:\s*/gm, ""), 6);
+    const bullets = sentences.length
+      ? sentences.map(s => "- " + s).join("\n")
+      : "- Chưa có đủ nội dung để tóm tắt.";
+    return "## Tóm tắt thông minh\n\n" + bullets +
+      "\n\n### Trọng tâm\n- Xác định chủ đề từ ngữ cảnh gần nhất.\n- Ưu tiên thông tin mới và nội dung người dùng vừa cung cấp.\n- Không tự thêm dữ kiện không có trong ngữ cảnh.\n\n**Intent:** summarize · **Model:** " + model;
   }
 
-  if (/(tóm tắt|summarize|summary)/i.test(prompt)) {
-    const recent = messages.slice(-8).map((m: any) => textOf(m.content)).filter(Boolean).join("\n");
-    return "## Tóm tắt\n\n" + recent.slice(-5000);
+  if (intent === "code") {
+    const codeSignals: string[] = [];
+    const source = context;
+    if (/\bTODO\b/i.test(source)) codeSignals.push("Có TODO/comment cần hoàn thiện.");
+    if (/\bconsole\.log\b/i.test(source)) codeSignals.push("Có console.log — nên loại bỏ hoặc thay bằng logging phù hợp trước production.");
+    if (/innerHTML\s*=/.test(source)) codeSignals.push("Có innerHTML — cần kiểm tra dữ liệu đầu vào để tránh XSS.");
+    if (/fetch\s*\(/.test(source) && !/catch\s*\(|\.catch\s*\(/.test(source)) codeSignals.push("Có fetch nhưng chưa thấy nhánh catch rõ ràng trong context hiện tại.");
+    if (/password|secret|api[_-]?key|service[_-]?role/i.test(source)) codeSignals.push("Có dấu hiệu dữ liệu bí mật — không nên đưa secret vào frontend hoặc commit.");
+    return "## Legendary Code Reasoning\n\n**Yêu cầu:** " + prompt +
+      "\n\n### Cách phân tích\n1. Xác định triệu chứng và phạm vi lỗi.\n2. Đọc context/tệp gần nhất trước khi kết luận.\n3. Kiểm tra dữ liệu, state, async flow và quyền truy cập.\n4. Đề xuất bản sửa nhỏ, có thể kiểm thử.\n\n" +
+      (codeSignals.length ? "### Tín hiệu phát hiện\n" + codeSignals.map(x => "- " + x).join("\n") : "### Tín hiệu phát hiện\n- Chưa thấy mẫu lỗi phổ biến trong context hiện tại.") +
+      "\n\n**Intent:** code · **Model:** " + model;
   }
 
-  if (/(viết lại|rewrite|dịch|translate|email|soạn)/i.test(prompt)) {
-    return "## Legendary Writing Mode\n\nĐã nhận yêu cầu:\n\n> " + prompt +
-      "\n\nMình có thể xử lý tiếp dựa trên nội dung/context bạn cung cấp.";
+  if (intent === "plan") {
+    return "## Kế hoạch thực hiện\n\n**Mục tiêu:** " + prompt +
+      "\n\n1. **Làm rõ đầu ra** — xác định kết quả cuối cùng và tiêu chí hoàn thành.\n2. **Kiểm tra hiện trạng** — dữ liệu, ràng buộc, dependency và phần đã có.\n3. **Chia nhỏ** — ưu tiên việc có thể kiểm chứng độc lập.\n4. **Triển khai** — làm từ phần nền tảng đến phần phụ thuộc.\n5. **Kiểm thử** — kiểm tra happy path, edge case và lỗi quyền/dữ liệu.\n6. **Hoàn thiện** — tối ưu UX, hiệu năng và khả năng bảo trì.\n\n**Intent:** plan · **Model:** " + model;
   }
 
-  return "## Legendary Engine\n\nMình đã nhận:\n\n> " + prompt +
-    "\n\nNative core đang hoạt động với context của phiên chat.\n\n**Model:** " + model;
+  if (intent === "compare") {
+    return "## So sánh có cấu trúc\n\n**Đối tượng:** " + prompt +
+      "\n\n| Tiêu chí | Phương án A | Phương án B |\n|---|---|---|\n| Mục tiêu | Cần xác định | Cần xác định |\n| Chi phí/nguồn lực | Phụ thuộc cấu hình | Phụ thuộc cấu hình |\n| Độ phức tạp | Cần kiểm tra | Cần kiểm tra |\n| Rủi ro | Cần kiểm tra | Cần kiểm tra |\n| Khi phù hợp | Theo yêu cầu thực tế | Theo yêu cầu thực tế |\n\nMình sẽ ưu tiên dữ kiện từ context thay vì tự bịa thông số.\n\n**Intent:** compare · **Model:** " + model;
+  }
+
+  if (intent === "explain") {
+    return "## Giải thích\n\n**Chủ đề:** " + prompt +
+      "\n\n### Hiểu nhanh\nTách vấn đề thành **khái niệm → cơ chế → ví dụ → giới hạn** để tránh trả lời theo kiểu chỉ đưa định nghĩa.\n\n### Context liên quan\n" +
+      (context ? context.slice(-1800) : "Chưa có context trước đó.") +
+      "\n\n**Intent:** explain · **Model:** " + model;
+  }
+
+  if (intent === "rewrite") {
+    return "## Viết lại\n\nMình đã nhận nội dung cần chỉnh. Luồng xử lý ưu tiên **giữ nguyên ý nghĩa → sửa cấu trúc → làm câu tự nhiên → kiểm tra giọng văn**.\n\n> " +
+      prompt + "\n\n**Intent:** rewrite · **Model:** " + model;
+  }
+
+  if (intent === "translate") {
+    return "## Dịch\n\nMình đã nhận yêu cầu dịch. Để bản dịch chính xác, mình sẽ ưu tiên **ngữ cảnh → nghĩa câu → thuật ngữ → giọng văn**, thay vì dịch từng từ máy móc.\n\n> " +
+      prompt + "\n\n**Intent:** translate · **Model:** " + model;
+  }
+
+  if (intent === "brainstorm") {
+    return "## Brainstorm\n\nTừ yêu cầu của bạn, hãy tách ý tưởng thành 4 nhóm:\n\n- **Core:** chức năng bắt buộc.\n- **Differentiator:** điểm tạo khác biệt.\n- **UX:** cách người dùng trải nghiệm.\n- **Scale:** cách mở rộng sau này.\n\n**Ý tưởng đầu vào:** " + prompt + "\n\n**Intent:** brainstorm · **Model:** " + model;
+  }
+
+  return "## Legendary Engine\n\nMình đã phân tích yêu cầu theo intent **general** và giữ context gần nhất của phiên chat.\n\n**Yêu cầu:** " + prompt +
+    "\n\n### Context gần nhất\n" + (context ? context.slice(-2400) : "Chưa có context trước đó.") +
+    "\n\n### Cách xử lý\n- Không tự bịa dữ kiện chưa có.\n- Ưu tiên thông tin người dùng vừa cung cấp.\n- Khi có model self-hosted khả dụng, chuyển yêu cầu sang model thật thay vì Native Core." +
+    attachmentHint +
+    "\n\n**Model:** " + model + (system ? "\n**System instruction:** đã áp dụng." : "");
 }
-
 async function ollama(baseUrl: string, model: string, messages: any[], system: string, maxTokens: number, temperature: number) {
   const base = baseUrl.replace(/\/$/, "");
   const payload = {

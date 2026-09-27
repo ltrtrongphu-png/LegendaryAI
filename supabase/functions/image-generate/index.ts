@@ -7,6 +7,11 @@ const ORIGINS = new Set([
   "http://127.0.0.1:3000",
 ]);
 
+const imageBuckets = new Map<string, { started:number; count:number }>();
+const IMAGE_WINDOW_MS = 60_000;
+const IMAGE_MAX_REQUESTS = 3;
+const IMAGE_MAX_PROMPT_CHARS = 8000;
+
 const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -104,6 +109,25 @@ Deno.serve(async (req) => {
     return json(req, { error: "prompt is required", code: "PROMPT_REQUIRED" }, 400);
   }
 
+  if (prompt.length > IMAGE_MAX_PROMPT_CHARS) {
+    return json(req, { error: "Prompt quá dài.", code: "PROMPT_TOO_LARGE" }, 413);
+  }
+
+  const bucketKey = authData.user.id;
+  const now = Date.now();
+  const bucket = imageBuckets.get(bucketKey);
+  if (!bucket || now - bucket.started >= IMAGE_WINDOW_MS) {
+    imageBuckets.set(bucketKey, { started: now, count: 1 });
+  } else {
+    bucket.count++;
+    if (bucket.count > IMAGE_MAX_REQUESTS) {
+      const retryAfter = Math.max(1, Math.ceil((IMAGE_WINDOW_MS - (now - bucket.started)) / 1000));
+      const response = json(req, { error: "Image generation rate limit.", code: "IMAGE_RATE_LIMITED", retryAfter }, 429);
+      response.headers.set("Retry-After", String(retryAfter));
+      return response;
+    }
+  }
+
   const allowedSizes = new Set(["auto", "1024x1024", "1024x1536", "1536x1024"]);
   const size = allowedSizes.has(String(body?.size || "auto"))
     ? String(body?.size || "auto")
@@ -122,6 +146,8 @@ Deno.serve(async (req) => {
   const model = Deno.env.get("OPENAI_IMAGE_MODEL") || "gpt-image-2";
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
@@ -137,7 +163,9 @@ Deno.serve(async (req) => {
         output_format: "png",
         n: 1,
       }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     const raw = await response.text();
     let data: any = null;

@@ -174,7 +174,7 @@
         messages: options.messages || [],
         system: options.system || '',
         temperature: options.temperature ?? 0.35,
-        max_tokens: options.max_tokens || 4096,
+        max_tokens: options.max_tokens || 8192,
         tool: options.tool || '',
         signal: options.signal || null
       };

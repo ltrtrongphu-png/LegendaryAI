@@ -333,7 +333,7 @@
       </article>
       <article class="testi-card">
         <div class="testi-stars">★★★★★</div>
-        <p class="testi-quote">"Hạn mức 1 triệu token mỗi ngày là đủ dùng thoải mái cho cả đội nghiên cứu của mình."</p>
+        <p class="testi-quote">"Hạn mức 6 triệu token mỗi ngày phù hợp với các workload AI lớn."</p>
         <div class="testi-person"><span class="testi-avatar"></span><div><div class="testi-name">Quốc Bảo</div><div class="testi-role">Nhà nghiên cứu dữ liệu</div></div></div>
       </article>
     </div>
@@ -379,9 +379,10 @@
         <h3>Pro</h3>
         <p class="price">149.000đ<span>/tháng</span></p>
         <ul>
-          <li>2.000.000 token / ngày</li><li>Model: <strong>LegendaryPro-1</strong></li>
-          <li>Toàn bộ 8 nhóm tính năng</li>
-          <li>Ghi nhớ ngữ cảnh dài</li>
+          <li>2.000.000 token / ngày</li><li>Model: <strong>Reasoner 32B*</strong></li>
+          <li>Memory dài hạn + Vision + phân tích tệp</li>
+          <li>Prompt Studio + xuất hội thoại</li>
+          <li>Context dài + ưu tiên tài nguyên</li>
         </ul>
         <button type="button" class="btn btn-primary plan-select-btn" data-plan="pro" data-label="Chọn Pro">Chọn Pro</button>
       </div>
@@ -389,9 +390,10 @@
         <h3>Legendary</h3>
         <p class="price">399.000đ<span>/tháng</span></p>
         <ul>
-          <li>6.000.000 token / ngày</li><li>Model: <strong>LegendaryUltra-1</strong></li>
-          <li>Tác vụ tự động không giới hạn bước</li>
-          <li>Hỗ trợ ưu tiên 24/7</li>
+          <li>6.000.000 token / ngày</li><li>Model: <strong>Ultra 120B* + Vision 109B*</strong></li>
+          <li>Advanced Memory + context siêu dài</li>
+          <li>Routing tự động theo tác vụ</li>
+          <li>Ưu tiên tài nguyên self-hosted</li>
         </ul>
         <button type="button" class="btn btn-outline plan-select-btn" data-plan="legendary" data-label="Chọn Legendary">Chọn Legendary</button>
       </div>
@@ -408,11 +410,11 @@
     <div class="faq-list reveal">
       <details class="faq-item">
         <summary>Legendary AI có miễn phí không?</summary>
-        <p>Có. Gói Free cấp 250.000 token mỗi ngày, đủ để bạn dùng thử các tính năng cốt lõi trước khi nâng cấp.</p>
+        <p>Có. Gói Free cấp 100.000 token mỗi ngày, đủ để bạn dùng thử các tính năng cốt lõi trước khi nâng cấp.</p>
       </details>
       <details class="faq-item">
         <summary>Hạn mức token được tính như thế nào?</summary>
-        <p>Mỗi tài khoản có một hạn mức token cố định, reset lại mỗi 24 giờ. Cả tin nhắn bạn gửi và phản hồi nhận về đều được tính vào hạn mức.</p>
+        <p>Mỗi tài khoản có một hạn mức token cố định, reset lại mỗi 24 giờ. Hệ thống dự trù token cho input + output trước khi chạy model và hoàn lại phần dự trù nếu model lỗi.</p>
       </details>
       <details class="faq-item">
         <summary>Tôi có thể dùng mô hình AI của riêng mình không?</summary>
@@ -420,7 +422,7 @@
       </details>
       <details class="faq-item">
         <summary>Dữ liệu trò chuyện của tôi có an toàn không?</summary>
-        <p>Dữ liệu được mã hoá khi truyền tải và không dùng để huấn luyện công khai. Khi dùng API key riêng ở chế độ demo, key chỉ lưu cục bộ trong trình duyệt của bạn.</p>
+        <p>Dữ liệu truyền qua HTTPS và quyền gói/model được kiểm tra ở backend. API key AI bên ngoài không được yêu cầu trong trình duyệt.</p>
       </details>
       <details class="faq-item">
         <summary>Tôi có thể huỷ hoặc đổi gói bất kỳ lúc nào không?</summary>

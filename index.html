@@ -28,6 +28,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/legendary-upgrade.css">
+<link rel="stylesheet" href="/css/power-suite.css">
 <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 
@@ -296,7 +297,7 @@
         <label>Chỉ dẫn hệ thống (tuỳ chọn)
           <input type="text" id="systemPrompt" placeholder="Ví dụ: Trả lời ngắn gọn, bằng tiếng Việt">
         </label>
-        <label class="modal-check"><input type="checkbox" id="streamToggle" checked> Bật phản hồi trực tiếp (streaming)</label>
+        <label class="modal-check"><input type="checkbox" id="streamToggle" checked> Phản hồi tối ưu (backend response)</label>
         <p class="modal-warn">✓ Legendary Engine Only. External AI đang tạm ngừng và không có API key AI nào được yêu cầu ở trình duyệt.</p>
         <button class="btn btn-primary" id="saveSettings">Lưu cài đặt</button>
       </div>
@@ -590,5 +591,6 @@
 <script src="/js/ai-engine.js" defer></script>
 <script src="/js/chat.js" defer></script>
 <script src="/js/ui-upgrade.js" defer></script>
+<script src="/js/power-suite.js" defer></script>
 </body>
 </html>

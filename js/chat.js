@@ -41,17 +41,10 @@
   var activeController = null;
   var pendingAttachments = [];
 
-  var DEFAULT_ENDPOINTS = {
-    anthropic: 'https://api.anthropic.com/v1/messages',
-    openai: 'https://api.openai.com/v1/chat/completions'
-  };
-
-  var DEFAULT_MODELS = {
-    anthropic: 'claude-sonnet-5',
-    openai: 'gpt-4o-mini'
-  };
+  // External AI provider configuration intentionally removed: Legendary Engine only.
 
   // ---------------------------------------------------------------------
+  // Settings (global, shared across conversations)  // ---------------------------------------------------------------------
   // Settings (global, shared across conversations)
   // ---------------------------------------------------------------------
   function loadSettings() {
@@ -144,75 +137,26 @@
   }
 
   function applySettingsToForm() {
-    modeSelect.value = settings.mode || 'demo';
-
-    if (engineModelSelect) {
-      engineModelSelect.value = settings.engineModel || 'auto';
-    }
-
-    providerSelect.value = settings.provider || 'anthropic';
-    apiEndpoint.value =
-      settings.endpoint ||
-      DEFAULT_ENDPOINTS[settings.provider || 'anthropic'];
-
-    apiKey.value = settings.key || '';
-
-    apiModel.value =
-      settings.model ||
-      DEFAULT_MODELS[settings.provider || 'anthropic'];
-
-    systemPrompt.value = settings.system || '';
-    streamToggle.checked = settings.stream !== false;
+    modeSelect.value = "legendary";
+    if (engineModelSelect) engineModelSelect.value = settings.engineModel || "auto";
+    if (systemPrompt) systemPrompt.value = settings.system || "";
+    if (streamToggle) streamToggle.checked = false;
+    if (providerSelect) { providerSelect.value = "legendary"; providerSelect.disabled = true; }
+    if (apiEndpoint) { apiEndpoint.value = ""; apiEndpoint.disabled = true; }
+    if (apiKey) { apiKey.value = ""; apiKey.disabled = true; }
+    if (apiModel) { apiModel.value = ""; apiModel.disabled = true; }
   }
 
-  function updateModeLabel() {
-    if (settings.mode === 'legendary') {
-      chatModeLabel.textContent =
-        'Legendary Engine · ' +
-        (settings.engineModel === 'auto'
-          ? 'Auto · Local Sandbox'
-          : settings.engineModel === 'custom'
-            ? 'Custom Local'
-            : settings.engineModel);
-
-      if (chatDot) chatDot.classList.add('live');
-      return;
-    }
-
-    var live = settings.mode === 'live';
-
-    chatModeLabel.textContent = live
-      ? 'Chế độ AI thật (' +
-        (settings.provider === 'openai'
-          ? 'OpenAI-compatible'
-          : 'Anthropic-compatible') +
-        ')'
-      : 'Chế độ mô phỏng';
-
-    if (chatDot) {
-      chatDot.classList.toggle('live', live);
-    }
+    function updateModeLabel() {
+    chatModeLabel.textContent =
+      "Legendary Engine · " +
+      (settings.engineModel === "auto"
+        ? "Auto · Native Core"
+        : settings.engineModel === "custom"
+          ? "Custom Core"
+          : settings.engineModel);
+    if (chatDot) chatDot.classList.add("live");
   }
-
-  providerSelect.addEventListener('change', function () {
-    var p = providerSelect.value;
-
-    if (
-      !apiEndpoint.value ||
-      apiEndpoint.value === DEFAULT_ENDPOINTS.anthropic ||
-      apiEndpoint.value === DEFAULT_ENDPOINTS.openai
-    ) {
-      apiEndpoint.value = DEFAULT_ENDPOINTS[p];
-    }
-
-    if (
-      !apiModel.value ||
-      apiModel.value === DEFAULT_MODELS.anthropic ||
-      apiModel.value === DEFAULT_MODELS.openai
-    ) {
-      apiModel.value = DEFAULT_MODELS[p];
-    }
-  });
 
   settingsBtn.addEventListener('click', function () {
     settingsBackdrop.classList.add('open');
@@ -245,29 +189,23 @@
 
   saveSettings.addEventListener('click', function () {
     settings = {
-      mode: modeSelect.value,
-      engineModel: engineModelSelect
-        ? engineModelSelect.value
-        : 'legendary-6',
-      provider: providerSelect.value,
-      endpoint:
-        apiEndpoint.value.trim() ||
-        DEFAULT_ENDPOINTS[providerSelect.value],
-      key: apiKey.value.trim(),
-      model:
-        apiModel.value.trim() ||
-        DEFAULT_MODELS[providerSelect.value],
-      system: systemPrompt.value.trim(),
-      stream: streamToggle.checked
+      mode: "legendary",
+      engineModel: engineModelSelect ? engineModelSelect.value : "auto",
+      provider: "legendary",
+      endpoint: "",
+      key: "",
+      model: "",
+      system: systemPrompt ? systemPrompt.value.trim() : "",
+      stream: false
     };
-
     saveSettingsToStorage(settings);
     updateModeLabel();
     syncEngineModelAccess();
-    settingsBackdrop.classList.remove('open');
+    settingsBackdrop.classList.remove("open");
   });
 
   // ---------------------------------------------------------------------
+  // Conversations (multi-thread, persisted per browser)  // ---------------------------------------------------------------------
   // Conversations (multi-thread, persisted per browser)
   // ---------------------------------------------------------------------
   function uid() {
@@ -1288,395 +1226,9 @@
     return 'LegendaryAI đang chạy Local Sandbox nên không gọi Claude, ChatGPT hoặc API AI bên ngoài. Chế độ này dùng để kiểm tra hệ thống mà không cần API key thật.';
   }
 
-  // ---------------------------------------------------------------------
-  // Live mode: direct call to an Anthropic- or OpenAI-compatible endpoint
-  // ---------------------------------------------------------------------
-  function buildMessageContent(m, provider) {
-    var textPart = m.text || '';
-    var atts = m.attachments || [];
+  // External AI client path removed. All AI requests use Legendary Engine.
 
-    var textAttachments = atts.filter(function (a) {
-      return a.kind === 'text';
-    });
-
-    var imageAttachments = atts.filter(function (a) {
-      return a.kind === 'image';
-    });
-
-    var composed = textPart;
-
-    textAttachments.forEach(function (a) {
-      composed +=
-        '\n\n--- Tệp đính kèm: ' +
-        a.name +
-        ' ---\n' +
-        (a.textContent || '');
-    });
-
-    if (!imageAttachments.length) {
-      return composed || ' ';
-    }
-
-    var blocks = imageAttachments.map(
-      function (a) {
-        if (provider === 'openai') {
-          return {
-            type: 'image_url',
-            image_url: {
-              url: a.dataUrl
-            }
-          };
-        }
-
-        return {
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type:
-              a.mediaType || 'image/png',
-            data:
-              a.dataUrl.split(',')[1] || ''
-          }
-        };
-      }
-    );
-
-    blocks.push({
-      type: 'text',
-      text: composed || ' '
-    });
-
-    return blocks;
-  }
-
-  function buildRequestBody(provider, conv) {
-    var messages = conv.messages.map(
-      function (m) {
-        return {
-          role:
-            m.role === 'ai'
-              ? 'assistant'
-              : 'user',
-          content:
-            buildMessageContent(m, provider)
-        };
-      }
-    );
-
-    if (provider === 'openai') {
-      var oaMessages = messages.slice();
-
-      if (settings.system) {
-        oaMessages.unshift({
-          role: 'system',
-          content: settings.system
-        });
-      }
-
-      return {
-        model: settings.model,
-        max_tokens: 1024,
-        stream: !!settings.stream,
-        messages: oaMessages
-      };
-    }
-
-    var body = {
-      model: settings.model,
-      max_tokens: 1024,
-      stream: !!settings.stream,
-      messages: messages
-    };
-
-    if (settings.system) {
-      body.system = settings.system;
-    }
-
-    return body;
-  }
-
-  function buildHeaders(provider) {
-    if (provider === 'openai') {
-      return {
-        'Content-Type': 'application/json',
-        'Authorization':
-          'Bearer ' + settings.key
-      };
-    }
-
-    return {
-      'Content-Type': 'application/json',
-      'x-api-key': settings.key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access':
-        'true'
-    };
-  }
-
-  function extractNonStreamText(provider, data) {
-    if (provider === 'openai') {
-      if (
-        data &&
-        data.choices &&
-        data.choices[0] &&
-        data.choices[0].message
-      ) {
-        return (
-          data.choices[0].message.content ||
-          ''
-        ).trim();
-      }
-
-      return '';
-    }
-
-    if (data && data.content) {
-      return data.content
-        .map(function (b) {
-          return b.text || '';
-        })
-        .join('\n')
-        .trim();
-    }
-
-    return '';
-  }
-
-  function extractErrorMessage(data) {
-    if (data && data.error) {
-      return typeof data.error === 'string'
-        ? data.error
-        : (
-            data.error.message ||
-            JSON.stringify(data.error)
-          );
-    }
-
-    return null;
-  }
-
-  function readStream(
-    response,
-    provider,
-    onDelta,
-    onDone,
-    onError
-  ) {
-    var reader = response.body.getReader();
-    var decoder = new TextDecoder();
-    var buffer = '';
-
-    function pump() {
-      return reader.read().then(function (result) {
-        if (result.done) {
-          onDone();
-          return;
-        }
-
-        buffer += decoder.decode(
-          result.value,
-          { stream: true }
-        );
-
-        var lines = buffer.split('\n');
-        buffer = lines.pop();
-
-        lines.forEach(function (line) {
-          line = line.trim();
-
-          if (!line.startsWith('data:')) {
-            return;
-          }
-
-          var payload = line.slice(5).trim();
-
-          if (payload === '[DONE]') {
-            onDone();
-            return;
-          }
-
-          var json;
-
-          try {
-            json = JSON.parse(payload);
-          } catch (e) {
-            return;
-          }
-
-          if (provider === 'openai') {
-            var delta =
-              json.choices &&
-              json.choices[0] &&
-              json.choices[0].delta;
-
-            if (delta && delta.content) {
-              onDelta(delta.content);
-            }
-          } else {
-            if (
-              json.type ===
-                'content_block_delta' &&
-              json.delta &&
-              json.delta.text
-            ) {
-              onDelta(json.delta.text);
-            }
-
-            if (json.type === 'error') {
-              onError(
-                extractErrorMessage(json) ||
-                  'Lỗi luồng dữ liệu từ API.'
-              );
-            }
-          }
-        });
-
-        return pump();
-      });
-    }
-
-    return pump().catch(onError);
-  }
-
-  function callLiveAPI(conv) {
-    var typing = addTypingBubble();
-
-    var provider =
-      settings.provider === 'openai'
-        ? 'openai'
-        : 'anthropic';
-
-    var useStream =
-      settings.stream !== false;
-
-    activeController =
-      new AbortController();
-
-    toggleBusyUI(true);
-
-    if (streamStatus) {
-      streamStatus.textContent = useStream
-        ? 'Đang nhận phản hồi trực tiếp…'
-        : 'Đang chờ phản hồi…';
-    }
-
-    fetch(settings.endpoint, {
-      method: 'POST',
-      headers: buildHeaders(provider),
-      body: JSON.stringify(
-        buildRequestBody(provider, conv)
-      ),
-      signal: activeController.signal
-    })
-      .then(function (res) {
-        var contentType =
-          res.headers.get('content-type') ||
-          '';
-
-        if (
-          useStream &&
-          contentType.indexOf(
-            'text/event-stream'
-          ) !== -1 &&
-          res.body
-        ) {
-          typing.bubble.classList.remove(
-            'typing'
-          );
-
-          typing.bubble.textContent = '';
-
-          return readStream(
-            res,
-            provider,
-            function (delta) {
-              typing.raw += delta;
-              typing.bubble.textContent =
-                typing.raw;
-
-              chatWindow.scrollTop =
-                chatWindow.scrollHeight;
-            },
-            function () {
-              finalizeAiBubble(typing);
-              toggleBusyUI(false);
-
-              if (streamStatus) {
-                streamStatus.textContent = '';
-              }
-            },
-            function (err) {
-              setErrorBubble(
-                typing,
-                'Lỗi khi đọc luồng dữ liệu: ' +
-                  (err && err.message
-                    ? err.message
-                    : err)
-              );
-
-              toggleBusyUI(false);
-
-              if (streamStatus) {
-                streamStatus.textContent = '';
-              }
-            }
-          );
-        }
-
-        return res.json().then(function (data) {
-          var errMsg =
-            extractErrorMessage(data);
-
-          if (errMsg) {
-            setErrorBubble(
-              typing,
-              'Lỗi API: ' + errMsg
-            );
-          } else {
-            typing.raw =
-              extractNonStreamText(
-                provider,
-                data
-              );
-
-            finalizeAiBubble(typing);
-          }
-
-          toggleBusyUI(false);
-
-          if (streamStatus) {
-            streamStatus.textContent = '';
-          }
-        });
-      })
-      .catch(function (err) {
-        if (
-          err &&
-          err.name === 'AbortError'
-        ) {
-          setErrorBubble(
-            typing,
-            'Đã dừng phản hồi.'
-          );
-        } else {
-          setErrorBubble(
-            typing,
-            'Không thể kết nối tới API (có thể do CORS hoặc endpoint sai). Chi tiết: ' +
-              (err && err.message
-                ? err.message
-                : err)
-          );
-        }
-
-        toggleBusyUI(false);
-
-        if (streamStatus) {
-          streamStatus.textContent = '';
-        }
-      });
-  }
-  
-    function callLegendaryEngine(conv) {
+  function callLegendaryEngine(conv) {    function callLegendaryEngine(conv) {
     var typing = addTypingBubble();
 
     toggleBusyUI(true);
@@ -1738,34 +1290,16 @@
 
   function triggerAssistantResponse() {
     var conv = getActiveConv();
-
-    if (
-      settings.mode === 'legendary' &&
-      window.LegendaryAIEngine
-    ) {
+    if (window.LegendaryAIEngine) {
       callLegendaryEngine(conv);
       return;
     }
 
-    if (
-      settings.mode === 'live' &&
-      settings.key
-    ) {
-      callLiveAPI(conv);
-      return;
-    }
-
-    var lastUserText =
-      getLastUserMessageText(conv);
-
     var typing = addTypingBubble();
-
     setTimeout(function () {
-      typing.raw =
-        getDemoReply(lastUserText);
-
+      typing.raw = "Legendary Engine chưa được tải. Hãy tải lại trang và thử lại.";
       finalizeAiBubble(typing);
-    }, 650 + Math.random() * 500);
+    }, 300);
   }
 
   function toggleBusyUI(busy) {

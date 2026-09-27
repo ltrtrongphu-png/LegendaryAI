@@ -1,0 +1,107 @@
+/* LegendaryAI Hero v11 — containment + composition fix */
+/* Root cause fixed: v10 allowed the oversized hero visual to overflow into stats/features. */
+.hero.hero{
+  position:relative!important;
+  overflow:hidden!important;
+  min-height:650px!important;
+}
+.hero-visual.hero-visual{
+  position:relative!important;
+  min-height:500px!important;
+  height:500px!important;
+  overflow:hidden!important;
+  isolation:isolate!important;
+  display:grid!important;
+  place-items:center!important;
+  padding:0!important;
+}
+.hero-visual .legendary-3d-logo.legendary-3d-logo{
+  width:410px!important;
+  height:410px!important;
+  max-width:none!important;
+  max-height:none!important;
+  z-index:30!important;
+}
+.hero-visual .legendary-3d-logo-img.legendary-3d-logo-img{
+  width:360px!important;
+  height:360px!important;
+  max-width:none!important;
+  max-height:none!important;
+  z-index:40!important;
+}
+.hero-visual .legendary-logo-aura{
+  width:370px!important;
+  height:370px!important;
+  max-width:none!important;
+  max-height:none!important;
+}
+.hero-visual .logo-orbit{
+  width:410px!important;
+  height:126px!important;
+  margin:-63px 0 0 -205px!important;
+  max-width:none!important;
+}
+/* Keep all capability cards inside the visual frame. */
+.hero-visual.hero-visual::before{
+  left:4%!important;
+  top:11%!important;
+  max-width:205px!important;
+}
+.hero-visual.hero-visual::after{
+  left:5%!important;
+  bottom:10%!important;
+  max-width:205px!important;
+}
+.hero-visual .orb-badge.orb-badge{
+  left:auto!important;
+  right:4%!important;
+  top:7%!important;
+  z-index:75!important;
+}
+.hero-visual .orb-badge::before{
+  right:0!important;
+  top:135%!important;
+  transform:rotate(5deg)!important;
+  animation:la10Writing 7.6s ease-in-out infinite!important;
+}
+.hero-visual .orb-badge::after{
+  right:2%!important;
+  top:auto!important;
+  bottom:-265%!important;
+  transform:rotate(5deg)!important;
+  animation:la10Reason 8.2s ease-in-out infinite!important;
+}
+/* Prevent decorative layers from escaping the hero into later sections. */
+.hero.hero::before,.hero.hero::after{overflow:hidden!important;}
+@media(max-width:1100px){
+  .hero.hero{min-height:620px!important}
+  .hero-visual.hero-visual{min-height:470px!important;height:470px!important}
+  .hero-visual .legendary-3d-logo{width:380px!important;height:380px!important}
+  .hero-visual .legendary-3d-logo-img{width:335px!important;height:335px!important}
+  .hero-visual .legendary-logo-aura{width:345px!important;height:345px!important}
+  .hero-visual .logo-orbit{width:380px!important;margin-left:-190px!important}
+}
+@media(max-width:900px){
+  .hero.hero{min-height:auto!important;overflow:hidden!important}
+  .hero-visual.hero-visual{min-height:440px!important;height:440px!important}
+  .hero-visual .legendary-3d-logo{width:350px!important;height:350px!important}
+  .hero-visual .legendary-3d-logo-img{width:305px!important;height:305px!important}
+  .hero-visual .legendary-logo-aura{width:315px!important;height:315px!important}
+  .hero-visual .logo-orbit{width:350px!important;margin-left:-175px!important}
+  .hero-visual.hero-visual::before{left:1%!important;top:7%!important}
+  .hero-visual.hero-visual::after{left:1%!important;bottom:6%!important}
+  .hero-visual .orb-badge{right:1%!important;top:3%!important}
+  .hero-visual .orb-badge::before{right:0!important;top:125%!important}
+  .hero-visual .orb-badge::after{right:0!important;bottom:-245%!important}
+}
+@media(max-width:760px){
+  .hero-visual.hero-visual{min-height:380px!important;height:380px!important}
+  .hero-visual .legendary-3d-logo{width:300px!important;height:300px!important}
+  .hero-visual .legendary-3d-logo-img{width:260px!important;height:260px!important}
+  .hero-visual .legendary-logo-aura{width:275px!important;height:275px!important}
+  .hero-visual .logo-orbit{width:300px!important;margin-left:-150px!important}
+  .hero-visual.hero-visual::before,.hero-visual.hero-visual::after,.hero-visual .orb-badge::before,.hero-visual .orb-badge::after{min-width:120px!important;min-height:50px!important;padding:8px 10px!important;font-size:9px!important}
+  .hero-visual.hero-visual::before{left:0!important;top:4%!important}
+  .hero-visual.hero-visual::after{left:0!important;bottom:3%!important}
+  .hero-visual .orb-badge{right:0!important;top:1%!important}
+}

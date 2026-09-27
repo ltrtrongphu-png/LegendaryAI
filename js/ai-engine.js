@@ -15,7 +15,7 @@
     var requestBody = Object.assign({}, payload);
     delete requestBody.signal;
     var config = window.LEGENDARY_SUPABASE_CONFIG || {};
-    var baseUrl = String(config.url || '').replace(/\\/$/, '');
+    var baseUrl = String(config.url || '').replace(/\/$/, '');
     var anonKey = String(config.anonKey || '');
 
     if (!baseUrl || !anonKey) {

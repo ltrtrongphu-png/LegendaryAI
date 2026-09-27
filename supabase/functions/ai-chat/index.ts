@@ -306,6 +306,27 @@ async function ollamaResponse(
   return String(text);
 }
 
+const TOOL_PROMPTS: Record<string, string> = {
+  summarize: "Summarize the supplied material. Return the key points, decisions, risks, and next actions. Do not invent missing facts.",
+  rewrite: "Rewrite the user's material while preserving meaning. Improve clarity, structure, grammar, and tone. Return only the requested rewritten result unless explanation is requested.",
+  plan: "Create an actionable plan with goal, assumptions, ordered steps, dependencies, risks, and a verification checklist.",
+  code_review: "Perform a production-grade code review. Identify correctness bugs, security issues, edge cases, maintainability problems, and concrete fixes. Prioritize findings by severity.",
+  debug: "Debug systematically. Identify likely root cause, evidence, reproduction steps, and the smallest safe fix. Do not pretend to execute code.",
+  email: "Draft a complete send-ready email. Infer a professional structure from the request, but never invent sensitive facts.",
+  translate: "Translate accurately while preserving meaning, formatting, terminology, and tone. Do not add commentary unless asked.",
+  extract: "Extract the requested facts into a compact structured format. If JSON is requested, return valid JSON only.",
+  json: "Return valid JSON only. Do not wrap it in markdown fences. Preserve the requested schema exactly.",
+};
+
+function normalizeTool(value: unknown): string {
+  const tool = String(value || "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(TOOL_PROMPTS, tool) ? tool : "";
+}
+
+function toolInstruction(tool: string): string {
+  return tool && TOOL_PROMPTS[tool] ? "\n\nACTIVE TOOL MODE: " + tool + "\n" + TOOL_PROMPTS[tool] : "";
+}
+
 function modelName(modelKey: string): string {
   if (modelKey === "legendary-ultra-1") return "LegendaryUltra-1";
   if (modelKey === "legendary-pro-1") return "LegendaryPro-1";
@@ -554,12 +575,13 @@ Deno.serve(async (req) => {
   const lastUser = [...normalizedMessages].reverse().find((m: any) => m?.role === "user");
   const lastUserText = textFromContent(lastUser?.content);
 
+  const requestedTool = normalizeTool(body.tool);
   const effectiveSystem = memoryAugmentedSystem(
-    system,
+    system + toolInstruction(requestedTool),
     memories,
     profile.plan === "legendary" || profile.role === "owner" ? 24 : 10,
   );
-  const intent = detectIntent(lastUserText);
+  const intent = requestedTool || detectIntent(lastUserText);
 
   if (profile.memory_enabled) {
     const candidates = extractMemoryCandidates(lastUserText);
@@ -585,7 +607,13 @@ Deno.serve(async (req) => {
     Math.max(256, requestedOutput),
     Number(selectedModel.max_output_tokens || 4096),
   );
-  const reservation = Math.min(estimatedInputTokens + maxTokens, 20000);
+  const reservation = Math.max(
+    1,
+    Math.min(
+      estimatedInputTokens + maxTokens,
+      Number(profile.token_limit || 150000),
+    ),
+  );
 
   const { data: allowed, error: tokenError } = await supabase.rpc("consume_tokens", {
     p_amount: reservation,
@@ -611,7 +639,21 @@ Deno.serve(async (req) => {
 
     let text: string;
 
-    if (selectedModel.provider === "ollama-compatible") {
+    const deterministicArithmetic = requestedTool === "calculator"
+      ? safeArithmetic(
+          lastUserText
+            .replace(/^(?:tính|calculate|calculator|calc)[:\\s]*/i, "")
+            .trim(),
+        )
+      : null;
+
+    if (requestedTool === "calculator" && deterministicArithmetic === null) {
+      throw new Error("Calculator cần một biểu thức số học hợp lệ, ví dụ: 125 * (8 + 2).");
+    }
+
+    if (requestedTool === "calculator" && deterministicArithmetic !== null) {
+      text = `## Calculator\\n\\n**${deterministicArithmetic}**\\n\\nĐã tính bằng bộ máy số học an toàn của LegendaryAI.`;
+    } else if (selectedModel.provider === "ollama-compatible") {
       const baseUrl = selectedModel.base_url ||
         (selectedModel.base_url_env ? Deno.env.get(selectedModel.base_url_env) : "") ||
         "";
@@ -675,8 +717,9 @@ Deno.serve(async (req) => {
       plan: profile.plan,
       planFeatures,
       brain: {
-        version: "4.0",
+        version: "6.0",
         intent,
+        tool: requestedTool || null,
         route: selectedModel.key,
         memory: profile.memory_enabled,
         session_context: !!planFeatures.session_context,
@@ -686,6 +729,13 @@ Deno.serve(async (req) => {
           arithmetic: !!planFeatures.smart_math,
           quick_reasoning: !!planFeatures.quick_reasoning,
           smart_formatting: !!planFeatures.smart_formatting,
+          summarizer: true,
+          translator: true,
+          structured_output: true,
+          extraction: true,
+          planning: true,
+          code_review: true,
+          calculator: !!planFeatures.smart_math,
           memory: profile.memory_enabled,
           web_search: !!profile.web_search_enabled,
           vision: !!profile.vision_enabled,

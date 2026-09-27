@@ -15,6 +15,7 @@ const ADAPTIVE_MAX_MESSAGES = 48;
 const ADAPTIVE_MAX_CONTEXT_CHARS = 90_000;
 const RESPONSE_CACHE_TTL_MS = 15_000;
 const responseCache = new Map<string, { created: number; text: string }>();
+const SHIELD_BUCKET_MAX = 2000;
 
 function requestId() { return crypto.randomUUID(); }
 
@@ -48,6 +49,13 @@ function cacheSet(key:string,text:string) {
   if (responseCache.size > 500) responseCache.delete(responseCache.keys().next().value);
 }
 
+function cleanupShield(now:number) {
+  if (shieldBuckets.size <= SHIELD_BUCKET_MAX) return;
+  for (const [key, bucket] of shieldBuckets) {
+    if (now - bucket.started >= SHIELD_WINDOW_MS) shieldBuckets.delete(key);
+    if (shieldBuckets.size <= SHIELD_BUCKET_MAX) break;
+  }
+}
 function clientKey(req: Request, userId: string) {
   const forwarded = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "";
   const ip = forwarded.split(",")[0].trim();
@@ -56,6 +64,7 @@ function clientKey(req: Request, userId: string) {
 
 function shield(req: Request, userId: string, bodyText: string) {
   const now = Date.now();
+  cleanupShield(now);
   if (new TextEncoder().encode(bodyText).byteLength > SHIELD_MAX_BODY_BYTES) {
     return { ok: false, code: "REQUEST_TOO_LARGE", retryAfter: 60 };
   }
@@ -163,6 +172,7 @@ Deno.serve(async(req)=>{
 const ms=compactMessages(rawMessages);
 const reqId=requestId();
 if(!ms.length)return out(req,{error:"messages is required"},400);
+if(ms.length>120)return out(req,{error:"Too many messages",code:"TOO_MANY_MESSAGES"},400);
 const shieldResult=shield(req,u.data.user.id,JSON.stringify(body));
 if(!shieldResult.ok){
  const response=out(req,{error:"Legendary Shield đã chặn request quá nhanh/quá lớn.",code:shieldResult.code,retryAfter:shieldResult.retryAfter},429);

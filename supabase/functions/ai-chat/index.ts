@@ -34,6 +34,36 @@ const MODEL_BY_PLAN: Record<string, string> = {
   legendary: "legendary-ultra-1",
 };
 
+function routeModelByTask(plan: string, role: string, prompt: string): string {
+  const text = (prompt || "").toLowerCase();
+
+  if (role === "owner" && /vision|ảnh|image|hình ảnh|screenshot|camera|ocr/.test(text)) {
+    return "legendary-vision-109b";
+  }
+
+  if ((plan === "legendary" || role === "owner") &&
+      /reason|reasoning|suy luận|chứng minh|toán|math|logic|debug|kiến trúc|architecture|phân tích sâu/.test(text)) {
+    return "legendary-ultra-120b";
+  }
+
+  if ((plan === "pro" || plan === "legendary" || role === "owner") &&
+      /code|coding|javascript|typescript|python|sql|supabase|github|debug|lỗi|bug|api|backend|frontend/.test(text)) {
+    return "legendary-reasoner-32b";
+  }
+
+  return MODEL_BY_PLAN[plan] || MODEL_BY_PLAN.free;
+}
+
+function detectIntent(prompt: string): string {
+  const text = (prompt || "").toLowerCase();
+  if (/ảnh|image|vision|screenshot|ocr|hình/.test(text)) return "vision";
+  if (/code|coding|javascript|typescript|python|sql|debug|bug|api|supabase|github/.test(text)) return "coding";
+  if (/tính|math|toán|phương trình|calculate|logic|reason|suy luận|chứng minh/.test(text)) return "reasoning";
+  if (/viết|soạn|email|content|rewrite|dịch|translate/.test(text)) return "writing";
+  if (/tóm tắt|summarize|summary|tổng hợp/.test(text)) return "summarization";
+  return "general";
+}
+
 const SYSTEM_DEFAULT = `You are LegendaryAI, the native AI core of LegendaryAI.
 
 Core principles:
@@ -211,6 +241,36 @@ function modelName(modelKey: string): string {
   return "LegendaryLite-1";
 }
 
+function extractMemoryCandidates(prompt: string): string[] {
+  const p = (prompt || "").trim();
+  if (!p) return [];
+
+  const patterns = [
+    /(?:hãy nhớ|nhớ rằng|ghi nhớ|remember that)[:\\s]+(.{4,300})$/i,
+    /(?:tôi tên là|mình tên là|my name is)[:\\s]+(.{2,80})$/i,
+    /(?:tôi thích|mình thích|i like)[:\\s]+(.{3,200})$/i,
+    /(?:tôi không thích|mình không thích|i dislike)[:\\s]+(.{3,200})$/i,
+    /(?:tôi đang làm|mình đang làm|i am working on)[:\\s]+(.{3,240})$/i,
+  ];
+
+  const results: string[] = [];
+  for (const pattern of patterns) {
+    const match = p.match(pattern);
+    if (match?.[1]) results.push(match[1].trim());
+  }
+
+  return [...new Set(results)];
+}
+
+function memoryAugmentedSystem(system: string, memories: string[]): string {
+  if (!memories.length) return system;
+  const memoryBlock = memories
+    .slice(0, 10)
+    .map((m) => "- " + m)
+    .join("\n");
+  return system + "\n\nLONG-TERM MEMORY (trusted user-provided context; use only when relevant):\n" + memoryBlock;
+}
+
 function localLegendaryResponse(
   modelKey: string,
   messages: any[],
@@ -313,9 +373,11 @@ Deno.serve(async (req) => {
   if (profileError || !profile) return json({ error: "Profile not found.", code: "PROFILE_NOT_FOUND" }, 404, req);
 
   const requested = typeof body.model === "string" ? body.model.trim() : "";
+  const provisionalLastUser = [...messages].reverse().find((m: any) => m?.role === "user");
+  const provisionalPrompt = textFromContent(provisionalLastUser?.content);
   const requestedKey = requested && requested !== "auto"
     ? requested
-    : (MODEL_BY_PLAN[profile.plan] || MODEL_BY_PLAN.free);
+    : routeModelByTask(profile.plan, profile.role, provisionalPrompt);
 
   const { data: requestedModel } = await supabase
     .from("ai_models")
@@ -379,6 +441,24 @@ Deno.serve(async (req) => {
 
   const lastUser = [...normalizedMessages].reverse().find((m: any) => m?.role === "user");
   const lastUserText = textFromContent(lastUser?.content);
+
+  const effectiveSystem = memoryAugmentedSystem(system, memories);
+  const intent = detectIntent(lastUserText);
+
+  if (profile.memory_enabled) {
+    const candidates = extractMemoryCandidates(lastUserText);
+    for (const memory of candidates.slice(0, 3)) {
+      const exists = memories.some((m) => m.toLowerCase() === memory.toLowerCase());
+      if (!exists) {
+        await supabase.from("ai_memories").insert({
+          user_id: user.id,
+          memory,
+          source: "chat",
+          importance: /tên là|name is|hãy nhớ|nhớ rằng|remember/i.test(lastUserText) ? 9 : 7,
+        });
+      }
+    }
+  }
 
   const estimatedInputTokens = estimateTokens(
     normalizedMessages.map((m: any) => textFromContent(m.content)).join("\n")
@@ -470,10 +550,26 @@ Deno.serve(async (req) => {
       local: true,
       native: true,
       text,
+      brain: {
+        version: "3.0",
+        intent,
+        route: selectedModel.key,
+        memory: profile.memory_enabled,
+        memory_count: memories.length,
+        capabilities,
+        tools: {
+          arithmetic: true,
+          memory: profile.memory_enabled,
+          web_search: !!profile.web_search_enabled,
+          vision: !!profile.vision_enabled,
+          self_hosted_models: true,
+        },
+      },
       usage: {
         estimated_input_tokens: estimatedInputTokens,
         estimated_output_tokens: estimatedOutputTokens,
         reserved_tokens: reservation,
+        request_ms: Date.now() - requestStarted,
       },
     }, 200, req);
   } catch (error) {

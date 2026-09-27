@@ -54,22 +54,14 @@
       return Object.assign({
         mode: 'legendary',
         engineModel: 'auto',
-        provider: 'anthropic',
-        endpoint: '',
-        key: '',
-        model: DEFAULT_MODELS.anthropic,
-        system: '',
+        provider: 'legendary', endpoint: '', key: '', model: '', system: '',
         stream: true
       }, parsed || {});
     } catch (e) {
       return {
         mode: 'legendary',
         engineModel: 'auto',
-        provider: 'anthropic',
-        endpoint: '',
-        key: '',
-        model: DEFAULT_MODELS.anthropic,
-        system: '',
+        provider: 'legendary', endpoint: '', key: '', model: '', system: '',
         stream: true
       };
     }
@@ -220,6 +212,7 @@
     return {
       id: uid(),
       title: 'Cuộc trò chuyện mới',
+      slug: 'cuoc-tro-chuyen',
       createdAt: Date.now(),
       messages: [
         {
@@ -247,16 +240,123 @@
   }
 
   var conversations = loadConversations();
-  var activeId = null;
 
-  try {
-    activeId = localStorage.getItem(ACTIVE_KEY);
-  } catch (e) {
-    /* ignore */
+  function slugify(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\\u0300-\\u036f]/g, '')
+      .toLowerCase()
+      .replace(/đ/g, 'd')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 70) || 'cuoc-tro-chuyen';
   }
 
-  if (!activeId || !findConv(activeId)) {
-    activeId = conversations[0].id;
+  function routeSlug() {
+    var path = window.location.pathname.replace(/\\/+$/, '') || '/';
+    var match = path.match(/^\\/chat\\/([^/]+)$/i);
+    if (!match) return null;
+    try {
+      return decodeURIComponent(match[1]);
+    } catch (e) {
+      return match[1];
+    }
+  }
+
+  function isNewRoute() {
+    return /^\\/new\\/?$/i.test(window.location.pathname);
+  }
+
+  function uniqueConversationSlug(conv) {
+    var base = slugify(conv.title);
+    var candidate = base;
+    var n = 2;
+
+    while (conversations.some(function (other) {
+      return other.id !== conv.id && other.slug === candidate;
+    })) {
+      candidate = base + '-' + n++;
+    }
+
+    conv.slug = candidate;
+    return candidate;
+  }
+
+  function ensureConversationSlugs() {
+    conversations.forEach(function (conv) {
+      if (!conv.slug) uniqueConversationSlug(conv);
+    });
+  }
+
+  ensureConversationSlugs();
+
+  var requestedSlug = routeSlug();
+  var activeId = null;
+
+  if (requestedSlug) {
+    var routed = conversations.find(function (conv) {
+      return conv.slug === requestedSlug;
+    });
+
+    if (!routed) {
+      routed = {
+        id: uid(),
+        title: requestedSlug
+          .split('-')
+          .map(function (part) {
+            return part ? part.charAt(0).toUpperCase() + part.slice(1) : '';
+          })
+          .join(' ') || 'Cuộc trò chuyện mới',
+        slug: requestedSlug,
+        createdAt: Date.now(),
+        messages: [{
+          role: 'ai',
+          text: 'Xin chào! Đây là cuộc trò chuyện ' +
+            requestedSlug + '. Bạn muốn bắt đầu với điều gì?',
+          attachments: []
+        }]
+      };
+      conversations.unshift(routed);
+    }
+
+    activeId = routed.id;
+  } else if (isNewRoute()) {
+    var fresh = makeNewConversation();
+    uniqueConversationSlug(fresh);
+    conversations.unshift(fresh);
+    activeId = fresh.id;
+  } else {
+    try {
+      activeId = localStorage.getItem(ACTIVE_KEY);
+    } catch (e) {
+      /* ignore */
+    }
+
+    if (!activeId || !conversations.some(function (conv) {
+      return conv.id === activeId;
+    })) {
+      activeId = conversations[0].id;
+    }
+  }
+
+  function syncRouteForConversation(conv, replace) {
+    if (!conv) return;
+
+    if (!conv.slug || conv.slug !== slugify(conv.title)) {
+      uniqueConversationSlug(conv);
+    }
+
+    var target = '/chat/' + encodeURIComponent(conv.slug);
+    var current = window.location.pathname;
+
+    if (current !== target) {
+      if (replace) window.history.replaceState({ conversationId: conv.id }, '', target);
+      else window.history.pushState({ conversationId: conv.id }, '', target);
+    }
+  }
+
+  function goToNewRoute() {
+    window.history.pushState({ newConversation: true }, '', '/new');
   }
 
   function persistConversations() {
@@ -303,6 +403,8 @@
     conv.title = t.length > 42
       ? t.slice(0, 42) + '…'
       : t;
+
+    uniqueConversationSlug(conv);
   }
 
   function newConversation() {
@@ -310,9 +412,11 @@
 
     conversations.unshift(conv);
     activeId = conv.id;
+    uniqueConversationSlug(conv);
 
     persistConversations();
     persistActiveId();
+    goToNewRoute();
 
     renderSidebar();
     renderMessages();
@@ -330,6 +434,7 @@
     activeId = id;
 
     persistActiveId();
+    syncRouteForConversation(findConv(id), true);
     renderSidebar();
     renderMessages();
     closeSidebarMobile();
@@ -377,7 +482,13 @@
       (newTitle || '').trim().slice(0, 60) ||
       'Cuộc trò chuyện mới';
 
+    uniqueConversationSlug(conv);
     persistConversations();
+
+    if (conv.id === activeId) {
+      syncRouteForConversation(conv, true);
+    }
+
     renderSidebar();
   }
 
@@ -1524,11 +1635,15 @@
         return;
       }
 
+      var convBeforeReply = getActiveConv();
+
       addMessage(
         'user',
         text,
         pendingAttachments.slice()
       );
+
+      syncRouteForConversation(convBeforeReply, false);
 
       pendingAttachments = [];
 
@@ -1581,6 +1696,40 @@
   // ---------------------------------------------------------------------
   // Init
   // ---------------------------------------------------------------------
+  window.addEventListener('popstate', function () {
+    var slug = routeSlug();
+
+    if (slug) {
+      var conv = conversations.find(function (item) {
+        return item.slug === slug;
+      });
+
+      if (conv) {
+        activeId = conv.id;
+        persistActiveId();
+        renderSidebar();
+        renderMessages();
+        return;
+      }
+    }
+
+    if (isNewRoute()) {
+      var fresh = makeNewConversation();
+      uniqueConversationSlug(fresh);
+      conversations.unshift(fresh);
+      activeId = fresh.id;
+      persistActiveId();
+      renderSidebar();
+      renderMessages();
+    }
+  });
+
+  persistConversations();
+  persistActiveId();
+  if (!isNewRoute() && !requestedSlug) {
+    syncRouteForConversation(getActiveConv(), true);
+  }
+
   renderSidebar();
   renderMessages();
 

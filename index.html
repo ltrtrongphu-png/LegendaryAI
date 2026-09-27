@@ -212,98 +212,6 @@
     </div>
   </section>
 
-  <!-- DEMO CHAT -->
-  <section id="demo" class="demo wrap">
-    <div class="section-head reveal">
-      <p class="section-tag">Dùng thử</p>
-      <h2>Trò chuyện trực tiếp</h2>
-      <p>Chat sử dụng <strong>Legendary Engine · Native Core</strong>. External AI đang tạm ngừng; website chỉ đi qua Legendary Engine và Supabase backend.</p>
-    </div>
-    <div class="chat-app reveal" id="chatApp">
-      <aside class="chat-sidebar" id="chatSidebar">
-        <button type="button" class="chat-new-btn" id="newChatBtn">+ Trò chuyện mới</button>
-        <div class="chat-conv-list" id="convList"></div>
-        <p class="chat-sidebar-note">Hội thoại có thể đồng bộ Supabase khi đăng nhập; bản nháp vẫn được giữ cục bộ.</p>
-      </aside>
-      <div class="chat-shell" id="chatShell">
-        <div class="chat-topbar">
-          <div class="chat-topbar-left">
-            <button type="button" id="sidebarToggle" class="btn btn-ghost btn-sm chat-icon-btn" aria-label="Danh sách hội thoại" aria-expanded="false" title="Danh sách hội thoại">☰</button>
-            <span class="chat-dot" id="chatDot"></span>
-            <span id="chatModeLabel">Legendary Engine</span>
-            <span class="chat-token-hud" id="chatTokenHud" aria-live="polite" title="Số token còn lại trong cửa sổ hiện tại">
-              <span class="chat-token-icon">◈</span>
-              <strong id="chatTokensRemaining">—</strong>
-              <span>token còn lại</span>
-            </span>
-          </div>
-          <div class="chat-topbar-right">
-            <button id="clearChatBtn" class="btn btn-ghost btn-sm" title="Xoá tin nhắn trong hội thoại này">🗑 Xoá</button>
-            <button type="button" id="expandChatBtn" class="btn btn-ghost btn-sm chat-icon-btn" aria-label="Phóng to toàn màn hình" title="Phóng to toàn màn hình">⤢</button>
-            <button id="settingsBtn" class="btn btn-ghost btn-sm">⚙ Cài đặt</button>
-          </div>
-        </div>
-        <div class="chat-window" id="chatWindow" role="log" aria-live="polite"></div>
-        <div class="chat-attach-preview" id="attachPreview" hidden></div>
-        <div class="chat-suggestions" id="chatSuggestions">
-          <button type="button" data-suggest="Giúp tôi debug một đoạn mã JavaScript">Debug mã JS</button>
-          <button type="button" data-suggest="Viết giúp tôi một email xin nghỉ phép lịch sự">Soạn email</button>
-          <button type="button" data-suggest="Tóm tắt nội dung sau và rút ra 5 ý chính: ">Tóm tắt</button>
-          <button type="button" data-suggest="Viết lại nội dung sau theo văn phong chuyên nghiệp, rõ ràng: ">Viết lại</button>
-          <button type="button" data-suggest="Lập kế hoạch từng bước để hoàn thành mục tiêu sau: ">Lập kế hoạch</button>
-          <button type="button" data-suggest="Phân tích đoạn code sau, tìm bug và đề xuất cách sửa: ">Code Review</button>
-        </div>
-        <form id="chatForm" class="chat-input-row">
-          <input type="file" id="fileInput" accept="image/*,.txt,.md,.csv,.json,.log" multiple hidden>
-          <button type="button" class="btn btn-ghost chat-icon-btn" id="attachBtn" title="Đính kèm ảnh/tệp" aria-label="Đính kèm ảnh hoặc tệp">📎</button>
-          <textarea id="chatInput" rows="1" placeholder="Nhập câu hỏi của bạn… (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
-          <button type="submit" class="btn btn-primary" id="sendBtn">Gửi</button>
-          <button type="button" class="btn btn-outline" id="stopBtn" hidden>Dừng</button>
-        </form>
-        <div class="chat-meta">
-          <span id="chatCharCount">0 ký tự</span>
-          <span id="chatStreamStatus"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Settings modal -->
-    <div class="modal-backdrop" id="settingsBackdrop">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-        <div class="modal-head">
-          <h3 id="settingsTitle">Cài đặt kết nối AI</h3>
-          <button class="btn btn-ghost btn-sm" id="closeSettings" aria-label="Đóng">✕</button>
-        </div>
-        <p class="modal-note">Legendary Engine xử lý chat. Tạo ảnh dùng Image Provider · GPT Image 2 qua Supabase Edge Function; API key chỉ nằm ở server, không đưa vào trình duyệt.</p>
-        <label>Chế độ
-          <select id="modeSelect">
-            <option value="legendary">Legendary Engine · Native Core</option>
-          </select>
-        </label>
-        <label>Model Engine
-          <select id="engineModelSelect">
-            <option value="auto">Auto · theo gói</option>
-            <option value="legendary-lite-1">LegendaryLite-1 · Free</option>
-            <option value="legendary-pro-1">LegendaryPro-1 · Pro</option>
-            <option value="legendary-vision-pro-11b">Legendary Vision Pro 11B · Self-hosted Vision</option>
-            <option value="legendary-ultra-1">LegendaryUltra-1 · Legendary</option>
-            <option value="custom">Custom Core · Owner</option>
-            <option value="legendary-reasoner-32b">Legendary Reasoner 32B · Self-hosted</option>
-            <option value="legendary-ultra-120b">Legendary Ultra 120B · Self-hosted</option>
-            <option value="legendary-vision-109b">Legendary Vision 109B · Self-hosted Vision</option>
-          </select>
-        </label>
-        <div class="external-ai-disabled"><strong>Image Provider · GPT Image 2</strong><span>Chat vẫn đi qua Legendary Engine. Khi bạn yêu cầu tạo ảnh, website gọi Image Provider qua backend an toàn.</span></div>
-        <label>Chỉ dẫn hệ thống (tuỳ chọn)
-          <input type="text" id="systemPrompt" placeholder="Ví dụ: Trả lời ngắn gọn, bằng tiếng Việt">
-        </label>
-        <label class="modal-check"><input type="checkbox" id="streamToggle" checked> Phản hồi tối ưu (backend response)</label>
-        <p class="modal-warn">✓ Legendary Engine Only. External AI đang tạm ngừng và không có API key AI nào được yêu cầu ở trình duyệt.</p>
-        <button class="btn btn-primary" id="saveSettings">Lưu cài đặt</button>
-      </div>
-    </div>
-  </section>
-
   <!-- COMPARE -->
   <section id="compare" class="compare wrap">
     <div class="section-head reveal">
@@ -448,6 +356,99 @@
       </details>
     </div>
   </section>
+
+  <!-- DEMO CHAT -->
+  <section id="demo" class="demo wrap">
+    <div class="section-head reveal">
+      <p class="section-tag">Dùng thử</p>
+      <h2>Trò chuyện trực tiếp</h2>
+      <p>Chat sử dụng <strong>Legendary Engine · Native Core</strong>; tạo ảnh được chuyển riêng qua <strong>Image Provider · GPT Image 2</strong>.</p>
+    </div>
+    <div class="chat-app reveal" id="chatApp">
+      <aside class="chat-sidebar" id="chatSidebar">
+        <button type="button" class="chat-new-btn" id="newChatBtn">+ Trò chuyện mới</button>
+        <div class="chat-conv-list" id="convList"></div>
+        <p class="chat-sidebar-note">Hội thoại có thể đồng bộ Supabase khi đăng nhập; bản nháp vẫn được giữ cục bộ.</p>
+      </aside>
+      <div class="chat-shell" id="chatShell">
+        <div class="chat-topbar">
+          <div class="chat-topbar-left">
+            <button type="button" id="sidebarToggle" class="btn btn-ghost btn-sm chat-icon-btn" aria-label="Danh sách hội thoại" aria-expanded="false" title="Danh sách hội thoại">☰</button>
+            <span class="chat-dot" id="chatDot"></span>
+            <span id="chatModeLabel">Legendary Engine</span>
+            <span class="chat-token-hud" id="chatTokenHud" aria-live="polite" title="Số token còn lại trong cửa sổ hiện tại">
+              <span class="chat-token-icon">◈</span>
+              <strong id="chatTokensRemaining">—</strong>
+              <span>token còn lại</span>
+            </span>
+          </div>
+          <div class="chat-topbar-right">
+            <button id="clearChatBtn" class="btn btn-ghost btn-sm" title="Xoá tin nhắn trong hội thoại này">🗑 Xoá</button>
+            <button type="button" id="expandChatBtn" class="btn btn-ghost btn-sm chat-icon-btn" aria-label="Phóng to toàn màn hình" title="Phóng to toàn màn hình">⤢</button>
+            <button id="settingsBtn" class="btn btn-ghost btn-sm">⚙ Cài đặt</button>
+          </div>
+        </div>
+        <div class="chat-window" id="chatWindow" role="log" aria-live="polite"></div>
+        <div class="chat-attach-preview" id="attachPreview" hidden></div>
+        <div class="chat-suggestions" id="chatSuggestions">
+          <button type="button" data-suggest="Giúp tôi debug một đoạn mã JavaScript">Debug mã JS</button>
+          <button type="button" data-suggest="Viết giúp tôi một email xin nghỉ phép lịch sự">Soạn email</button>
+          <button type="button" data-suggest="Tóm tắt nội dung sau và rút ra 5 ý chính: ">Tóm tắt</button>
+          <button type="button" data-suggest="Viết lại nội dung sau theo văn phong chuyên nghiệp, rõ ràng: ">Viết lại</button>
+          <button type="button" data-suggest="Lập kế hoạch từng bước để hoàn thành mục tiêu sau: ">Lập kế hoạch</button>
+          <button type="button" data-suggest="Phân tích đoạn code sau, tìm bug và đề xuất cách sửa: ">Code Review</button>
+        </div>
+        <form id="chatForm" class="chat-input-row">
+          <input type="file" id="fileInput" accept="image/*,.txt,.md,.csv,.json,.log" multiple hidden>
+          <button type="button" class="btn btn-ghost chat-icon-btn" id="attachBtn" title="Đính kèm ảnh/tệp" aria-label="Đính kèm ảnh hoặc tệp">📎</button>
+          <textarea id="chatInput" rows="1" placeholder="Nhập câu hỏi của bạn… (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
+          <button type="submit" class="btn btn-primary" id="sendBtn">Gửi</button>
+          <button type="button" class="btn btn-outline" id="stopBtn" hidden>Dừng</button>
+        </form>
+        <div class="chat-meta">
+          <span id="chatCharCount">0 ký tự</span>
+          <span id="chatStreamStatus"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div class="modal-backdrop" id="settingsBackdrop">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="modal-head">
+          <h3 id="settingsTitle">Cài đặt kết nối AI</h3>
+          <button class="btn btn-ghost btn-sm" id="closeSettings" aria-label="Đóng">✕</button>
+        </div>
+        <p class="modal-note">Legendary Engine xử lý chat. Tạo ảnh dùng Image Provider · GPT Image 2 qua Supabase Edge Function; API key chỉ nằm ở server, không đưa vào trình duyệt.</p>
+        <label>Chế độ
+          <select id="modeSelect">
+            <option value="legendary">Legendary Engine · Native Core</option>
+          </select>
+        </label>
+        <label>Model Engine
+          <select id="engineModelSelect">
+            <option value="auto">Auto · theo gói</option>
+            <option value="legendary-lite-1">LegendaryLite-1 · Free</option>
+            <option value="legendary-pro-1">LegendaryPro-1 · Pro</option>
+            <option value="legendary-vision-pro-11b">Legendary Vision Pro 11B · Self-hosted Vision</option>
+            <option value="legendary-ultra-1">LegendaryUltra-1 · Legendary</option>
+            <option value="custom">Custom Core · Owner</option>
+            <option value="legendary-reasoner-32b">Legendary Reasoner 32B · Self-hosted</option>
+            <option value="legendary-ultra-120b">Legendary Ultra 120B · Self-hosted</option>
+            <option value="legendary-vision-109b">Legendary Vision 109B · Self-hosted Vision</option>
+          </select>
+        </label>
+        <div class="external-ai-disabled"><strong>Image Provider · GPT Image 2</strong><span>Chat vẫn đi qua Legendary Engine. Khi bạn yêu cầu tạo ảnh, website gọi Image Provider qua backend an toàn.</span></div>
+        <label>Chỉ dẫn hệ thống (tuỳ chọn)
+          <input type="text" id="systemPrompt" placeholder="Ví dụ: Trả lời ngắn gọn, bằng tiếng Việt">
+        </label>
+        <label class="modal-check"><input type="checkbox" id="streamToggle" checked> Phản hồi tối ưu (backend response)</label>
+        <p class="modal-warn">✓ Legendary Engine Only. External AI đang tạm ngừng và không có API key AI nào được yêu cầu ở trình duyệt.</p>
+        <button class="btn btn-primary" id="saveSettings">Lưu cài đặt</button>
+      </div>
+    </div>
+  </section>
+
 
   <!-- CTA BAND -->
   <section class="cta-band wrap">

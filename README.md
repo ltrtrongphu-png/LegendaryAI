@@ -178,6 +178,31 @@ Legendary Engine hiện tập trung vào:
 
 **Quan trọng:** Native Legendary Core hiện là engine/orchestration nội bộ, chưa phải một foundation model neural có năng lực ngang ChatGPT/Claude. Muốn có khả năng sinh ngôn ngữ tự do ở mức foundation-model, cần triển khai một model backend/weights riêng của LegendaryAI. Việc này có thể làm sau mà không cần đưa API key vào frontend.
 
+### Native high-end model profiles
+
+LegendaryAI now has a self-hosted model gateway in `ai-chat` for Ollama-compatible servers. The catalog includes:
+
+- **Legendary Reasoner 32B** → `qwen3:30b`
+- **Legendary Ultra 120B** → `gpt-oss:120b`
+- **Legendary Vision 109B** → `llama4:scout`
+
+These profiles are intentionally disabled until a self-hosted inference server is configured. This keeps the product independent of third-party AI APIs while avoiding fake claims that a large model is already running.
+
+Ollama exposes these model families through its local API; Qwen3 provides a 235B option, gpt-oss provides a 120B option, and Llama 4 provides multimodal Scout/Maverick variants.
+
+Set the Supabase Edge Function secret:
+
+`LEGENDARY_LOCAL_AI_URL=https://your-private-ollama-server`
+
+Then enable the desired `ai_models` row. Do not put this URL or any private inference credentials in browser JavaScript.
+
+### Conversation URLs
+
+- `/new` creates a fresh chat.
+- After the first user message, the route becomes `/chat/<ten-chat>`.
+- Conversation slugs are persisted in Supabase so cloud sync can keep deep links stable.
+- Browser Back/Forward switches conversations without losing the current thread.
+
 ### Deploy
 
 Frontend trên Vercel có thể tự deploy khi push GitHub nếu project Vercel đã liên kết repo.

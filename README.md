@@ -87,12 +87,11 @@ Cấu hình các secret ở Supabase Edge Functions:
 
 SUPABASE_SERVICE_ROLE_KEY
 SITE_URL
-AI_FREE_API_URL
-AI_FREE_API_KEY
-AI_PRO_API_URL
-AI_PRO_API_KEY
-AI_LEGENDARY_API_URL
-AI_LEGENDARY_API_KEY
+LEGENDARY_LOCAL_AI_URL
+MOMO_PARTNER_CODE
+MOMO_ACCESS_KEY
+MOMO_SECRET_KEY
+MOMO_ENDPOINT
 
 Nếu muốn dùng model khác, sửa model registry trong:
 
@@ -103,11 +102,11 @@ hoặc chỉnh các bản ghi trong bảng public.ai_models bằng Owner.
 Các model mặc định là product profiles, không phải tên của một foundation model do repo tự huấn luyện:
 
 Free      → legendary-lite-1
-Pro       → legendary-pro-1
-Legendary → legendary-ultra-1
-Owner     → custom
+Pro       → auto → Reasoner 32B* / Vision Pro 11B* → fallback LegendaryPro-1
+Legendary → auto → Ultra 120B* / Vision 109B* → fallback LegendaryUltra-1
+Owner     → custom / toàn quyền model registry
 
-Endpoint model nên tương thích OpenAI Chat Completions để dùng trực tiếp với gateway hiện tại.
+* Model self-hosted chỉ được chọn khi bản ghi ai_models đã enabled.
 
 3. Deploy Edge Functions
 
@@ -132,7 +131,7 @@ Chat Legendary AI
   ↓
 Supabase Edge Function: ai-chat
   ↓
-Model backend (OpenAI-compatible)
+Model backend (Legendary native hoặc self-hosted Ollama-compatible)
   ↓
 Trả câu trả lời về website
 
@@ -161,8 +160,8 @@ LegendaryAI hiện sử dụng **Legendary Engine** làm đường AI duy nhất
 | Gói | Model profile | Backend |
 |---|---|---|
 | Free | LegendaryLite-1 | Native Legendary Core |
-| Pro | LegendaryPro-1 | Native Legendary Core |
-| Legendary | LegendaryUltra-1 | Native Legendary Core |
+| Pro | Reasoner 32B* / Vision Pro 11B* / LegendaryPro-1 fallback | Native + self-hosted Ollama |
+| Legendary | Ultra 120B* / Vision 109B* / LegendaryUltra-1 fallback | Native + self-hosted Ollama |
 | Owner | Legendary Custom Core | Native Legendary Core |
 
 External AI (Claude / OpenAI / ChatGPT / Anthropic) đang **tạm ngừng hỗ trợ** ở frontend và gateway. Browser không cần, không lưu và không gửi API key AI bên ngoài.
@@ -172,6 +171,7 @@ Legendary Engine hiện tập trung vào:
 - context dài, chuẩn hoá lịch sử hội thoại và token reservation;
 - memory retrieval khi tài khoản được bật memory;
 - core tính toán số học an toàn;
+- multimodal image payloads qua Ollama cho các gói đã bật vision;
 - các bộ xử lý chuyên biệt cho code/debug, viết, tóm tắt và giải thích;
 - usage logging, quota và refund khi engine lỗi;
 - CORS/error handling rõ ràng ở Supabase Edge Function.
@@ -182,19 +182,26 @@ Legendary Engine hiện tập trung vào:
 
 LegendaryAI now has a self-hosted model gateway in `ai-chat` for Ollama-compatible servers. The catalog includes:
 
-- **Legendary Reasoner 32B** → `qwen3:30b`
-- **Legendary Ultra 120B** → `gpt-oss:120b`
-- **Legendary Vision 109B** → `llama4:scout`
+- **Legendary Reasoner 32B** → `qwen3:30b` (Pro)
+- **Legendary Vision Pro 11B** → `llama3.2-vision:11b` (Pro)
+- **Legendary Ultra 120B** → `gpt-oss:120b` (Legendary)
+- **Legendary Vision 109B** → `llama4:scout` (Legendary)
 
 These profiles are intentionally disabled until a self-hosted inference server is configured. This keeps the product independent of third-party AI APIs while avoiding fake claims that a large model is already running.
 
-Ollama exposes these model families through its local API; Qwen3 provides a 235B option, gpt-oss provides a 120B option, and Llama 4 provides multimodal Scout/Maverick variants.
+Ollama exposes the configured model families through its local API. The Pro vision profile uses Llama 3.2 Vision 11B; the larger reasoning/vision profiles remain disabled until the private inference server is ready.
 
 Set the Supabase Edge Function secret:
 
 `LEGENDARY_LOCAL_AI_URL=https://your-private-ollama-server`
 
 Then enable the desired `ai_models` row. Do not put this URL or any private inference credentials in browser JavaScript.
+
+### Paid plans
+
+- **Pro — 149.000đ/tháng:** 2.000.000 token/ngày, Reasoner 32B*, Vision Pro 11B*, long context, memory, Prompt Studio và export Markdown.
+- **Legendary — 399.000đ/tháng:** 6.000.000 token/ngày, Ultra 120B*, Vision 109B*, Advanced Memory và routing model cao cấp.
+- **Free — 0đ/tháng:** 100.000 token/ngày và LegendaryLite-1.
 
 ### Conversation URLs
 

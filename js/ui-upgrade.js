@@ -32,6 +32,51 @@
     return n;
   }
 
+  function injectHeroExperience(){
+    var visual=document.querySelector('.hero-visual');
+    var logo=document.querySelector('.legendary-3d-logo');
+    if(!visual || !logo || visual.dataset.heroFxReady==='true') return;
+    visual.dataset.heroFxReady='true';
+
+    // Give the transparent atom mark real visual thickness while keeping the
+    // original SVG as the front face. The depth layers rotate with it.
+    var img=logo.querySelector('.legendary-3d-logo-img');
+    if(img){
+      for(var i=1;i<=7;i++){
+        var layer=img.cloneNode(true);
+        layer.className='legendary-3d-depth depth-'+i;
+        layer.setAttribute('aria-hidden','true');
+        logo.insertBefore(layer,img);
+      }
+    }
+
+    var glow=el('div','legendary-logo-aura');
+    logo.appendChild(glow);
+    ['logo-orbit-a','logo-orbit-b','logo-orbit-c'].forEach(function(cls){
+      logo.appendChild(el('div','logo-orbit '+cls));
+    });
+
+    var cards=[
+      {cls:'code',icon:'</>',title:'Code',sub:'Build · Debug · Optimize',accent:'cyan'},
+      {cls:'live',icon:'⚡',title:'Phản hồi theo thời gian thực',sub:'Low latency · Native core',accent:'blue'},
+      {cls:'writing',icon:'▤',title:'Writing',sub:'Docs · Content · Publish',accent:'violet'},
+      {cls:'vision',icon:'◫',title:'Vision',sub:'Image · Files · Create',accent:'cyan'},
+      {cls:'reasoning',icon:'✦',title:'Reasoning',sub:'Context · Logic · Connect',accent:'violet'}
+    ];
+
+    var layer=el('div','hero-float-layer');
+    cards.forEach(function(item){
+      var card=el('div','hero-float-card '+item.cls+' '+item.accent);
+      card.appendChild(el('span','hero-card-icon',item.icon));
+      var copy=el('span','hero-card-copy');
+      copy.appendChild(el('strong','hero-card-title',item.title));
+      copy.appendChild(el('span','hero-card-sub',item.sub));
+      card.appendChild(copy);
+      layer.appendChild(card);
+    });
+    visual.appendChild(layer);
+  }
+
   function injectModelDock(){
     var chat=document.getElementById('chatApp');
     var demo=document.getElementById('demo');
@@ -56,8 +101,7 @@
     var banner=el('div','la-engine-banner');
     banner.appendChild(el('span','la-live-dot'));
     banner.appendChild(el('span','Native Engine · '));
-    var strong=el('b','', 'External AI providers disabled');
-    banner.appendChild(strong);
+    banner.appendChild(el('b','', 'External AI providers disabled'));
 
     if(demo){
       var head=demo.querySelector('.section-head');
@@ -101,6 +145,7 @@
   }
 
   function boot(){
+    injectHeroExperience();
     injectModelDock();
     updateClaims();
     var backend=window.LegendaryBackend;

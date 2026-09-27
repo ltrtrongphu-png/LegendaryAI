@@ -713,6 +713,7 @@ Deno.serve(async (req) => {
       reserved_tokens: reservation,
       request_ms: Date.now() - requestStarted,
       status: "success",
+      tool_key: requestedTool || null,
     });
 
     const edgeRuntime = (globalThis as any).EdgeRuntime;

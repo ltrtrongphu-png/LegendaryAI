@@ -7,7 +7,11 @@
   // Capture image requests here so they always reach the real image provider.
   // ---------------------------------------------------------------------
   function isImageGenerationPrompt(text) {
-    return /(?:\b(?:tạo|vẽ|generate|draw|create)\b.*\b(?:ảnh|hình|image|picture)\b|\b(?:ảnh|hình|image|picture)\b.*\b(?:tạo|vẽ|generate|draw|create)\b)/i.test(String(text || ''));
+    var x = String(text || '').trim().toLowerCase();
+    if (!x) return false;
+    if (/(?:^|\s)(?:vẽ|draw)(?:\s|$)/i.test(x)) return true;
+    return /(?:^|\s)(?:tạo|generate|create)(?:\s|$)/i.test(x) &&
+      /(?:ảnh|hình|image|picture|illustration|art|wallpaper|avatar|logo|poster|thumbnail|photo|meme)/i.test(x);
   }
 
   function escapeImageAlt(text) {

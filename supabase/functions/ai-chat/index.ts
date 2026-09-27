@@ -324,6 +324,20 @@ function normalizeTool(value: unknown): string {
   return Object.prototype.hasOwnProperty.call(TOOL_PROMPTS, tool) ? tool : "";
 }
 
+function inferTool(prompt: string): string {
+  const text = String(prompt || "").toLowerCase();
+  if (/^(tính|calculate|calculator|calc)[:\\s]/.test(text) || /^(?:[-+]?\\d+(?:[.,]\\d+)?\\s*[+\\-*/%×÷()\\s]+)$/.test(text)) return "calculator";
+  if (/tóm tắt|summarize|summary|rút gọn/.test(text)) return "summarize";
+  if (/viết lại|rewrite|paraphrase/.test(text)) return "rewrite";
+  if (/lập kế hoạch|plan|roadmap|kế hoạch từng bước/.test(text)) return "plan";
+  if (/code review|review code|review đoạn code/.test(text)) return "code_review";
+  if (/debug|gỡ lỗi|tìm bug|sửa lỗi/.test(text)) return "debug";
+  if (/soạn email|viết email|draft email/.test(text)) return "email";
+  if (/dịch sang|translate|dịch đoạn/.test(text)) return "translate";
+  if (/json|trích xuất|extract|tách dữ liệu/.test(text)) return "extract";
+  return "";
+}
+
 function toolInstruction(tool: string): string {
   return tool && TOOL_PROMPTS[tool] ? "\n\nACTIVE TOOL MODE: " + tool + "\n" + TOOL_PROMPTS[tool] : "";
 }
@@ -576,7 +590,7 @@ Deno.serve(async (req) => {
   const lastUser = [...normalizedMessages].reverse().find((m: any) => m?.role === "user");
   const lastUserText = textFromContent(lastUser?.content);
 
-  const requestedTool = normalizeTool(body.tool);
+  const requestedTool = normalizeTool(body.tool) || inferTool(lastUserText);
   const effectiveSystem = memoryAugmentedSystem(
     system + toolInstruction(requestedTool),
     memories,

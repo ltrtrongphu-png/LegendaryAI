@@ -42,11 +42,15 @@ const FALLBACK_BY_PLAN: Record<string, string> = {
 
 const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> = {
   free: {
-    token_limit: 100000,
+    token_limit: 150000,
     memory: false,
+    session_context: true,
     vision: false,
     file_analysis: false,
     advanced_reasoning: false,
+    quick_reasoning: true,
+    smart_math: true,
+    smart_formatting: true,
     advanced_memory: false,
     long_context: false,
     priority: false,
@@ -388,6 +392,18 @@ function localLegendaryResponse(
     return `## Tóm tắt context hiện có\n\n${source || "Chưa có đủ nội dung nguồn để tóm tắt."}\n\n> Đây là bản tóm tắt từ context đã gửi cho Legendary Engine; chưa có web search trong phiên này.`;
   }
 
+  if (/(checklist|liệt kê|danh sách|bullet|gạch đầu dòng)/i.test(prompt)) {
+    const items = prompt
+      .replace(/^(hãy|giúp tôi|cho tôi|tạo|làm)\s+/i, "")
+      .split(/[,;]|\s+và\s+/i)
+      .map((x) => x.trim())
+      .filter((x) => x.length > 2)
+      .slice(0, 10);
+    return items.length > 1
+      ? "## Checklist nhanh\n\n" + items.map((x, i) => (i + 1) + ". " + x).join("\n") + "\n\n**Free Quick Mode** · LegendaryLite-1"
+      : "## Checklist nhanh\n\n- Làm rõ mục tiêu\n- Chia việc thành bước nhỏ\n- Kiểm tra kết quả\n\n**Free Quick Mode** · LegendaryLite-1";
+  }
+
   if (/(ai là|what is|là gì|giải thích|explain)/i.test(prompt)) {
     return `## Phân tích yêu cầu\n\nBạn đang hỏi: **${prompt}**\n\nLegendary Engine hiện ưu tiên trả lời từ context, memory và các năng lực core đã triển khai. Với dữ liệu kiến thức bên ngoài chưa có trong context, mình sẽ không giả vờ đã tra web.\n\n**Memory liên quan:**\n${memoryText || "- Không có memory được lưu cho phiên này."}`;
   }
@@ -651,10 +667,13 @@ Deno.serve(async (req) => {
         intent,
         route: selectedModel.key,
         memory: profile.memory_enabled,
+        session_context: !!planFeatures.session_context,
         memory_count: memories.length,
         capabilities,
         tools: {
-          arithmetic: true,
+          arithmetic: !!planFeatures.smart_math,
+          quick_reasoning: !!planFeatures.quick_reasoning,
+          smart_formatting: !!planFeatures.smart_formatting,
           memory: profile.memory_enabled,
           web_search: !!profile.web_search_enabled,
           vision: !!profile.vision_enabled,

@@ -1,6 +1,27 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     { "source": "/new", "destination": "/" },
     { "source": "/chat/:slug", "destination": "/" }
+  ],
+  "headers": [
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Link",
+          "value": "</css/hero-v5.css>; rel=\"stylesheet\""
+        }
+      ]
+    },
+    {
+      "source": "/css/hero-v5.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
   ]
 }

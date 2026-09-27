@@ -15,8 +15,8 @@ function cors(body: unknown, status = 200): Response {
 }
 
 const PLAN = {
-  pro: { amount: 299000, name: "Legendary AI Pro" },
-  legendary: { amount: 899000, name: "Legendary AI Legendary" },
+  pro: { amount: 149000, name: "Legendary AI Pro" },
+  legendary: { amount: 399000, name: "Legendary AI Legendary" },
 } as const;
 
 Deno.serve(async (req) => {

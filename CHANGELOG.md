@@ -1,23 +1,28 @@
 # LegendaryAI Changelog
 
+## 1.1.3
+- Hardened client retry behavior: **429 rate-limit responses are no longer automatically retried**, preventing retry amplification.
+- Added bounded client request retry/backoff behavior for transient server failures.
+- Hardened local conversation persistence against browser storage quotas.
+- Large base64 image attachments are no longer allowed to silently break the entire local chat history.
+- Truncated oversized persisted attachment text while keeping the active in-memory conversation intact.
+- Fixed attachment context formatting so file contents are sent with real line breaks.
+- Hardened **Legendary Shield** memory by pruning stale rate-limit buckets.
+- Added explicit chat-context validation.
+- Hardened image generation with prompt-size limits, per-user request limits, bounded rate-limit memory and upstream timeout protection.
+- Keeps **Adaptive Intelligence 1.1.2**, **Legendary Brain 9.0**, and **Legendary Shield 1.1.0**.
+
 ## 1.1.2
-- Added **Resilient Adaptive Intelligence**.
-- Adds intent-aware output budgets so short tasks do not reserve unnecessarily large output windows while code/reasoning tasks retain larger budgets.
-- Adds graceful fallback from a configured Ollama-compatible Local AI route to Native Core when the local model is unavailable or times out.
-- Reports the actual route and fallback state in the response brain metadata.
-- Adds a request ID to successful AI responses for easier troubleshooting.
-- Separates native/local route mode in the response cache key so a cached Native Core answer is not reused after Local AI becomes available.
-- Keeps **Legendary Adaptive Intelligence 1.1.1** and **Legendary Shield 1.1.0** protections.
-- No external AI API key is required for the Native Core or fallback path.
+- Added Resilient Adaptive Intelligence.
+- Added intent-aware output budgets.
+- Added Local AI → Native Core fallback.
+- Added route/fallback observability and request IDs.
+- Separated Local AI and Native Core cache routes.
 
 ## 1.1.1
-- Added **Adaptive Intelligence Layer**.
-- Compacts long conversations to a bounded, recent context window before inference.
-- Adds short-lived, user-scoped response caching to reduce duplicate compute.
-- Adds request IDs and latency/performance telemetry in the AI response.
-- Reports raw vs compacted context size and cache hits for observability.
-- Keeps existing Legendary Shield 1.1.0 protection.
-- No external AI API key is required for the Native Core path.
+- Added Adaptive Intelligence Layer.
+- Compacted long conversations to a bounded recent context window.
+- Added short-lived response caching and performance telemetry.
 
 ## 1.1.0
 - Legendary Brain 9.0 structured reasoning.
@@ -25,6 +30,6 @@
 - Versioning baseline and changelog.
 
 ### Versioning policy
-- Patch: 1.1.0 -> 1.1.1 for fixes/optimizations.
+- Patch: 1.1.x -> 1.1.x+1 for fixes/optimizations.
 - Minor: 1.1.x -> 1.2.0 for substantial new features.
 - Major: 1.x.x -> 2.0.0 for breaking changes.

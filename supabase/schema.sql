@@ -383,3 +383,44 @@ $$;
 
 revoke all on function public.refund_tokens(integer) from public;
 grant execute on function public.refund_tokens(integer) to authenticated;
+
+-- Was missing entirely: supabase/functions/ai-chat/index.ts calls this after
+-- every successful reply to true the reservation made by consume_tokens()
+-- down to the actual tokens used. Without it, every request permanently
+-- keeps the full pessimistic reservation (input + max_tokens, e.g. 4096+)
+-- charged against tokens_used even though the real reply used far less --
+-- draining the account's budget after a fraction of the messages it should
+-- actually allow, and eventually causing spurious TOKEN_LIMIT errors.
+create or replace function public.finalize_tokens(p_reserved integer, p_actual integer)
+returns table (
+  tokens_used integer,
+  tokens_remaining integer,
+  token_limit integer,
+  token_reset_at timestamptz
+)
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  delta integer := coalesce(p_actual, 0) - coalesce(p_reserved, 0);
+begin
+  if uid is null then
+    return;
+  end if;
+
+  return query
+  update public.profiles p
+     set tokens_used = greatest(p.tokens_used + delta, 0),
+         updated_at = now()
+   where p.id = uid
+  returning
+    p.tokens_used,
+    greatest(p.token_limit - p.tokens_used, 0),
+    p.token_limit,
+    p.token_reset_at;
+end;
+$$;
+
+revoke all on function public.finalize_tokens(integer, integer) from public;
+grant execute on function public.finalize_tokens(integer, integer) to authenticated;

@@ -79,10 +79,27 @@
 .msg-user .msg-bubble{border-radius:16px 16px 4px 16px!important;}
 .msg-ai .msg-bubble{border-radius:16px 16px 16px 4px!important;}
 .chat-token-hud{
-  top:14px!important;border-radius:999px!important;
+  top:14px!important;
+  right:18px!important;
+  min-width:150px;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:6px!important;
+  padding:8px 14px!important;
+  border-radius:999px!important;
   background:var(--la-glass-strong)!important;
   box-shadow:0 10px 30px rgba(0,0,0,.16);
+  white-space:nowrap!important;
+  z-index:5;
 }
+.chat-token-hud strong{
+  display:inline-block;
+  min-width:0;
+  font-variant-numeric:tabular-nums;
+  color:var(--text)!important;
+}
+.chat-token-reset{display:none!important;}
 .chat-suggestions{padding:12px 18px 2px!important;}
 .chat-suggestions button{
   border-radius:999px!important;background:rgba(126,168,255,.045)!important;

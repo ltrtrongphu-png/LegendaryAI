@@ -55,7 +55,6 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     memory: false,
     session_context: true,
     vision: false,
-    file_analysis: false,
     advanced_reasoning: false,
     quick_reasoning: true,
     smart_math: true,
@@ -79,7 +78,6 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     smart_formatting: true,
     advanced_memory: false,
     long_context: true,
-    file_analysis: true,
     web_search: false,
     priority: true,
     token_reset_hours: 12,
@@ -96,7 +94,6 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     smart_formatting: true,
     advanced_memory: true,
     long_context: true,
-    file_analysis: true,
     web_search: false,
     priority: true,
     token_reset_hours: 18,
@@ -527,7 +524,7 @@ Deno.serve(async (req) => {
 
   const { data: requestedModel } = await supabase
     .from("ai_models")
-    .select("key,display_name,tier,provider,model_id,context_window,max_output_tokens,capabilities,system_prompt,enabled")
+    .select("key,display_name,tier,provider,model_id,context_window,max_output_tokens,capabilities,system_prompt,enabled,base_url,base_url_env")
     .eq("key", requestedKey)
     .eq("enabled", true)
     .maybeSingle();
@@ -546,7 +543,7 @@ Deno.serve(async (req) => {
     let fallback = null;
     const { data: entitledModel } = await supabase
       .from("ai_models")
-      .select("key,display_name,tier,provider,model_id,context_window,max_output_tokens,capabilities,system_prompt,enabled")
+      .select("key,display_name,tier,provider,model_id,context_window,max_output_tokens,capabilities,system_prompt,enabled,base_url,base_url_env")
       .eq("key", entitledKey)
       .eq("enabled", true)
       .maybeSingle();
@@ -555,7 +552,7 @@ Deno.serve(async (req) => {
     if (!fallback && fallbackKey !== entitledKey) {
       const { data: safeFallback } = await supabase
         .from("ai_models")
-        .select("key,display_name,tier,provider,model_id,context_window,max_output_tokens,capabilities,system_prompt,enabled")
+        .select("key,display_name,tier,provider,model_id,context_window,max_output_tokens,capabilities,system_prompt,enabled,base_url,base_url_env")
         .eq("key", fallbackKey)
         .eq("enabled", true)
         .maybeSingle();

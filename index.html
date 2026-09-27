@@ -212,7 +212,7 @@
     <div class="section-head reveal">
       <p class="section-tag">Dùng thử</p>
       <h2>Trò chuyện trực tiếp</h2>
-      <p>Chat sử dụng <strong>Legendary Engine · Local Sandbox</strong> mặc định. Không gọi Claude/ChatGPT và không cần API key AI thật. Bạn vẫn có đăng nhập, nhiều hội thoại, quota, model routing và Supabase backend để kiểm thử toàn bộ hệ thống.</p>
+      <p>Chat sử dụng <strong>Legendary Engine · Native Core</strong>. External AI đang tạm ngừng; website chỉ đi qua Legendary Engine và Supabase backend.</p>
     </div>
     <div class="chat-app reveal" id="chatApp">
       <aside class="chat-sidebar" id="chatSidebar">
@@ -261,11 +261,10 @@
           <h3 id="settingsTitle">Cài đặt kết nối AI</h3>
           <button class="btn btn-ghost btn-sm" id="closeSettings" aria-label="Đóng">✕</button>
         </div>
-        <p class="modal-note">Legendary Engine gọi model qua backend an toàn. API key của model không nằm trong trình duyệt. Chế độ API riêng vẫn hỗ trợ endpoint OpenAI-compatible/Anthropic-compatible cho nhu cầu cá nhân.</p>
+        <p class="modal-note">Legendary Engine là đường AI duy nhất của website. External AI đang tạm ngừng; trình duyệt không lưu hoặc gửi API key AI bên ngoài.</p>
         <label>Chế độ
           <select id="modeSelect">
-            <option value="legendary">Legendary Engine · Local Sandbox</option>
-            <option value="demo">Demo UI (offline)</option>
+            <option value="legendary">Legendary Engine · Native Core</option>
           </select>
         </label>
         <label>Model Engine
@@ -277,32 +276,12 @@
             <option value="custom">Custom Model · Owner</option>
           </select>
         </label>
-        <div class="external-ai-disabled">
-          <strong>External AI tạm thời tắt</strong>
-          <span>Claude / ChatGPT / OpenAI API / Anthropic API chưa được sử dụng. Legendary Engine hiện chạy Local Sandbox, không cần API key AI.</span>
-        </div>
-        <label class="external-ai-field">Nhà cung cấp / định dạng API
-          <select id="providerSelect">
-            <option value="anthropic">Anthropic-compatible (/v1/messages)</option>
-            <option value="openai">OpenAI-compatible (/chat/completions)</option>
-          </select>
-        </label>
-        <label class="external-ai-field">API endpoint
-          <input type="text" id="apiEndpoint" placeholder="Tạm thời không sử dụng">
-        </label>
-        <div class="row2 external-ai-field">
-          <label>API key
-            <input type="password" id="apiKey" placeholder="Không cần">
-          </label>
-          <label>Model
-            <input type="text" id="apiModel" placeholder="Không cần">
-          </label>
-        </div>
+        <div class="external-ai-disabled"><strong>Legendary Engine Only</strong><span>Claude / ChatGPT / OpenAI / Anthropic và API AI ngoài đang tạm ngừng. Mọi yêu cầu chat đi qua Legendary Engine.</span></div>
         <label>Chỉ dẫn hệ thống (tuỳ chọn)
           <input type="text" id="systemPrompt" placeholder="Ví dụ: Trả lời ngắn gọn, bằng tiếng Việt">
         </label>
         <label class="modal-check"><input type="checkbox" id="streamToggle" checked> Bật phản hồi trực tiếp (streaming)</label>
-        <p class="modal-warn">✓ Hiện tại không cần API key AI. Legendary Engine chạy Local Sandbox qua Supabase Edge Function. Khi bạn muốn gắn foundation model thật, có thể bật lại provider backend sau.</p>
+        <p class="modal-warn">✓ Legendary Engine Only. External AI đang tạm ngừng và không có API key AI nào được yêu cầu ở trình duyệt.</p>
         <button class="btn btn-primary" id="saveSettings">Lưu cài đặt</button>
       </div>
     </div>

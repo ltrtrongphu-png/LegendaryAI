@@ -211,6 +211,7 @@
     note.querySelector('.owner-close').addEventListener('click', function(){ note.remove(); });
     try {
       var result = await supabase.functions.invoke('owner-stats', {
+        method: 'GET',
         headers: { Authorization: 'Bearer ' + await window.LegendaryBackend.getAccessToken() }
       });
       if (result.error || !result.data) throw new Error((result.data && result.data.error) || result.error.message || 'Không tải được dashboard.');

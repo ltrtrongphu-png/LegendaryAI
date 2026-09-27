@@ -9,7 +9,7 @@ create table if not exists public.profiles (
   avatar_url text,
   role text not null default 'user' check (role in ('user','admin','owner')),
   plan text not null default 'free' check (plan in ('free','pro','legendary')),
-  token_limit integer not null default 100000,
+  token_limit integer not null default 150000,
   memory_enabled boolean not null default false,
   vision_enabled boolean not null default false,
   web_search_enabled boolean not null default false,
@@ -355,7 +355,7 @@ set
     when role = 'owner' then greatest(token_limit, 6000000)
     when plan = 'legendary' then 6000000
     when plan = 'pro' then 2000000
-    else 100000
+    else 150000
   end,
   vision_enabled = (plan in ('pro','legendary') or role = 'owner'),
   memory_enabled = (plan in ('pro','legendary') or role = 'owner'),

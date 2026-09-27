@@ -54,6 +54,8 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     advanced_memory: false,
     long_context: false,
     priority: false,
+    token_reset_hours: 6,
+    manual_reset: false,
   },
   pro: {
     token_limit: 2000000,
@@ -64,6 +66,8 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     advanced_memory: false,
     long_context: true,
     priority: true,
+    token_reset_hours: 12,
+    manual_reset: true,
   },
   legendary: {
     token_limit: 6000000,
@@ -74,6 +78,8 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     advanced_memory: true,
     long_context: true,
     priority: true,
+    token_reset_hours: 18,
+    manual_reset: true,
   },
 };
 

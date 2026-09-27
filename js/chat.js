@@ -112,7 +112,7 @@
 
       if (key === 'auto') allowed = !!profile;
       else if (key === 'legendary-lite-1') allowed = true;
-      else if (key === 'legendary-pro-1') allowed =
+      else if (key === 'legendary-pro-1' || key === 'legendary-vision-pro-11b') allowed =
         role === 'owner' || plan === 'pro' || plan === 'legendary';
       else if (key === 'legendary-ultra-1') allowed =
         role === 'owner' || plan === 'legendary';

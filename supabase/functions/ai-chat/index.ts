@@ -509,7 +509,7 @@ Deno.serve(async (req) => {
         baseUrl,
         selectedModel.model_id,
         normalizedMessages,
-        system,
+        effectiveSystem,
         maxTokens,
         temperature,
       );
@@ -517,7 +517,7 @@ Deno.serve(async (req) => {
       text = localLegendaryResponse(
         selectedModel.key,
         normalizedMessages,
-        system,
+        effectiveSystem,
         memories,
       );
     }

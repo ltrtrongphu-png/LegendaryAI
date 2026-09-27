@@ -1,23 +1,50 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+const configuredSiteUrl = (Deno.env.get("SITE_URL") || "").replace(/\/$/, "");
+const baseCorsHeaders = {
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Credentials": "true",
+};
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    ...baseCorsHeaders,
+    "Access-Control-Allow-Origin": configuredSiteUrl || origin || "*",
+    "Vary": "Origin",
+  };
+}
+
+function json(body: unknown, status = 200, req?: Request) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      ...(req ? corsHeaders(req) : baseCorsHeaders),
+    },
+  });
+}
+
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok");
-  if (req.method !== "POST") return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { "Content-Type": "application/json" } });
+  const cors = corsHeaders(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, req);
 
   const auth = req.headers.get("Authorization");
-  if (!auth) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  if (!auth) return json({ error: "Unauthorized" }, 401, req);
 
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !key) return new Response(JSON.stringify({ error: "Server configuration missing" }), { status: 503, headers: { "Content-Type": "application/json" } });
+  if (!url || !key) return json({ error: "Server configuration missing" }, 503, req);
 
   const admin = createClient(url, key, { global: { headers: { Authorization: auth } } });
   const { data: { user }, error: userError } = await admin.auth.getUser();
-  if (userError || !user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  if (userError || !user) return json({ error: "Unauthorized" }, 401, req);
 
   const { data, error } = await admin.rpc("manual_reset_tokens");
-  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { "Content-Type": "application/json" } });
+  if (error) return json({ error: error.message }, 400, req);
 
   const row = Array.isArray(data) ? data[0] : data;
-  return new Response(JSON.stringify(row || { success: false }), { status: 200, headers: { "Content-Type": "application/json" } });
+  return json(row || { success: false }, 200, req);
 });

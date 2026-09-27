@@ -108,6 +108,10 @@
       else if (key === 'legendary-ultra-1') allowed =
         role === 'owner' || plan === 'legendary';
       else if (key === 'custom') allowed = role === 'owner';
+      else if (key === 'legendary-reasoner-32b') allowed =
+        role === 'owner' || plan === 'pro' || plan === 'legendary';
+      else if (key === 'legendary-ultra-120b' || key === 'legendary-vision-109b') allowed =
+        role === 'owner' || plan === 'legendary';
 
       options[i].disabled = !allowed;
     }

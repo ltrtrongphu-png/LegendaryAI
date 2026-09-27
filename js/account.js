@@ -252,6 +252,12 @@
       btn.textContent = 'Đăng nhập';
       btn.addEventListener('click', function () { openAuthModal('login'); });
       accountArea.appendChild(btn);
+      var headerCta = document.getElementById('headerTrialCta');
+      if (headerCta) {
+        headerCta.textContent = 'Dùng thử ngay';
+        headerCta.href = '#demo';
+        headerCta.title = 'Dùng thử Legendary AI';
+      }
       renderPricingState(null);
       return;
     }
@@ -452,7 +458,9 @@
     });
   }
 
-  renderAccountArea();
+  renderAccountArea().then(function () {
+    window.dispatchEvent(new CustomEvent('legendary:profile-ready'));
+  });
   window.LegendaryAuth = {
     currentUser: async function () { return LegendaryBackend.getUser(); },
     logoutUser: signOut,

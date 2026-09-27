@@ -156,6 +156,54 @@ function safeArithmetic(input: string): number | null {
   }
 }
 
+async function ollamaResponse(
+  baseUrl: string,
+  modelId: string,
+  messages: any[],
+  system: string,
+  maxTokens: number,
+  temperature: number,
+): Promise<string> {
+  const url = baseUrl.replace(/\/$/, "") + "/api/chat";
+  const payloadMessages = [
+    ...(system ? [{ role: "system", content: system }] : []),
+    ...messages.map((m: any) => ({
+      role: m.role === "assistant" ? "assistant" : m.role === "system" ? "system" : "user",
+      content: textFromContent(m.content),
+    })),
+  ];
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: modelId,
+      messages: payloadMessages,
+      stream: false,
+      options: {
+        temperature,
+        num_predict: maxTokens,
+      },
+    }),
+  });
+
+  const raw = await response.text();
+  if (!response.ok) {
+    throw new Error(`Self-hosted model error (${response.status}): ${raw.slice(0, 600)}`);
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error("Self-hosted model returned invalid JSON.");
+  }
+
+  const text = data?.message?.content || data?.response || "";
+  if (!text) throw new Error("Self-hosted model returned no text.");
+  return String(text);
+}
+
 function modelName(modelKey: string): string {
   if (modelKey === "legendary-ultra-1") return "LegendaryUltra-1";
   if (modelKey === "legendary-pro-1") return "LegendaryPro-1";
@@ -281,7 +329,7 @@ Deno.serve(async (req) => {
 
   if (
     !selectedModel ||
-    selectedModel.provider !== "local" ||
+    !["local", "ollama-compatible"].includes(selectedModel.provider) ||
     !tierAllowed(profile.role, profile.plan, selectedModel.tier)
   ) {
     const entitledKey = MODEL_BY_PLAN[profile.plan] || MODEL_BY_PLAN.free;
@@ -360,12 +408,39 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const text = localLegendaryResponse(
-      selectedModel.key,
-      normalizedMessages,
-      system,
-      memories,
+    const temperature = Math.min(
+      1.5,
+      Math.max(0, Number(body.temperature ?? 0.35)),
     );
+
+    let text: string;
+
+    if (selectedModel.provider === "ollama-compatible") {
+      const baseUrl = selectedModel.base_url ||
+        (selectedModel.base_url_env ? Deno.env.get(selectedModel.base_url_env) : "") ||
+        "";
+      if (!baseUrl) {
+        throw new Error(
+          "Self-hosted model chưa được cấu hình. Đặt secret LEGENDARY_LOCAL_AI_URL trong Supabase trước khi bật model này.",
+        );
+      }
+
+      text = await ollamaResponse(
+        baseUrl,
+        selectedModel.model_id,
+        normalizedMessages,
+        system,
+        maxTokens,
+        temperature,
+      );
+    } else {
+      text = localLegendaryResponse(
+        selectedModel.key,
+        normalizedMessages,
+        system,
+        memories,
+      );
+    }
 
     const estimatedOutputTokens = estimateTokens(text);
 

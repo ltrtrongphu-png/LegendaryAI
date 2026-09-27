@@ -420,24 +420,29 @@
     }
   }
 
+  // Normalize legacy /chat/:slug and /new links back to the canonical homepage URL.
+  if (window.location.pathname !== '/') {
+    window.history.replaceState({ canonical: true }, '', '/');
+  }
+
   function syncRouteForConversation(conv, replace) {
     if (!conv) return;
-
     if (!conv.slug || conv.slug !== slugify(conv.title)) {
       uniqueConversationSlug(conv);
     }
 
-    var target = '/chat/' + encodeURIComponent(conv.slug);
-    var current = window.location.pathname;
-
-    if (current !== target) {
-      if (replace) window.history.replaceState({ conversationId: conv.id }, '', target);
-      else window.history.pushState({ conversationId: conv.id }, '', target);
+    // LegendaryAI intentionally keeps the public URL at the homepage.
+    // Conversation state is persisted locally/Supabase instead of exposing
+    // conversation slugs in the browser URL.
+    if (window.location.pathname !== '/') {
+      window.history.replaceState({ conversationId: conv.id }, '', '/');
     }
   }
 
   function goToNewRoute() {
-    window.history.pushState({ newConversation: true }, '', '/new');
+    if (window.location.pathname !== '/') {
+      window.history.replaceState({ newConversation: true }, '', '/');
+    }
   }
 
   function persistConversations() {
@@ -1428,17 +1433,17 @@
     {
       match: /(tài liệu|báo cáo|hợp đồng|viết|email)/i,
       reply:
-        'Legendary AI có thể soạn thảo tài liệu hoàn chỉnh theo đúng giọng văn và cấu trúc bạn cần — chỉ cần mô tả mục đích, đối tượng đọc và độ dài mong muốn.'
+        'Legendary AI có thể hỗ trợ soạn thảo tài liệu theo đúng giọng văn và cấu trúc bạn cần — chỉ cần mô tả mục đích, đối tượng đọc và độ dài mong muốn.'
     },
     {
       match: /(tìm kiếm|tra cứu|thông tin mới)/i,
       reply:
-        'Ở chế độ AI thật, Legendary AI tra cứu thông tin cập nhật và tổng hợp lại kèm nguồn tham khảo rõ ràng.'
+        'LegendaryAI hiện không bật web search mặc định; khi có search gateway thật, tính năng này mới được kích hoạt.'
     },
     {
       match: /(token|giá|gói|pricing|so sánh)/i,
       reply:
-        'Gói Legendary cấp hạn mức tối đa **1.000.000 token mỗi ngày**. Bạn có thể xem chi tiết các gói ở phần "Chọn gói phù hợp" phía dưới, hoặc bảng so sánh ở phần "So sánh".'
+        'Gói Legendary cấp hạn mức tối đa **6.000.000 token mỗi cửa sổ 18 giờ**. Bạn có thể xem chi tiết các gói ở phần "Chọn gói phù hợp" phía dưới, hoặc bảng so sánh ở phần "So sánh".'
     },
     {
       match: /(xin chào|hello|hi|chào)/i,

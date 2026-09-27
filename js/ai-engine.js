@@ -12,33 +12,66 @@
 
   async function invokeWithRetry(payload, token) {
     var lastError = null;
+    var config = window.LEGENDARY_SUPABASE_CONFIG || {};
+    var baseUrl = String(config.url || '').replace(/\\/$/, '');
+    var anonKey = String(config.anonKey || '');
+
+    if (!baseUrl || !anonKey) {
+      return { error: new Error('Supabase client chưa được cấu hình.') };
+    }
 
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
-        var result = await sb.functions.invoke('ai-chat', {
-          body: payload,
+        // Use a direct fetch here instead of supabase.functions.invoke().
+        // This makes the Edge Function request explicit and avoids client-side
+        // invoke wrapper failures while preserving Supabase JWT + CORS auth.
+        var response = await fetch(baseUrl + '/functions/v1/ai-chat', {
+          method: 'POST',
           headers: {
-            Authorization: 'Bearer ' + token
-          }
+            'Content-Type': 'application/json',
+            'apikey': anonKey,
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify(payload)
         });
 
-        if (!result.error) {
-          return result;
+        var raw = await response.text();
+        var data = null;
+
+        try {
+          data = raw ? JSON.parse(raw) : null;
+        } catch (_) {
+          data = null;
         }
 
-        lastError = result.error;
+        if (response.ok) {
+          return { data: data };
+        }
 
-        // Retry only transient gateway/network failures.
-        var status = result.error.context && result.error.context.status;
-        if (status && status !== 408 && status !== 429 && status < 500) {
-          return result;
+        var serverMessage =
+          (data && (data.error || data.message || data.msg)) ||
+          raw.slice(0, 800) ||
+          ('HTTP ' + response.status);
+
+        lastError = new Error(
+          'Edge Function HTTP ' + response.status + ': ' + serverMessage
+        );
+
+        // Do not retry authentication, permission, validation, or token-limit
+        // failures. Retry only transient 408/429/5xx responses.
+        if (
+          response.status !== 408 &&
+          response.status !== 429 &&
+          response.status < 500
+        ) {
+          return { error: lastError, data: data };
         }
       } catch (error) {
         lastError = error;
       }
 
       if (attempt === 0) {
-        await sleep(120);
+        await sleep(250);
       }
     }
 

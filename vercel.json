@@ -11,11 +11,24 @@
         {
           "key": "Link",
           "value": "</css/hero-v10.css>; rel=\"stylesheet\""
+        },
+        {
+          "key": "Link",
+          "value": "</css/hero-v11-fix.css>; rel=\"stylesheet\""
         }
       ]
     },
     {
       "source": "/css/hero-v10.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/css/hero-v11-fix.css",
       "headers": [
         {
           "key": "Cache-Control",

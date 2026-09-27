@@ -1,7 +1,7 @@
 const fs = require('fs');
 const assert = require('assert/strict');
 
-const source = fs.readFileSync('js/chat.js', 'utf8');
+const source = fs.readFileSync('js/main.js', 'utf8');
 const match = source.match(
   /function\s+isImageGenerationPrompt\(text\)\s*\{\s*return\s+(.+?)\.test\(String\(text\s*\|\|\s*''\)\);/s
 );
@@ -13,5 +13,6 @@ assert.equal(classifier.test('tạo ảnh con mèo full hd'), true);
 assert.equal(classifier.test('vẽ một con mèo'), true);
 assert.equal(classifier.test('create an image of a cat'), true);
 assert.equal(classifier.test('tạo code plugin Paper 1.21.4'), false);
+assert.equal(classifier.test('viết giúp tôi một email xin nghỉ phép'), false);
 
 console.log('chat routing regression: PASS');

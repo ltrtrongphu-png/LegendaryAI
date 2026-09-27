@@ -94,7 +94,7 @@ function cleanMessages(messages: any[], maxChars: number): any[] {
 function safeArithmetic(input: string): number | null {
   const expression = input
     .replace(/,/g, "")
-    .replace(/\?×/g, "*")
+    .replace(/×/g, "*")
     .replace(/÷/g, "/")
     .trim();
 

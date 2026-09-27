@@ -54,13 +54,13 @@
   var confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
 
   var PLAN_INFO = {
-    free: { name: 'Gói Free', price: '0đ / tháng', amount: 0, limit: 100000 },
+    free: { name: 'Gói Free', price: '0đ / tháng', amount: 0, limit: 150000 },
     pro: { name: 'Gói Pro', price: '149.000đ / tháng', amount: 149000, limit: 2000000 },
     legendary: { name: 'Gói Legendary', price: '399.000đ / tháng', amount: 399000, limit: 6000000 }
   };
   var PLAN_LABEL = { free: 'Free', pro: 'Pro', legendary: 'Legendary' };
   var PLAN_FEATURES = {
-    free: ['Chat cơ bản', 'LegendaryLite-1', '100.000 token/ngày'],
+    free: ['LegendaryLite-1 nâng cấp', 'Quick Mode + máy tính', 'Context phiên tốt hơn', '150.000 token/ngày'],
     pro: ['Reasoner 32B*', 'Memory dài hạn', 'Vision + phân tích tệp', '2.000.000 token/ngày', 'Prompt Studio + xuất chat'],
     legendary: ['Ultra 120B*', 'Vision 109B*', 'Context siêu dài', 'Advanced Memory', '6.000.000 token/ngày', 'Ưu tiên tài nguyên']
   };

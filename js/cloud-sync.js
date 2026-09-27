@@ -52,6 +52,7 @@
       return {
         id: row.id,
         title: row.title,
+        slug: row.slug || '',
         createdAt: new Date(row.created_at).getTime(),
         messages: byId[row.id] || []
       };
@@ -78,6 +79,7 @@
         id: String(conv.id),
         user_id: user.id,
         title: conv.title || 'Cuộc trò chuyện mới',
+        slug: conv.slug || null,
         created_at: new Date(conv.createdAt || Date.now()).toISOString(),
         updated_at: new Date().toISOString()
       }, { onConflict: 'id' });

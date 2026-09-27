@@ -48,6 +48,15 @@ function modelFor(plan: string) {
   return "legendary-lite-1";
 }
 
+function modelTierAllowed(plan: string, role: string, requestedTier: string) {
+  // Plans can use their own model tier or any lower tier.
+  // Owner/Legendary can access all normal tiers.
+  if (role === "owner") return ["free", "pro", "legendary"].includes(requestedTier);
+  if (plan === "legendary") return ["free", "pro", "legendary"].includes(requestedTier);
+  if (plan === "pro") return ["free", "pro"].includes(requestedTier);
+  return requestedTier === "free";
+}
+
 function safeMath(input: string): number | null {
   const s = String(input || "").trim().replace(/,/g, ".");
   if (!s || !/^[0-9+\-*/%(). x×÷]+$/i.test(s)) return null;
@@ -204,7 +213,42 @@ Deno.serve(async (req) => {
 
   const plan = String(profile.plan || "free");
   const role = String(profile.role || "user");
-  const modelKey = modelFor(plan);
+  const requestedModel = typeof body?.model === "string" ? body.model.trim() : "auto";
+
+  // "auto" keeps the plan's default. A specific model is allowed only when
+  // its tier is at or below the user's entitlement.
+  let modelKey = modelFor(plan);
+  if (requestedModel && requestedModel !== "auto") {
+    const { data: requested } = await supabase
+      .from("ai_models")
+      .select("key,tier,enabled")
+      .eq("key", requestedModel)
+      .eq("enabled", true)
+      .maybeSingle();
+
+    if (!requested) {
+      return json(req, {
+        error: "Model không tồn tại hoặc đang tắt.",
+        code: "MODEL_NOT_AVAILABLE"
+      }, 400);
+    }
+
+    if (requested.tier === "system") {
+      if (role !== "owner") {
+        return json(req, {
+          error: "Model này chỉ dành cho Owner.",
+          code: "MODEL_FORBIDDEN"
+        }, 403);
+      }
+    } else if (!modelTierAllowed(plan, role, requested.tier)) {
+      return json(req, {
+        error: "Model này không thuộc quyền của gói hiện tại.",
+        code: "MODEL_FORBIDDEN"
+      }, 403);
+    }
+
+    modelKey = requested.key;
+  }
 
   const { data: model } = await supabase
     .from("ai_models")

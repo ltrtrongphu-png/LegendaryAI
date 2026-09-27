@@ -33,7 +33,12 @@ function json(req: Request, body: unknown, status = 200) {
 function textOf(value: unknown): string {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) {
-    return value.map((x: any) => typeof x === "string" ? x : (x?.text || x?.content || "")).join("\n");
+    return value.map((x: any) => {
+      if (typeof x === "string") return x;
+      if (x?.type === "text") return x.text || "";
+      if (x?.type === "image") return "[Hình ảnh đính kèm: " + String(x.name || "image") + "]";
+      return x?.text || x?.content || "";
+    }).join("\n");
   }
   return value == null ? "" : JSON.stringify(value);
 }
@@ -111,7 +116,7 @@ async function ollama(baseUrl: string, model: string, messages: any[], system: s
     stream: false,
     messages: [
       ...(system ? [{ role: "system", content: system }] : []),
-      ...messages.map((m: any) => ({ role: m.role, content: textOf(m.content) })),
+      ...messages.map((m: any) => ({ role: m.role, content: m.content })),
     ],
     options: { temperature, num_predict: maxTokens },
   };
@@ -151,7 +156,7 @@ Deno.serve(async (req) => {
   let body: any;
   try { body = await req.json(); } catch { return json(req, { error: "Invalid JSON", code: "INVALID_JSON" }, 400); }
 
-  const messages = Array.isArray(body?.messages) ? body.messages.slice(-30) : [];
+  const messages = Array.isArray(body?.messages) ? body.messages.slice(-80) : [];
   if (!messages.length) return json(req, { error: "messages is required", code: "MESSAGES_REQUIRED" }, 400);
 
   const user = authResult.data.user;
@@ -261,7 +266,10 @@ Deno.serve(async (req) => {
 
   const inputText = messages.map((m: any) => textOf(m.content)).join("\n");
   const inputTokens = estimateTokens(inputText);
-  const maxTokens = Math.min(Math.max(Number(body?.max_tokens) || Number(model.max_output_tokens) || 2048, 256), Number(model.max_output_tokens) || 8192);
+  const maxTokens = Math.min(
+    Math.max(Number(body?.max_tokens) || Number(model.max_output_tokens) || 8192, 256),
+    Number(model.max_output_tokens) || 8192
+  );
   const reservation = Math.max(1, Math.min(inputTokens + maxTokens, Number(profile.token_limit || 150000)));
 
   const { data: allowed, error: tokenError } = await supabase.rpc("consume_tokens", { p_amount: reservation });

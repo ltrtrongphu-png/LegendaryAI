@@ -115,6 +115,51 @@
   }
 
   window.LegendaryAIEngine = {
+    async image(options) {
+      options = options || {};
+      var token = await window.LegendaryBackend.getAccessToken();
+      if (!token) throw new Error('Bạn cần đăng nhập để tạo ảnh.');
+
+      var config = window.LEGENDARY_SUPABASE_CONFIG || {};
+      var baseUrl = String(config.url || '').replace(/\/$/, '');
+      var anonKey = String(config.anonKey || '');
+      if (!baseUrl || !anonKey) throw new Error('Supabase client chưa được cấu hình.');
+
+      var response = await fetch(baseUrl + '/functions/v1/image-generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': anonKey,
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+          prompt: String(options.prompt || '').trim(),
+          size: options.size || 'auto',
+          quality: options.quality || 'auto',
+          background: options.background || 'auto'
+        }),
+        signal: options.signal || undefined
+      });
+
+      var raw = await response.text();
+      var data = null;
+      try { data = raw ? JSON.parse(raw) : null; } catch (_) { data = null; }
+
+      if (!response.ok) {
+        throw new Error(
+          (data && (data.error || data.message)) ||
+          raw.slice(0, 800) ||
+          ('HTTP ' + response.status)
+        );
+      }
+
+      if (!data || !data.imageDataUrl) {
+        throw new Error('Image Provider đã phản hồi nhưng không có ảnh.');
+      }
+
+      return data;
+    },
+
     async chat(options) {
       options = options || {};
 

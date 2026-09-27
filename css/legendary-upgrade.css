@@ -227,32 +227,41 @@ h1,h2,h3,.brand,.stat-num,.price,.engine-card strong{font-family:var(--font-head
 .section-tag{letter-spacing:.08em;}
 
 
-/* 3D AI emblem — replaces the old globe/orb visual */
-.hero-visual{display:grid;place-items:center;perspective:1100px;}
-.ai-emblem{position:relative;width:330px;height:330px;transform-style:preserve-3d;transform:rotateX(8deg) rotateY(-12deg);filter:drop-shadow(0 28px 45px rgba(0,0,0,.35));}
-.ai-emblem-core{
-  position:absolute;inset:68px;display:grid;place-items:center;
-  border:1px solid rgba(137,177,255,.65);border-radius:30% 70% 45% 55% / 45% 40% 60% 55%;
-  background:linear-gradient(145deg,#f7fbff 0%,#a9c7ff 12%,#315dbd 42%,#0a1734 100%);
-  box-shadow:inset 12px 12px 25px rgba(255,255,255,.5),inset -18px -20px 35px rgba(0,0,0,.65),0 0 55px rgba(62,123,250,.28);
-  transform:translateZ(34px) rotate(-8deg);
+/* 3D LegendaryAI logo hero */
+.hero-visual{display:grid;place-items:center;perspective:1200px;}
+.legendary-3d-logo{
+  position:relative;width:340px;height:340px;display:grid;place-items:center;
+  transform-style:preserve-3d;transform:rotateX(8deg) rotateY(-12deg);
+  filter:drop-shadow(0 30px 45px rgba(0,0,0,.42));
 }
-.ai-emblem-core::before,.ai-emblem-core::after{
-  content:"";position:absolute;border:1px solid rgba(255,255,255,.28);border-radius:inherit;inset:12px;transform:translateZ(16px);
+.legendary-3d-logo-img{
+  position:relative;z-index:4;width:270px;height:270px;object-fit:contain;
+  transform:translateZ(48px);
+  filter:drop-shadow(0 18px 20px rgba(0,0,0,.48)) drop-shadow(0 0 30px rgba(62,123,250,.28));
 }
-.ai-emblem-core::after{inset:25px;border-color:rgba(62,123,250,.35);transform:translateZ(24px);}
-.ai-letter{
-  position:relative;z-index:3;font-family:Inter,sans-serif;font-weight:700;font-size:86px;
-  letter-spacing:-.1em;color:#071126;text-shadow:1px 2px 0 rgba(255,255,255,.65),0 0 22px rgba(255,255,255,.5);
-  transform:translateZ(55px) skewX(-6deg);
+.logo-depth{
+  position:absolute;width:270px;height:270px;border-radius:59px;
+  background:linear-gradient(145deg,#263b70,#071025 65%,#030711);
+  border:1px solid rgba(130,170,255,.38);
+  transform:translateZ(0) translate(8px,12px);
+  box-shadow:inset 0 2px 8px rgba(255,255,255,.12),0 25px 45px rgba(0,0,0,.5);
 }
-.ai-orbit{position:absolute;left:50%;top:50%;width:360px;height:118px;margin:-59px 0 0 -180px;border:2px solid rgba(116,164,255,.62);border-radius:50%;transform-style:preserve-3d;box-shadow:0 0 18px rgba(62,123,250,.18);}
-.orbit-a{transform:rotateX(67deg) rotateZ(12deg) translateZ(58px);}
-.orbit-b{transform:rotateY(64deg) rotateZ(-18deg) translateZ(24px);border-color:rgba(220,235,255,.42);}
-.orbit-c{transform:rotateX(72deg) rotateY(30deg) rotateZ(42deg) translateZ(-35px);border-color:rgba(62,123,250,.34);}
-.ai-node{position:absolute;width:11px;height:11px;border-radius:50%;background:#eaf2ff;border:2px solid #5c91ff;box-shadow:0 0 18px #3e7bfa;transform:translateZ(75px);}
-.node-a{left:20px;top:120px;}.node-b{right:30px;top:64px;}.node-c{right:65px;bottom:35px;}
+.logo-reflection{
+  position:absolute;width:270px;height:270px;border-radius:59px;
+  border:1px solid rgba(255,255,255,.22);
+  transform:translateZ(58px) translate(-4px,-4px);
+  pointer-events:none;
+}
+.logo-orbit{
+  position:absolute;left:50%;top:50%;width:390px;height:128px;
+  margin:-64px 0 0 -195px;border:2px solid rgba(92,145,255,.42);
+  border-radius:50%;transform-style:preserve-3d;
+  box-shadow:0 0 20px rgba(62,123,250,.14);
+}
+.logo-orbit-a{transform:rotateX(68deg) rotateZ(16deg) translateZ(80px);}
+.logo-orbit-b{transform:rotateY(66deg) rotateZ(-22deg) translateZ(38px);border-color:rgba(220,235,255,.28);}
 @media (max-width:760px){
-  .ai-emblem{width:245px;height:245px;transform:scale(.9) rotateX(8deg) rotateY(-12deg);}
-  .ai-emblem-core{inset:52px}.ai-letter{font-size:64px}.ai-orbit{width:275px;margin-left:-137px}
+  .legendary-3d-logo{width:255px;height:255px;}
+  .legendary-3d-logo-img,.logo-depth,.logo-reflection{width:205px;height:205px;border-radius:45px;}
+  .logo-orbit{width:295px;margin-left:-147px;}
 }

@@ -73,14 +73,36 @@
     try {
       if (!window.LegendaryBackend || !window.LegendaryBackend.getProfile) return;
       var profile = await window.LegendaryBackend.getProfile();
-      updateTokenHud(profile ? {
-        tokens_remaining: Math.max(Number(profile.token_limit || 0) - Number(profile.tokens_used || 0), 0),
-        token_limit: profile.token_limit,
-        tokens_used: profile.tokens_used,
+
+      if (!profile) {
+        updateTokenHud(null);
+        return;
+      }
+
+      var limit = Number(profile.token_limit);
+      var used = Number(profile.tokens_used);
+      var remaining = Number.isFinite(limit) && Number.isFinite(used)
+        ? Math.max(limit - used, 0)
+        : null;
+
+      updateTokenHud({
+        tokens_remaining: remaining,
+        token_limit: limit,
+        tokens_used: used,
         token_reset_at: profile.token_reset_at
-      } : null);
-    } catch (_) {}
+      });
+    } catch (_) {
+      // Keep the last known value instead of replacing a valid token count
+      // with a dash during a transient Supabase request.
+    }
   }
+
+  // Auth/profile can become ready after chat.js has already initialized.
+  // Refresh immediately when the account is available instead of waiting 30s.
+  window.addEventListener('legendary:profile-ready', refreshTokenHud);
+  window.addEventListener('legendary:auth-changed', function () {
+    setTimeout(refreshTokenHud, 50);
+  });
 
   var SETTINGS_KEY = 'legendaryai_settings';
   var CONV_KEY = 'legendaryai_conversations_v2';

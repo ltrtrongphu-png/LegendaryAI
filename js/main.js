@@ -1,6 +1,95 @@
 (function () {
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // ---------------------------------------------------------------------
+  // Chat image-routing hotfix
+  // The legacy chat.js classifier can be served from an older cached build.
+  // Capture image requests here so they always reach the real image provider.
+  // ---------------------------------------------------------------------
+  function isImageGenerationPrompt(text) {
+    return /(?:\b(?:tạo|vẽ|generate|draw|create)\b.*\b(?:ảnh|hình|image|picture)\b|\b(?:ảnh|hình|image|picture)\b.*\b(?:tạo|vẽ|generate|draw|create)\b)/i.test(String(text || ''));
+  }
+
+  function escapeImageAlt(text) {
+    return String(text || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function installImageRoutingHotfix() {
+    var form = document.getElementById('chatForm');
+    var input = document.getElementById('chatInput');
+    var windowEl = document.getElementById('chatWindow');
+    if (!form || !input || !windowEl || !window.LegendaryAIEngine) return;
+    if (form.dataset.legendaryImageRoutingHotfix === '1') return;
+    form.dataset.legendaryImageRoutingHotfix = '1';
+
+    form.addEventListener('submit', function (event) {
+      var prompt = String(input.value || '').trim();
+      if (!isImageGenerationPrompt(prompt)) return;
+
+      // Stop chat.js before it sends the prompt to the text AI endpoint.
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      var userWrap = document.createElement('div');
+      userWrap.className = 'msg msg-user';
+      var userBubble = document.createElement('div');
+      userBubble.className = 'msg-bubble';
+      userBubble.textContent = prompt;
+      userWrap.appendChild(userBubble);
+      windowEl.appendChild(userWrap);
+
+      input.value = '';
+      var aiWrap = document.createElement('div');
+      aiWrap.className = 'msg msg-ai';
+      var avatar = document.createElement('div');
+      avatar.className = 'msg-avatar';
+      avatar.textContent = 'L';
+      var bubble = document.createElement('div');
+      bubble.className = 'msg-bubble typing';
+      bubble.textContent = 'Đang tạo ảnh…';
+      aiWrap.appendChild(avatar);
+      aiWrap.appendChild(bubble);
+      windowEl.appendChild(aiWrap);
+      windowEl.scrollTop = windowEl.scrollHeight;
+
+      var controller = new AbortController();
+      window.LegendaryAIEngine.image({
+        prompt: prompt,
+        size: 'auto',
+        quality: 'auto',
+        background: 'auto',
+        signal: controller.signal
+      })
+        .then(function (result) {
+          var dataUrl = result && result.imageDataUrl;
+          if (!dataUrl) throw new Error('Image Provider không trả về ảnh.');
+
+          bubble.classList.remove('typing');
+          bubble.innerHTML =
+            '<div class="generated-image-wrap">' +
+            '<img class="generated-image" src="' + dataUrl + '" alt="' + escapeImageAlt(prompt) + '">' +
+            '<div class="generated-image-meta">GPT Image 2 · Image Provider</div>' +
+            '</div>';
+          windowEl.scrollTop = windowEl.scrollHeight;
+        })
+        .catch(function (error) {
+          bubble.classList.remove('typing');
+          bubble.classList.add('error');
+          bubble.textContent = 'Không thể tạo ảnh: ' + (error && error.message ? error.message : String(error));
+        });
+    }, true);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installImageRoutingHotfix, { once: true });
+  } else {
+    installImageRoutingHotfix();
+  }
+
   // ---- Mobile nav ----
   var navToggle = document.getElementById('navToggle');
   var mainNav = document.getElementById('mainNav');

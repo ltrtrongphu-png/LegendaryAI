@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/new", "destination": "/" },
+    { "source": "/chat/:slug", "destination": "/" }
+  ]
+}

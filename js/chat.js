@@ -1549,7 +1549,7 @@
       messages: messages,
       system: settings.system || '',
       temperature: 0.35,
-      max_tokens: 4096,
+      max_tokens: 8192,
       signal: controller.signal
     })
       .then(function (result) {
@@ -1753,8 +1753,11 @@
   }
 
   // ---------------------------------------------------------------------
-  // Attachments (images + text files)
+  // Attachments (images + text/code files + ZIP)
   // ---------------------------------------------------------------------
+  var MAX_TEXT_ATTACHMENT_CHARS = 120000;
+  var TEXT_FILE_EXTENSIONS = /\.(txt|md|markdown|csv|json|jsonl|log|js|jsx|ts|tsx|py|java|c|h|cpp|hpp|cs|go|rs|php|rb|swift|kt|kts|html|htm|css|scss|sass|xml|yaml|yml|toml|ini|env|sql|sh|bat|ps1|vue|svelte|astro|graphql|gql)$/i;
+
   function renderAttachPreview() {
     if (!attachPreview) return;
 
@@ -1767,126 +1770,189 @@
     attachPreview.hidden = false;
     attachPreview.innerHTML = '';
 
-    pendingAttachments.forEach(
-      function (a, idx) {
-        var chip =
-          document.createElement('span');
+    pendingAttachments.forEach(function (a, idx) {
+      var chip = document.createElement('span');
+      chip.className = 'att-chip';
 
-        chip.className = 'att-chip';
-
-        if (a.kind === 'image') {
-          var img =
-            document.createElement('img');
-
-          img.src = a.dataUrl;
-          img.alt = a.name;
-
-          chip.appendChild(img);
-        } else {
-          chip.appendChild(
-            document.createTextNode('📄 ')
-          );
-        }
-
-        var nameSpan =
-          document.createElement('span');
-
-        nameSpan.className = 'att-name';
-        nameSpan.textContent = a.name;
-
-        chip.appendChild(nameSpan);
-
-        var rm =
-          document.createElement('button');
-
-        rm.type = 'button';
-        rm.className = 'att-remove';
-        rm.title = 'Bỏ tệp này';
-
-        rm.setAttribute(
-          'aria-label',
-          'Bỏ tệp ' + a.name
-        );
-
-        rm.textContent = '✕';
-
-        rm.addEventListener(
-          'click',
-          function () {
-            pendingAttachments.splice(idx, 1);
-            renderAttachPreview();
-          }
-        );
-
-        chip.appendChild(rm);
-        attachPreview.appendChild(chip);
+      if (a.kind === 'image') {
+        var img = document.createElement('img');
+        img.src = a.dataUrl;
+        img.alt = a.name;
+        chip.appendChild(img);
+      } else if (a.kind === 'archive') {
+        chip.appendChild(document.createTextNode('🗜️ '));
+      } else {
+        chip.appendChild(document.createTextNode('📄 '));
       }
-    );
+
+      var nameSpan = document.createElement('span');
+      nameSpan.className = 'att-name';
+      nameSpan.textContent = a.name;
+      chip.appendChild(nameSpan);
+
+      var rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'att-remove';
+      rm.title = 'Bỏ tệp này';
+      rm.setAttribute('aria-label', 'Bỏ tệp ' + a.name);
+      rm.textContent = '✕';
+      rm.addEventListener('click', function () {
+        pendingAttachments.splice(idx, 1);
+        renderAttachPreview();
+      });
+
+      chip.appendChild(rm);
+      attachPreview.appendChild(chip);
+    });
   }
 
-  function readAttachment(file) {
-    var isImage =
-      file.type.indexOf('image/') === 0;
+  function trimAttachmentText(text) {
+    text = String(text || '');
+    if (text.length <= MAX_TEXT_ATTACHMENT_CHARS) return text;
+    return text.slice(0, MAX_TEXT_ATTACHMENT_CHARS) +
+      '\n\n… [Phần còn lại của tệp đã được cắt để tránh làm nặng phiên chat]';
+  }
 
-    var reader = new FileReader();
-
-    reader.onload = function () {
-      if (isImage) {
-        pendingAttachments.push({
-          name: file.name,
-          kind: 'image',
-          mediaType: file.type,
-          dataUrl: reader.result
-        });
-      } else {
-        var content =
-          String(reader.result || '');
-
-        if (content.length > 6000) {
-          content =
-            content.slice(0, 6000) +
-            '\n… (đã cắt bớt, tệp quá dài)';
-        }
-
-        pendingAttachments.push({
+  function readTextFile(file) {
+    return new Promise(function (resolve) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        resolve({
           name: file.name,
           kind: 'text',
-          mediaType: 'text/plain',
-          textContent: content
+          mediaType: file.type || 'text/plain',
+          textContent: trimAttachmentText(reader.result || '')
         });
-      }
+      };
+      reader.onerror = function () {
+        resolve({
+          name: file.name,
+          kind: 'file',
+          mediaType: file.type || 'application/octet-stream'
+        });
+      };
+      reader.readAsText(file);
+    });
+  }
 
-      renderAttachPreview();
+  async function readZipFile(file) {
+    if (!window.JSZip) {
+      throw new Error('ZIP reader chưa tải xong. Hãy thử lại sau vài giây.');
+    }
+
+    var zip = await window.JSZip.loadAsync(file);
+    var names = Object.keys(zip.files);
+    var textParts = [];
+    var totalChars = 0;
+    var maxFiles = 120;
+
+    for (var i = 0; i < names.length && i < maxFiles; i++) {
+      var name = names[i];
+      var entry = zip.files[name];
+
+      if (entry.dir) continue;
+      if (!TEXT_FILE_EXTENSIONS.test(name)) continue;
+
+      var remaining = MAX_TEXT_ATTACHMENT_CHARS - totalChars;
+      if (remaining <= 0) break;
+
+      try {
+        var content = await entry.async('string');
+        content = content.slice(0, remaining);
+        textParts.push('\n===== ' + name + ' =====\n' + content);
+        totalChars += content.length;
+      } catch (_) {
+        // Skip binary/corrupt entries instead of failing the whole ZIP.
+      }
+    }
+
+    var summary = [
+      'ZIP: ' + file.name,
+      'Tổng entry: ' + names.length,
+      'Đã đọc file text/code: ' + textParts.length,
+      ''
+    ].join('\n') + textParts.join('\n');
+
+    return {
+      name: file.name,
+      kind: 'archive',
+      mediaType: 'application/zip',
+      textContent: trimAttachmentText(summary)
     };
+  }
+
+  async function readAttachment(file) {
+    var lowerName = String(file.name || '').toLowerCase();
+    var isImage = file.type.indexOf('image/') === 0;
+    var isZip = file.type === 'application/zip' || /\.zip$/i.test(lowerName);
 
     if (isImage) {
-      reader.readAsDataURL(file);
-    } else {
-      reader.readAsText(file);
+      return await new Promise(function (resolve) {
+        var reader = new FileReader();
+        reader.onload = function () {
+          resolve({
+            name: file.name,
+            kind: 'image',
+            mediaType: file.type,
+            dataUrl: reader.result
+          });
+        };
+        reader.onerror = function () {
+          resolve({
+            name: file.name,
+            kind: 'file',
+            mediaType: file.type || 'application/octet-stream'
+          });
+        };
+        reader.readAsDataURL(file);
+      });
     }
+
+    if (isZip) {
+      return await readZipFile(file);
+    }
+
+    if (TEXT_FILE_EXTENSIONS.test(lowerName) || /^text\//i.test(file.type)) {
+      return await readTextFile(file);
+    }
+
+    return {
+      name: file.name,
+      kind: 'file',
+      mediaType: file.type || 'application/octet-stream',
+      size: file.size || 0
+    };
   }
 
   if (attachBtn && fileInput) {
-    attachBtn.addEventListener(
-      'click',
-      function () {
-        fileInput.click();
+    attachBtn.addEventListener('click', function () {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', async function () {
+      var files = Array.prototype.slice.call(fileInput.files || []);
+      fileInput.value = '';
+
+      if (!files.length) return;
+
+      if (streamStatus) streamStatus.textContent = 'Đang đọc tệp…';
+
+      for (var i = 0; i < files.length; i++) {
+        try {
+          var attachment = await readAttachment(files[i]);
+          pendingAttachments.push(attachment);
+        } catch (error) {
+          if (streamStatus) {
+            streamStatus.textContent =
+              'Không đọc được ' + files[i].name + ': ' +
+              (error && error.message ? error.message : error);
+          }
+        }
       }
-    );
 
-    fileInput.addEventListener(
-      'change',
-      function () {
-        var files =
-          Array.prototype.slice.call(
-            fileInput.files || []
-          );
-
-        files.forEach(readAttachment);
-
-        fileInput.value = '';
-      }
-    );
+      renderAttachPreview();
+      if (streamStatus) streamStatus.textContent = '';
+    });
   }
 
   // ---------------------------------------------------------------------

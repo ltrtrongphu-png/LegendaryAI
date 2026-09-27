@@ -1,5 +1,5 @@
 /* LegendaryAI Hero v11 — containment + composition fix */
-/* v12 polish: continuous 3D motion + duplicate live-card guard */
+/* v13 polish: continuous logo motion + remove the extra card behind Live */
 .hero.hero{
   position:relative!important;
   overflow:hidden!important;
@@ -87,12 +87,14 @@
   top:7%!important;
   z-index:75!important;
 }
+
+/* Remove the extra Writing card that sits immediately behind the Live card. */
 .hero-visual .orb-badge::before{
-  right:0!important;
-  top:135%!important;
-  transform:rotate(5deg)!important;
-  animation:la10Writing 7.6s ease-in-out infinite!important;
+  display:none!important;
+  content:none!important;
 }
+
+/* Keep Reasoning as the lower companion card. */
 .hero-visual .orb-badge::after{
   right:2%!important;
   top:auto!important;
@@ -155,7 +157,6 @@
   .hero-visual.hero-visual::before{left:1%!important;top:7%!important}
   .hero-visual.hero-visual::after{left:1%!important;bottom:6%!important}
   .hero-visual .orb-badge{right:1%!important;top:3%!important}
-  .hero-visual .orb-badge::before{right:0!important;top:125%!important}
   .hero-visual .orb-badge::after{right:0!important;bottom:-245%!important}
 }
 @media(max-width:760px){

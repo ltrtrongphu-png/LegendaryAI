@@ -66,7 +66,10 @@
     if (!localStorage.getItem(ACTIVE_KEY) || !remote.some(function (x) { return x.id === localStorage.getItem(ACTIVE_KEY); })) {
       localStorage.setItem(ACTIVE_KEY, remote[0].id);
     }
-    location.reload();
+
+    // Sync the local cache without reloading the whole page. A full reload here
+    // used to happen a few seconds after login and made the site feel broken.
+    window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
   }
 
   async function uploadLocal(user) {

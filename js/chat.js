@@ -5,6 +5,7 @@
   var newChatBtn = document.getElementById('newChatBtn');
   var convList = document.getElementById('convList');
   var expandChatBtn = document.getElementById('expandChatBtn');
+  var exportChatBtn = document.getElementById('exportChatBtn');
 
   var chatWindow = document.getElementById('chatWindow');
   var chatForm = document.getElementById('chatForm');
@@ -34,6 +35,7 @@
   var systemPrompt = document.getElementById('systemPrompt');
   var streamToggle = document.getElementById('streamToggle');
   var engineModelSelect = document.getElementById('engineModelSelect');
+  var promptPresetSelect = document.getElementById('promptPresetSelect');
 
   var SETTINGS_KEY = 'legendaryai_settings';
   var CONV_KEY = 'legendaryai_conversations_v2';
@@ -73,6 +75,14 @@
       /* ignore */
     }
   }
+
+  var PROMPT_PRESETS = {
+    default: '',
+    coder: 'Bạn là kiến trúc sư phần mềm cấp cao. Ưu tiên giải pháp production-ready, bảo mật, testable và giải thích trade-off ngắn gọn.',
+    research: 'Bạn là chuyên gia phân tích. Tách dữ kiện khỏi giả định, nêu mức độ chắc chắn và cấu trúc kết quả theo luận điểm → bằng chứng → kết luận.',
+    writer: 'Bạn là biên tập viên cao cấp. Giữ đúng mục tiêu, đối tượng, giọng văn và cấu trúc; viết tự nhiên, không sáo rỗng.',
+    concise: 'Trả lời ngắn gọn, trực tiếp, ưu tiên checklist hoặc các bước hành động. Không lặp lại đề bài.'
+  };
 
   var settings = loadSettings();
   applySettingsToForm();
@@ -135,6 +145,7 @@
     modeSelect.value = "legendary";
     if (engineModelSelect) engineModelSelect.value = settings.engineModel || "auto";
     if (systemPrompt) systemPrompt.value = settings.system || "";
+    if (promptPresetSelect) promptPresetSelect.value = settings.preset || "default";
     if (streamToggle) streamToggle.checked = false;
     if (providerSelect) { providerSelect.value = "legendary"; providerSelect.disabled = true; }
     if (apiEndpoint) { apiEndpoint.value = ""; apiEndpoint.disabled = true; }
@@ -156,6 +167,24 @@
   settingsBtn.addEventListener('click', function () {
     settingsBackdrop.classList.add('open');
   });
+
+  if (promptPresetSelect) {
+    promptPresetSelect.addEventListener('change', async function () {
+      var profile = null;
+      try {
+        profile = window.LegendaryBackend && window.LegendaryBackend.enabled
+          ? await window.LegendaryBackend.getProfile()
+          : null;
+      } catch (e) {}
+      if (!profile || (profile.plan !== 'pro' && profile.plan !== 'legendary' && profile.role !== 'owner')) {
+        promptPresetSelect.value = 'default';
+        if (streamStatus) streamStatus.textContent = 'Prompt Studio cần gói Pro hoặc Legendary.';
+        return;
+      }
+      var key = promptPresetSelect.value;
+      if (systemPrompt && PROMPT_PRESETS[key] !== undefined) systemPrompt.value = PROMPT_PRESETS[key];
+    });
+  }
 
   closeSettings.addEventListener('click', function () {
     settingsBackdrop.classList.remove('open');
@@ -191,6 +220,7 @@
       key: "",
       model: "",
       system: systemPrompt ? systemPrompt.value.trim() : "",
+      preset: promptPresetSelect ? promptPresetSelect.value : "default",
       stream: false
     };
     saveSettingsToStorage(settings);
@@ -624,6 +654,45 @@
       chatWindow.scrollTop = chatWindow.scrollHeight;
     });
   }
+
+  function exportActiveConversation() {
+    (async function () {
+      var profile = null;
+      try {
+        profile = window.LegendaryBackend && window.LegendaryBackend.enabled
+          ? await window.LegendaryBackend.getProfile()
+          : null;
+      } catch (e) {}
+      if (!profile || (profile.plan !== 'pro' && profile.plan !== 'legendary' && profile.role !== 'owner')) {
+        if (streamStatus) streamStatus.textContent = 'Xuất hội thoại cần gói Pro hoặc Legendary.';
+        return;
+      }
+      var conv = getActiveConv();
+      if (!conv) return;
+      var lines = ['# ' + conv.title, '', 'Xuất từ LegendaryAI', ''];
+      conv.messages.forEach(function (m) {
+        lines.push(m.role === 'user' ? '## Bạn' : '## LegendaryAI');
+        lines.push(m.text || '');
+        if (m.attachments && m.attachments.length) {
+          lines.push('');
+          lines.push('Tệp đính kèm: ' + m.attachments.map(function (a) { return a.name; }).join(', '));
+        }
+        lines.push('');
+      });
+      var blob = new Blob([lines.join('\n')], {type:'text/markdown;charset=utf-8'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (slugify(conv.title) || 'legendary-chat') + '.md';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      if (streamStatus) streamStatus.textContent = '✓ Đã xuất hội thoại Markdown.';
+    })();
+  }
+
+  if (exportChatBtn) exportChatBtn.addEventListener('click', exportActiveConversation);
 
   // ---------------------------------------------------------------------
   // Markdown-lite renderer with headings/lists/quotes/tables/code blocks
@@ -1344,21 +1413,22 @@
   function buildMessageContent(message) {
     var text = String((message && message.text) || '');
     var attachments = (message && message.attachments) || [];
-
     if (!attachments.length) return text;
 
-    var attachmentText = attachments.map(function (a) {
-      if (!a) return '';
-      if (a.kind === 'text' && a.textContent) {
-        return '\\n\\n[File: ' + (a.name || 'attachment') + ']\\n' + a.textContent;
-      }
-      if (a.kind === 'image') {
-        return '\\n\\n[Image attachment: ' + (a.name || 'image') + ']';
-      }
-      return '\\n\\n[Attachment: ' + (a.name || 'file') + ']';
-    }).join('');
+    var parts = [];
+    if (text) parts.push({ type: 'text', text: text });
 
-    return text + attachmentText;
+    attachments.forEach(function (a) {
+      if (!a) return;
+      if (a.kind === 'text' && a.textContent) {
+        parts.push({ type: 'text', text: '\\n\\n[File: ' + (a.name || 'attachment') + ']\\n' + a.textContent });
+      } else if (a.kind === 'image' && a.dataUrl) {
+        parts.push({ type: 'image', image: a.dataUrl, name: a.name || 'image' });
+      } else {
+        parts.push({ type: 'text', text: '\\n\\n[Attachment: ' + (a.name || 'file') + ']' });
+      }
+    });
+    return parts.length === 1 && parts[0].type === 'text' ? parts[0].text : parts;
   }
 
   function callLegendaryEngine(conv) {

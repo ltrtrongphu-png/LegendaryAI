@@ -134,19 +134,33 @@ function textFromContent(content: unknown): string {
   return content == null ? "" : JSON.stringify(content);
 }
 
+function hasImageContent(content: unknown): boolean {
+  return Array.isArray(content) && content.some((part: any) =>
+    part && part.type === "image" && typeof part.image === "string"
+  );
+}
+
 function cleanMessages(messages: any[], maxChars: number): any[] {
   const cleaned = messages
     .filter((m: any) => m && ["user", "assistant", "system"].includes(m.role))
     .map((m: any) => ({
       role: m.role,
-      content: textFromContent(m.content).slice(0, 12000),
+      content: Array.isArray(m.content)
+        ? m.content
+            .filter((part: any) => part && (part.type === "text" || part.type === "image"))
+            .map((part: any) => part.type === "image"
+              ? { type: "image", image: String(part.image || "").slice(0, 8_000_000), name: part.name || "image" }
+              : { type: "text", text: String(part.text || part.content || "").slice(0, 12000) })
+        : textFromContent(m.content).slice(0, 12000),
     }));
 
   let total = 0;
   const kept: any[] = [];
   for (let i = cleaned.length - 1; i >= 0; i--) {
     const item = cleaned[i];
-    const size = item.content.length + 40;
+    const size = (typeof item.content === "string"
+      ? item.content.length
+      : textFromContent(item.content).length + JSON.stringify(item.content).length) + 40;
     if (kept.length && total + size > maxChars) break;
     kept.unshift(item);
     total += size;
@@ -230,10 +244,18 @@ async function ollamaResponse(
   const url = baseUrl.replace(/\/$/, "") + "/api/chat";
   const payloadMessages = [
     ...(system ? [{ role: "system", content: system }] : []),
-    ...messages.map((m: any) => ({
-      role: m.role === "assistant" ? "assistant" : m.role === "system" ? "system" : "user",
-      content: textFromContent(m.content),
-    })),
+    ...messages.map((m: any) => {
+      const role = m.role === "assistant" ? "assistant" : m.role === "system" ? "system" : "user";
+      if (!Array.isArray(m.content)) return { role, content: textFromContent(m.content) };
+      const content = m.content
+        .filter((p: any) => p?.type === "text")
+        .map((p: any) => p.text || "")
+        .join("\n");
+      const images = m.content
+        .filter((p: any) => p?.type === "image" && typeof p.image === "string")
+        .map((p: any) => String(p.image).replace(/^data:[^;]+;base64,/, ""));
+      return images.length ? { role, content, images } : { role, content };
+    }),
   ];
 
   const response = await fetch(url, {
@@ -271,6 +293,9 @@ function modelName(modelKey: string): string {
   if (modelKey === "legendary-ultra-1") return "LegendaryUltra-1";
   if (modelKey === "legendary-pro-1") return "LegendaryPro-1";
   if (modelKey === "custom") return "Legendary Custom Core";
+  if (modelKey === "legendary-reasoner-32b") return "Legendary Reasoner 32B";
+  if (modelKey === "legendary-ultra-120b") return "Legendary Ultra 120B";
+  if (modelKey === "legendary-vision-109b") return "Legendary Vision 109B";
   return "LegendaryLite-1";
 }
 
@@ -441,6 +466,14 @@ Deno.serve(async (req) => {
 
   if (!selectedModel) {
     return json({ error: "Legendary model chưa được cấu hình cho tài khoản này.", code: "MODEL_NOT_CONFIGURED" }, 503, req);
+  }
+
+  const hasImages = messages.some((m: any) => hasImageContent(m?.content));
+  if (hasImages && !profile.vision_enabled) {
+    return json({
+      error: "Phân tích hình ảnh cần gói Pro hoặc Legendary.",
+      code: "VISION_PLAN_REQUIRED",
+    }, 403, req);
   }
 
   const capabilities = Array.isArray(selectedModel.capabilities)

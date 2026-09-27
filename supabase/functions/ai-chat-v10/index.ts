@@ -228,7 +228,12 @@ Deno.serve(async (req) => {
   const inputTokens = approxTokens(selectedMessages.map(m => m.content).join("\n"));
   const reserve = Math.max(1, Math.min(inputTokens + maxTokens, Number(profile.token_limit || 150000)));
 
-  const { data: tokenOk, error: tokenError } = await admin.rpc("consume_tokens", { p_amount: reserve });
+  // The service-role client has no auth.uid(). Always pass the authenticated
+  // user explicitly so Postgres resolves the service-only overload unambiguously.
+  const { data: tokenOk, error: tokenError } = await admin.rpc("consume_tokens", {
+    p_amount: reserve,
+    p_user_id: authData.user.id,
+  });
   if (tokenError) return out(req, { error: tokenError.message, code: "TOKEN_RPC_ERROR" }, 500);
   if (!tokenOk) return out(req, { error: "Bạn đã chạm hạn mức token của gói hiện tại.", code: "TOKEN_LIMIT", tokenLimit: Number(profile.token_limit || 0), tokensUsed: Number(profile.tokens_used || 0), tokenResetAt: profile.token_reset_at }, 429);
 
@@ -264,7 +269,12 @@ Deno.serve(async (req) => {
 
     const outputTokens = approxTokens(text);
     const actualTokens = inputTokens + outputTokens;
-    if (reserve > actualTokens) await admin.rpc("refund_tokens", { p_amount: reserve - actualTokens });
+    if (reserve > actualTokens) {
+      await admin.rpc("refund_tokens", {
+        p_amount: reserve - actualTokens,
+        p_user_id: authData.user.id,
+      });
+    }
     const { data: latest } = await admin.from("profiles").select("token_limit,tokens_used,token_reset_at").eq("id", authData.user.id).maybeSingle();
     const latencyMs = Date.now() - startedAt;
     await admin.from("ai_usage_logs").insert({ user_id: authData.user.id, model_key: model.key, provider_model: model.model_id, plan, input_tokens: inputTokens, output_tokens: outputTokens, reserved_tokens: reserve, request_ms: latencyMs, status: "success" });
@@ -287,7 +297,10 @@ Deno.serve(async (req) => {
       usage: { input_tokens: inputTokens, output_tokens: outputTokens, total_tokens: actualTokens, tokens_used: Number(latest?.tokens_used ?? Number(profile.tokens_used || 0) + actualTokens), token_limit: Number(latest?.token_limit ?? profile.token_limit), remaining_tokens: Math.max(0, Number(latest?.token_limit ?? profile.token_limit) - Number(latest?.tokens_used ?? 0)) },
     });
   } catch (error) {
-    await admin.rpc("refund_tokens", { p_amount: reserve });
+    await admin.rpc("refund_tokens", {
+      p_amount: reserve,
+      p_user_id: authData.user.id,
+    });
     return out(req, { error: error instanceof Error ? error.message : "AI engine error", code: "AI_ENGINE_ERROR" }, 502);
   }
 });

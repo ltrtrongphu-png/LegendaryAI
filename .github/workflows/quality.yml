@@ -17,3 +17,5 @@ jobs:
         run: node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');for(const x of ['/js/chat.js','/js/ai-engine.js','/js/power-suite.js','/css/power-suite.css'])if(!h.includes(x))throw new Error('Missing '+x);console.log('frontend hooks: PASS')"
       - name: Regression test chat routing
         run: node tests/chat-routing.test.js
+      - name: Regression test Legendary Brain native core
+        run: node tests/brain-native-core.test.mjs

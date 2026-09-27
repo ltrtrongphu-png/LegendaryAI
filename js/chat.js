@@ -1228,7 +1228,7 @@
 
   // External AI client path removed. All AI requests use Legendary Engine.
 
-  function callLegendaryEngine(conv) {    function callLegendaryEngine(conv) {
+  function callLegendaryEngine(conv) {
     var typing = addTypingBubble();
 
     toggleBusyUI(true);

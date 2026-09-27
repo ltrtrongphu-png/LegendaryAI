@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
         display_name: user.user_metadata?.full_name || user.user_metadata?.name || (email ? email.split("@")[0] : "Legendary User"),
         avatar_url: user.user_metadata?.avatar_url || null,
         role: isOwner ? "owner" : "user",
-        plan: "free",
+        plan: isOwner ? "legendary" : "free",
         token_limit: isOwner ? 6000000 : 150000,
         memory_enabled: isOwner,
         vision_enabled: isOwner,

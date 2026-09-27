@@ -294,6 +294,7 @@
       title: 'Cuộc trò chuyện mới',
       slug: 'cuoc-tro-chuyen',
       createdAt: Date.now(),
+      draft: true,
       messages: [
         {
           role: 'ai',
@@ -441,7 +442,10 @@
 
   function persistConversations() {
     try {
-      localStorage.setItem(CONV_KEY, JSON.stringify(conversations));
+      var stored = conversations.filter(function (conv) {
+        return !conv.draft;
+      });
+      localStorage.setItem(CONV_KEY, JSON.stringify(stored));
     } catch (e) {
       /* ignore */
     }
@@ -493,8 +497,6 @@
     conversations.unshift(conv);
     activeId = conv.id;
     uniqueConversationSlug(conv);
-
-    persistConversations();
     persistActiveId();
     goToNewRoute();
 
@@ -1278,6 +1280,7 @@
     });
 
     if (role === 'user') {
+      conv.draft = false;
       autoTitle(conv, text, atts);
     }
 

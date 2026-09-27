@@ -10,6 +10,44 @@ const SHIELD_MAX_BODY_BYTES = 1_500_000;
 const SHIELD_MAX_MESSAGE_CHARS = 500_000;
 const shieldBuckets = new Map<string, { started: number; count: number; last: number }>();
 
+// Legendary Adaptive Intelligence 1.1.1
+const ADAPTIVE_MAX_MESSAGES = 48;
+const ADAPTIVE_MAX_CONTEXT_CHARS = 90_000;
+const RESPONSE_CACHE_TTL_MS = 15_000;
+const responseCache = new Map<string, { created: number; text: string }>();
+
+function requestId() { return crypto.randomUUID(); }
+
+function compactMessages(messages:any[]) {
+  const selected = (Array.isArray(messages) ? messages : []).slice(-ADAPTIVE_MAX_MESSAGES);
+  let total = 0;
+  const kept:any[] = [];
+  for (let i = selected.length - 1; i >= 0; i--) {
+    const m = selected[i], size = textOf(m?.content).length;
+    if (kept.length && total + size > ADAPTIVE_MAX_CONTEXT_CHARS) break;
+    kept.unshift(m);
+    total += size;
+  }
+  return kept;
+}
+
+async function stableHash(value:string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+function cacheGet(key:string) {
+  const hit = responseCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.created > RESPONSE_CACHE_TTL_MS) { responseCache.delete(key); return null; }
+  return hit.text;
+}
+
+function cacheSet(key:string,text:string) {
+  responseCache.set(key,{created:Date.now(),text});
+  if (responseCache.size > 500) responseCache.delete(responseCache.keys().next().value);
+}
+
 function clientKey(req: Request, userId: string) {
   const forwarded = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "";
   const ip = forwarded.split(",")[0].trim();
@@ -117,7 +155,9 @@ Deno.serve(async(req)=>{
  const url=Deno.env.get("SUPABASE_URL"),key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");if(!url||!key)return out(req,{error:"Server configuration missing",code:"SERVER_CONFIG"},503);
  const sb=createClient(url,key,{global:{headers:{Authorization:auth}}}),u=await sb.auth.getUser();if(u.error||!u.data.user)return out(req,{error:"Unauthorized"},401);
  let body:any;try{body=await req.json()}catch{return out(req,{error:"Invalid JSON"},400)}
- const ms=Array.isArray(body?.messages)?body.messages.slice(-120):[];
+ const rawMessages=Array.isArray(body?.messages)?body.messages.slice(-120):[];
+const ms=compactMessages(rawMessages);
+const reqId=requestId();
 if(!ms.length)return out(req,{error:"messages is required"},400);
 const shieldResult=shield(req,u.data.user.id,JSON.stringify(body));
 if(!shieldResult.ok){
@@ -125,7 +165,7 @@ if(!shieldResult.ok){
  response.headers.set("Retry-After",String(shieldResult.retryAfter));
  return response;
 }
-const messageChars=ms.reduce((n:any,m:any)=>n+textOf(m?.content).length,0);
+const messageChars=rawMessages.reduce((n:any,m:any)=>n+textOf(m?.content).length,0);
 if(messageChars>SHIELD_MAX_MESSAGE_CHARS)return out(req,{error:"Nội dung request vượt giới hạn bảo vệ.",code:"MESSAGE_TOO_LARGE"},413);
  let {data:p,error:pe}=await sb.from("profiles").select("role,plan,token_limit,tokens_used,token_reset_at,memory_enabled,vision_enabled").eq("id",u.data.user.id).maybeSingle();
  if(pe||!p)return out(req,{error:"Profile could not be loaded",code:"PROFILE_NOT_FOUND"},500);
@@ -142,15 +182,23 @@ if(messageChars>SHIELD_MAX_MESSAGE_CHARS)return out(req,{error:"Nội dung reque
  const input=tokens(ms.map((m:any)=>textOf(m.content)).join("\n")),max=Math.min(Math.max(Number(body?.max_tokens)||Number(model.max_output_tokens)||8192,256),Number(model.max_output_tokens)||8192),reserve=Math.max(1,Math.min(input+max,Number(p.token_limit||150000)));
  const {data:ok,error:te}=await sb.rpc("consume_tokens",{p_amount:reserve});if(te)return out(req,{error:te.message,code:"TOKEN_RPC_ERROR"},500);if(!ok)return out(req,{error:"Bạn đã chạm hạn mức token của gói hiện tại.",code:"TOKEN_LIMIT",tokenLimit:Number(p.token_limit||0),tokensUsed:Number(p.tokens_used||0),tokenResetAt:p.token_reset_at},429);
  try{
+  const startedAt=Date.now();
   const system=typeof body?.system==="string"?body.system.trim():String(model.system_prompt||"");
   const gateway=Deno.env.get("LEGENDARY_LOCAL_AI_URL")||"";
-  let text=gateway&&model.provider==="ollama-compatible"&&model.model_id?await ollama(gateway,model.model_id,ms,system,max,Number(body?.temperature??0.3)):answer(model.display_name||mk,ms,system);
-  if(!text)text=answer(model.display_name||mk,ms,system);
+  const cacheKey=await stableHash(JSON.stringify({user:u.data.user.id,model:model.key,system,messages:ms,temperature:Number(body?.temperature??0.3),max}));
+  let text=cacheGet(cacheKey);
+  const cacheHit=Boolean(text);
+  if(!text){
+    text=gateway&&model.provider==="ollama-compatible"&&model.model_id?await ollama(gateway,model.model_id,ms,system,max,Number(body?.temperature??0.3)):answer(model.display_name||mk,ms,system);
+    if(!text)text=answer(model.display_name||mk,ms,system);
+    if(text)cacheSet(cacheKey,text);
+  }
   const output=tokens(text),actual=input+output;if(reserve>actual)await sb.rpc("refund_tokens",{p_amount:reserve-actual});
   const {data:latest}=await sb.from("profiles").select("token_limit,tokens_used,token_reset_at").eq("id",u.data.user.id).maybeSingle();
+  const latencyMs=Date.now()-startedAt;
   await sb.from("ai_usage_logs").insert({user_id:u.data.user.id,model_key:model.key,provider_model:model.model_id,plan,input_tokens:input,output_tokens:output,reserved_tokens:reserve,request_ms:0,status:"success"});
   const i=intent(textOf([...ms].reverse().find((m:any)=>m.role==="user")?.content));
-  return out(req,{model:model.key,displayModel:model.display_name||mk,providerModel:model.model_id,tier:model.tier,capabilities:Array.isArray(model.capabilities)?model.capabilities:[],fallbackUsed:false,local:true,native:true,text,plan,brain:{version:"1.1.0",engine:"Legendary Brain 9.0",shield:"Legendary Shield 1.1.0",intent:i,memory:Boolean(p.memory_enabled),vision:Boolean(p.vision_enabled),route:model.provider==="ollama-compatible"&&gateway?"local-ai":"native-core",contextMessages:ms.length,contextChars:ms.map((m:any)=>textOf(m.content)).join("").length,selfCheck:true,reasoning:"structured",tool:null},usage:{input_tokens:input,output_tokens:output,total_tokens:actual,tokens_used:Number(latest?.tokens_used??Number(p.tokens_used||0)+actual),token_limit:Number(latest?.token_limit??p.token_limit),remaining_tokens:Math.max(0,Number(latest?.token_limit??p.token_limit)-Number(latest?.tokens_used??0))}});
+  return out(req,{model:model.key,displayModel:model.display_name||mk,providerModel:model.model_id,tier:model.tier,capabilities:Array.isArray(model.capabilities)?model.capabilities:[],fallbackUsed:false,local:true,native:true,text,plan,brain:{version:"1.1.1",engine:"Legendary Brain 9.0",shield:"Legendary Shield 1.1.0",adaptive:"Adaptive Intelligence 1.1.1",intent:i,memory:Boolean(p.memory_enabled),vision:Boolean(p.vision_enabled),route:model.provider==="ollama-compatible"&&gateway?"local-ai":"native-core",contextMessages:ms.length,rawContextMessages:rawMessages.length,contextChars:ms.map((m:any)=>textOf(m.content)).join("").length,cacheHit,selfCheck:true,reasoning:"structured",tool:null},performance:{latency_ms:latencyMs,cache_hit:cacheHit,context_compacted:rawMessages.length!==ms.length},usage:{input_tokens:input,output_tokens:output,total_tokens:actual,tokens_used:Number(latest?.tokens_used??Number(p.tokens_used||0)+actual),token_limit:Number(latest?.token_limit??p.token_limit),remaining_tokens:Math.max(0,Number(latest?.token_limit??p.token_limit)-Number(latest?.tokens_used??0))}});
  }catch(e){
   await sb.rpc("refund_tokens",{p_amount:reserve});
   return out(req,{error:e instanceof Error?e.message:String(e),code:"AI_ENGINE_ERROR"},502);

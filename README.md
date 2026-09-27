@@ -154,22 +154,37 @@ Lưu ý
 
 Repo không thể tự biết URL/anon key của project Supabase hoặc API key model của bạn. Vì vậy sau khi copy các file lên hosting, bạn vẫn cần cấu hình các secret ở Supabase. Đây là phần bắt buộc để đăng ký/đăng nhập và AI thật hoạt động an toàn.
 
-### Temporary Local Sandbox Mode
+### Legendary-only mode
 
-Hiện tại LegendaryAI chạy **Local Sandbox Models**, không gọi Claude/ChatGPT/OpenAI/Anthropic và không cần AI provider API key.
+LegendaryAI hiện sử dụng **Legendary Engine** làm đường AI duy nhất.
 
-| Gói | Model | Backend |
+| Gói | Model profile | Backend |
 |---|---|---|
-| Free | LegendaryLite-1 | Local Sandbox |
-| Pro | LegendaryPro-1 | Local Sandbox |
-| Legendary | LegendaryUltra-1 | Local Sandbox |
-| Owner | Custom Local | Local Sandbox |
+| Free | LegendaryLite-1 | Native Legendary Core |
+| Pro | LegendaryPro-1 | Native Legendary Core |
+| Legendary | LegendaryUltra-1 | Native Legendary Core |
+| Owner | Legendary Custom Core | Native Legendary Core |
 
-Local Sandbox chỉ phục vụ kiểm thử sản phẩm/end-to-end. Nó không phải foundation model có năng lực tương đương Claude hoặc ChatGPT. Khi hệ thống production sẵn sàng, có thể thay provider local bằng model backend thật mà không đổi frontend.
+External AI (Claude / OpenAI / ChatGPT / Anthropic) đang **tạm ngừng hỗ trợ** ở frontend và gateway. Browser không cần, không lưu và không gửi API key AI bên ngoài.
 
-Supabase project hiện tại:
+Legendary Engine hiện tập trung vào:
+- routing model theo gói và quyền Owner;
+- context dài, chuẩn hoá lịch sử hội thoại và token reservation;
+- memory retrieval khi tài khoản được bật memory;
+- core tính toán số học an toàn;
+- các bộ xử lý chuyên biệt cho code/debug, viết, tóm tắt và giải thích;
+- usage logging, quota và refund khi engine lỗi;
+- CORS/error handling rõ ràng ở Supabase Edge Function.
+
+**Quan trọng:** Native Legendary Core hiện là engine/orchestration nội bộ, chưa phải một foundation model neural có năng lực ngang ChatGPT/Claude. Muốn có khả năng sinh ngôn ngữ tự do ở mức foundation-model, cần triển khai một model backend/weights riêng của LegendaryAI. Việc này có thể làm sau mà không cần đưa API key vào frontend.
+
+### Deploy
+
+Frontend trên Vercel có thể tự deploy khi push GitHub nếu project Vercel đã liên kết repo.
+
+Supabase Edge Function `ai-chat` cần được deploy lên project Supabase sau khi cập nhật code. Nếu bạn kết nối Supabase với ChatGPT, có thể triển khai function và xem log trực tiếp; không đặt service-role key trong frontend.
+
+Supabase project:
 https://ampddcztjvejwjirqoer.supabase.co
 
-Publishable key được đặt trong js/supabase-config.js. Không đặt service-role key hoặc secret AI/MoMo vào frontend.
-
-Tạm thời không cấu hình Claude API, OpenAI/ChatGPT API, Anthropic API hoặc bất kỳ AI provider API key thật nào.
+Publishable key nằm trong `js/supabase-config.js`. Không đặt service-role key hoặc secret AI/MoMo vào frontend.

@@ -70,9 +70,9 @@
   };
   var PLAN_LABEL = { free: 'Free', pro: 'Pro', legendary: 'Legendary' };
   var PLAN_FEATURES = {
-    free: ['LegendaryLite-1 nâng cấp', 'Quick Mode + máy tính', 'Context phiên tốt hơn', '150.000 token/ngày'],
-    pro: ['Reasoner 32B*', 'Memory dài hạn', 'Vision + phân tích tệp', '2.000.000 token/ngày', 'Prompt Studio + xuất chat'],
-    legendary: ['Ultra 120B*', 'Vision 109B*', 'Context siêu dài', 'Advanced Memory', '6.000.000 token/ngày', 'Ưu tiên tài nguyên']
+    free: ['LegendaryLite-1 nâng cấp', 'Quick Mode + máy tính', 'Context phiên tốt hơn', '150.000 token / 6 giờ'],
+    pro: ['Reasoner 32B*', 'Memory dài hạn', 'Vision + phân tích tệp', '2.000.000 token / 12 giờ', 'Prompt Studio + xuất chat'],
+    legendary: ['Ultra 120B*', 'Vision 109B*', 'Context siêu dài', 'Advanced Memory', '6.000.000 token / 18 giờ', 'Ưu tiên tài nguyên']
   };
   var pendingPlan = null, checkoutPlan = null;
 

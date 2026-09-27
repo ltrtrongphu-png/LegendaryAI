@@ -30,8 +30,8 @@ function json(body: unknown, status = 200, req?: Request) {
 
 const MODEL_BY_PLAN: Record<string, string> = {
   free: "legendary-lite-1",
-  pro: "legendary-reasoner-32b",
-  legendary: "legendary-ultra-120b",
+  pro: "legendary-pro-1",
+  legendary: "legendary-ultra-1",
 };
 
 const FALLBACK_BY_PLAN: Record<string, string> = {

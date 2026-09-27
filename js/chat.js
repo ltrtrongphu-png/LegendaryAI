@@ -91,6 +91,15 @@
         tokens_used: used,
         token_reset_at: profile.token_reset_at
       });
+
+      if (chatModeLabel) {
+        var planModel = profile.role === 'owner' || profile.plan === 'legendary'
+          ? 'LegendaryUltra-1'
+          : profile.plan === 'pro'
+            ? 'LegendaryPro-1'
+            : 'LegendaryLite-1';
+        chatModeLabel.textContent = 'Legendary Engine · ' + planModel;
+      }
     } catch (_) {
       // Keep the last known value instead of replacing a valid token count
       // with a dash during a transient Supabase request.
@@ -1512,6 +1521,8 @@
   function callLegendaryEngine(conv) {
     var typing = addTypingBubble();
 
+    var controller = new AbortController();
+    activeController = controller;
     toggleBusyUI(true);
 
     if (streamStatus) {
@@ -1539,7 +1550,8 @@
       messages: messages,
       system: settings.system || '',
       temperature: 0.35,
-      max_tokens: 4096
+      max_tokens: 4096,
+      signal: controller.signal
     })
       .then(function (result) {
         typing.raw = result.text || '';
@@ -1567,18 +1579,31 @@
         }
       })
       .catch(function (err) {
-        setErrorBubble(
-          typing,
-          'Legendary Engine: ' +
-            (err && err.message
-              ? err.message
-              : err)
-        );
+        if (err && err.name === 'AbortError') {
+          setErrorBubble(typing, 'Đã dừng phản hồi.');
+        } else {
+          setErrorBubble(
+            typing,
+            'Legendary Engine: ' +
+              (err && err.message
+                ? err.message
+                : err)
+          );
+        }
 
         toggleBusyUI(false);
 
+        if (activeController === controller) {
+          activeController = null;
+        }
+
         if (streamStatus) {
           streamStatus.textContent = '';
+        }
+      })
+      .finally(function () {
+        if (activeController === controller) {
+          activeController = null;
         }
       });
   }

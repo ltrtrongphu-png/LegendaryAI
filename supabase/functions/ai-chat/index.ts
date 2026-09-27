@@ -34,6 +34,12 @@ const MODEL_BY_PLAN: Record<string, string> = {
   legendary: "legendary-ultra-120b",
 };
 
+const FALLBACK_BY_PLAN: Record<string, string> = {
+  free: "legendary-lite-1",
+  pro: "legendary-pro-1",
+  legendary: "legendary-ultra-1",
+};
+
 const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> = {
   free: {
     token_limit: 100000,
@@ -453,12 +459,26 @@ Deno.serve(async (req) => {
     !tierAllowed(profile.role, profile.plan, selectedModel.tier)
   ) {
     const entitledKey = MODEL_BY_PLAN[profile.plan] || MODEL_BY_PLAN.free;
-    const { data: fallback } = await supabase
+    const fallbackKey = FALLBACK_BY_PLAN[profile.plan] || FALLBACK_BY_PLAN.free;
+
+    let fallback = null;
+    const { data: entitledModel } = await supabase
       .from("ai_models")
       .select("key,display_name,tier,provider,model_id,context_window,max_output_tokens,capabilities,system_prompt,enabled")
       .eq("key", entitledKey)
       .eq("enabled", true)
       .maybeSingle();
+    fallback = entitledModel;
+
+    if (!fallback && fallbackKey !== entitledKey) {
+      const { data: safeFallback } = await supabase
+        .from("ai_models")
+        .select("key,display_name,tier,provider,model_id,context_window,max_output_tokens,capabilities,system_prompt,enabled")
+        .eq("key", fallbackKey)
+        .eq("enabled", true)
+        .maybeSingle();
+      fallback = safeFallback;
+    }
 
     selectedModel = fallback;
     fallbackUsed = true;

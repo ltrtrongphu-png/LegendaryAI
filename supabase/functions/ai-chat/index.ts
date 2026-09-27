@@ -1,14 +1,25 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 const configuredSiteUrl = (Deno.env.get("SITE_URL") || "").replace(/\/$/, "");
+const ALLOWED_WEB_ORIGINS = new Set([
+  "https://legendaryai.vercel.app",
+  "https://www.legendaryai.vercel.app",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+]);
+if (configuredSiteUrl) ALLOWED_WEB_ORIGINS.add(configuredSiteUrl);
+
 const baseCorsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Credentials": "true",
+  "Access-Control-Expose-Headers": "content-type",
 };
 
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
-  const allowedOrigin = configuredSiteUrl || origin || "*";
+  const allowedOrigin = ALLOWED_WEB_ORIGINS.has(origin)
+    ? origin
+    : "https://legendaryai.vercel.app";
   return {
     ...baseCorsHeaders,
     "Access-Control-Allow-Origin": allowedOrigin,

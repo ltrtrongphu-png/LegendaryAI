@@ -30,6 +30,7 @@ create table if not exists public.conversations (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null default 'Cuộc trò chuyện mới',
+  slug text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -63,6 +64,8 @@ create table if not exists public.orders (
 
 create index if not exists conversations_user_updated_idx
   on public.conversations(user_id, updated_at desc);
+create unique index if not exists conversations_user_slug_uidx
+  on public.conversations(user_id, slug) where slug is not null;
 create index if not exists messages_conversation_created_idx
   on public.messages(conversation_id, created_at);
 create index if not exists orders_user_created_idx
@@ -210,7 +213,7 @@ create table if not exists public.ai_models (
 );
 
 alter table public.ai_models drop constraint if exists ai_models_provider_check;
-alter table public.ai_models add constraint ai_models_provider_check check (provider in ('local','openai-compatible','anthropic-compatible'));
+alter table public.ai_models add constraint ai_models_provider_check check (provider in ('local','ollama-compatible','openai-compatible','anthropic-compatible'));
 alter table public.ai_models add column if not exists tier text not null default 'free';
 alter table public.ai_models add column if not exists base_url_env text;
 alter table public.ai_models add column if not exists api_key_env text;
@@ -300,7 +303,46 @@ on conflict (key) do update set
   model_id = excluded.model_id,
   base_url = excluded.base_url,
   system_prompt = excluded.system_prompt,
-  updated_at = now();
+  updated_at = now(),
+(
+  'legendary-reasoner-32b',
+  'Legendary Reasoner 32B',
+  'pro',
+  'ollama-compatible',
+  'qwen3:30b',
+  'LEGENDARY_LOCAL_AI_URL',
+  null,
+  131072,
+  16384,
+  '["chat","code","reasoning","math","writing","tools"]'::jsonb,
+  'Native Legendary reasoning profile powered by a self-hosted Qwen3-class model.'
+),
+(
+  'legendary-ultra-120b',
+  'Legendary Ultra 120B',
+  'legendary',
+  'ollama-compatible',
+  'gpt-oss:120b',
+  'LEGENDARY_LOCAL_AI_URL',
+  null,
+  131072,
+  32768,
+  '["chat","code","reasoning","math","writing","vision","tools","memory"]'::jsonb,
+  'Native Legendary high-end reasoning profile powered by a self-hosted open-weight model.'
+),
+(
+  'legendary-vision-109b',
+  'Legendary Vision 109B',
+  'legendary',
+  'ollama-compatible',
+  'llama4:scout',
+  'LEGENDARY_LOCAL_AI_URL',
+  null,
+  1048576,
+  16384,
+  '["chat","code","vision","files","reasoning","multimodal","memory"]'::jsonb,
+  'Native Legendary multimodal profile powered by a self-hosted Llama 4 Scout-class model.'
+);
 
 -- Owner can list users and orders only through the owner-only edge function.
 

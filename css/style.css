@@ -467,3 +467,9 @@ table.compare-table{width:100%; border-collapse:collapse; min-width:640px;}
 .external-ai-disabled strong{font-size:.85rem;}
 .external-ai-disabled span{font-size:.76rem;color:var(--text-muted);line-height:1.45;}
 .external-ai-field{display:none!important;}
+
+
+/* Generated image output */
+.generated-image-wrap{display:flex;flex-direction:column;gap:8px;max-width:min(100%,900px)}
+.generated-image{display:block;width:auto;max-width:100%;height:auto;max-height:70vh;border-radius:16px;border:1px solid rgba(120,140,180,.22);box-shadow:0 12px 40px rgba(0,0,0,.18)}
+.generated-image-meta{font-size:12px;opacity:.65}

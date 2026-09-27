@@ -53,6 +53,8 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     smart_formatting: true,
     advanced_memory: false,
     long_context: false,
+    file_analysis: false,
+    web_search: false,
     priority: false,
     token_reset_hours: 6,
     manual_reset: false,
@@ -63,8 +65,13 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     vision: true,
     file_analysis: true,
     advanced_reasoning: true,
+    quick_reasoning: true,
+    smart_math: true,
+    smart_formatting: true,
     advanced_memory: false,
     long_context: true,
+    file_analysis: true,
+    web_search: false,
     priority: true,
     token_reset_hours: 12,
     manual_reset: true,
@@ -75,8 +82,13 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     vision: true,
     file_analysis: true,
     advanced_reasoning: true,
+    quick_reasoning: true,
+    smart_math: true,
+    smart_formatting: true,
     advanced_memory: true,
     long_context: true,
+    file_analysis: true,
+    web_search: false,
     priority: true,
     token_reset_hours: 18,
     manual_reset: true,
@@ -85,18 +97,19 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
 
 function routeModelByTask(plan: string, role: string, prompt: string): string {
   const text = (prompt || "").toLowerCase();
+  const localGatewayReady = Boolean(Deno.env.get("LEGENDARY_LOCAL_AI_URL"));
 
-  if (/vision|ảnh|image|hình ảnh|screenshot|camera|ocr/.test(text)) {
+  if (localGatewayReady && /vision|ảnh|image|hình ảnh|screenshot|camera|ocr/.test(text)) {
     if (plan === "pro") return "legendary-vision-pro-11b";
     if (plan === "legendary" || role === "owner") return "legendary-vision-109b";
   }
 
-  if ((plan === "legendary" || role === "owner") &&
+  if (localGatewayReady && (plan === "legendary" || role === "owner") &&
       /reason|reasoning|suy luận|chứng minh|toán|math|logic|debug|kiến trúc|architecture|phân tích sâu/.test(text)) {
     return "legendary-ultra-120b";
   }
 
-  if ((plan === "pro" || plan === "legendary" || role === "owner") &&
+  if (localGatewayReady && (plan === "pro" || plan === "legendary" || role === "owner") &&
       /code|coding|javascript|typescript|python|sql|supabase|github|debug|lỗi|bug|api|backend|frontend/.test(text)) {
     return "legendary-reasoner-32b";
   }
@@ -126,7 +139,7 @@ Core principles:
 - For reasoning, work step-by-step internally and present a clear, useful result.
 - If information is uncertain or unavailable, say so plainly and give the best supported next step.
 - Keep answers concise by default, but go deep when the task requires it.
-- LegendaryAI is currently Legendary-only and does not call Claude, OpenAI, ChatGPT, Anthropic, or other external AI providers.`;
+- LegendaryAI does not call Claude, OpenAI, ChatGPT, Anthropic, or other external AI providers.`;
 
 function estimateTokens(text: string): number {
   return Math.max(1, Math.ceil((text || "").length / 4));
@@ -733,7 +746,7 @@ Deno.serve(async (req) => {
       plan: profile.plan,
       planFeatures,
       brain: {
-        version: "6.0",
+        version: "7.0",
         intent,
         tool: requestedTool || null,
         route: selectedModel.key,
@@ -753,9 +766,9 @@ Deno.serve(async (req) => {
           code_review: true,
           calculator: !!planFeatures.smart_math,
           memory: profile.memory_enabled,
-          web_search: !!profile.web_search_enabled,
+          web_search: false,
           vision: !!profile.vision_enabled,
-          self_hosted_models: true,
+          self_hosted_models: Boolean(Deno.env.get("LEGENDARY_LOCAL_AI_URL")),
         },
       },
       usage: {

@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
   await supabase.from("orders").update(update).eq("id", order.id);
 
   if (success) {
-    const limits: Record<string, number> = { pro: 300000, legendary: 1000000 };
+    const limits: Record<string, number> = { pro: 2000000, legendary: 6000000 };
     await supabase.from("profiles").update({
       plan: order.plan,
       token_limit: limits[order.plan] || 250000,

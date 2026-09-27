@@ -92,13 +92,12 @@
         token_reset_at: profile.token_reset_at
       });
 
-      if (chatModeLabel) {
-        var planModel = profile.role === 'owner' || profile.plan === 'legendary'
-          ? 'LegendaryUltra-1'
-          : profile.plan === 'pro'
-            ? 'LegendaryPro-1'
-            : 'LegendaryLite-1';
-        chatModeLabel.textContent = 'Legendary Engine · ' + planModel;
+      // Do not replace the user's selected model with the plan default here.
+      // refreshTokenHud() runs periodically and after auth/profile events; using
+      // the plan default here made an explicitly selected Lite/Pro model appear
+      // to "switch back" to Ultra for Legendary/Owner accounts.
+      if (typeof settings !== 'undefined' && settings) {
+        updateModeLabel();
       }
     } catch (_) {
       // Keep the last known value instead of replacing a valid token count

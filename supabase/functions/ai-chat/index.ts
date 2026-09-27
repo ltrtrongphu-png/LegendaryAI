@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const ORIGINS=new Set(["https://legendaryai.vercel.app","https://www.legendaryai.vercel.app","http://localhost:3000","http://127.0.0.1:3000"]);\n
+const ORIGINS=new Set(["https://legendaryai.vercel.app","https://www.legendaryai.vercel.app","http://localhost:3000","http://127.0.0.1:3000"]);
+
 // Legendary Shield 1.1.0 — application-layer abuse/DDoS resistance.
 // This is not a substitute for a CDN/WAF/network DDoS provider.
 const SHIELD_WINDOW_MS = 60_000;

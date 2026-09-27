@@ -76,8 +76,9 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
 function routeModelByTask(plan: string, role: string, prompt: string): string {
   const text = (prompt || "").toLowerCase();
 
-  if ((role === "owner" || plan === "legendary") && /vision|ảnh|image|hình ảnh|screenshot|camera|ocr/.test(text)) {
-    return "legendary-vision-109b";
+  if (/vision|ảnh|image|hình ảnh|screenshot|camera|ocr/.test(text)) {
+    if (plan === "pro") return "legendary-vision-pro-11b";
+    if (plan === "legendary" || role === "owner") return "legendary-vision-109b";
   }
 
   if ((plan === "legendary" || role === "owner") &&
@@ -300,6 +301,7 @@ function modelName(modelKey: string): string {
   if (modelKey === "legendary-pro-1") return "LegendaryPro-1";
   if (modelKey === "custom") return "Legendary Custom Core";
   if (modelKey === "legendary-reasoner-32b") return "Legendary Reasoner 32B";
+  if (modelKey === "legendary-vision-pro-11b") return "Legendary Vision Pro 11B";
   if (modelKey === "legendary-ultra-120b") return "Legendary Ultra 120B";
   if (modelKey === "legendary-vision-109b") return "Legendary Vision 109B";
   return "LegendaryLite-1";
@@ -326,10 +328,10 @@ function extractMemoryCandidates(prompt: string): string[] {
   return [...new Set(results)];
 }
 
-function memoryAugmentedSystem(system: string, memories: string[]): string {
+function memoryAugmentedSystem(system: string, memories: string[], maxCount = 10): string {
   if (!memories.length) return system;
   const memoryBlock = memories
-    .slice(0, 10)
+    .slice(0, maxCount)
     .map((m) => "- " + m)
     .join("\n");
   return system + "\n\nLONG-TERM MEMORY (trusted user-provided context; use only when relevant):\n" + memoryBlock;
@@ -513,6 +515,7 @@ Deno.serve(async (req) => {
       : (selectedModel.system_prompt || SYSTEM_DEFAULT);
 
   let memories: string[] = [];
+  const memoryLimit = profile.plan === "legendary" || profile.role === "owner" ? 24 : 12;
   if (profile.memory_enabled) {
     const { data: memoryRows } = await supabase
       .from("ai_memories")
@@ -520,7 +523,7 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .order("importance", { ascending: false })
       .order("updated_at", { ascending: false })
-      .limit(12);
+      .limit(memoryLimit);
     memories = (memoryRows || [])
       .map((row: any) => String(row.memory || "").trim())
       .filter(Boolean);
@@ -529,7 +532,11 @@ Deno.serve(async (req) => {
   const lastUser = [...normalizedMessages].reverse().find((m: any) => m?.role === "user");
   const lastUserText = textFromContent(lastUser?.content);
 
-  const effectiveSystem = memoryAugmentedSystem(system, memories);
+  const effectiveSystem = memoryAugmentedSystem(
+    system,
+    memories,
+    profile.plan === "legendary" || profile.role === "owner" ? 24 : 10,
+  );
   const intent = detectIntent(lastUserText);
 
   if (profile.memory_enabled) {

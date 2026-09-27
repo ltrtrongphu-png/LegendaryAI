@@ -1,11 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders as supabaseCorsHeaders } from "npm:@supabase/supabase-js@2/cors";
-
 const configuredSiteUrl = (Deno.env.get("SITE_URL") || "").replace(/\/$/, "");
 const baseCorsHeaders = {
-  ...supabaseCorsHeaders,
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Credentials": "true",
 };
 
 function getCorsHeaders(req: Request) {

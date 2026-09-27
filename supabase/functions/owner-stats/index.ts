@@ -3,14 +3,25 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const configuredSiteUrl = (Deno.env.get("SITE_URL") || "").replace(/\/$/, "");
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
 };
 function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("origin") || "";
+  const origin = (req.headers.get("origin") || "").replace(/\/$/, "");
+  const allowed = new Set([
+    configuredSiteUrl,
+    "https://legendaryai.vercel.app",
+    "https://www.legendaryai.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+  ].filter(Boolean));
+  const isVercelPreview = /^https:\/\/legendaryai(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+  const allowOrigin = allowed.has(origin) || isVercelPreview ? origin : (configuredSiteUrl || "https://legendaryai.vercel.app");
   return {
     ...baseCorsHeaders,
-    "Access-Control-Allow-Origin": configuredSiteUrl || origin || "*",
+    "Access-Control-Allow-Origin": allowOrigin,
     "Vary": "Origin",
   };
 }
@@ -45,6 +56,12 @@ Deno.serve(async (req) => {
     admin.from("orders").select("amount,status,plan,created_at").order("created_at", { ascending: false }).limit(20),
     admin.from("conversations").select("id", { count: "exact", head: true }),
   ]);
+
+  const queryErrors = [users.error, paid.error, orders.error, chats.error].filter(Boolean);
+  if (queryErrors.length) {
+    console.error("owner-stats query failure", queryErrors);
+    return json({ error: "Không đọc được dữ liệu dashboard." }, 500, req);
+  }
 
   const revenue = (paid.data || []).reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
 

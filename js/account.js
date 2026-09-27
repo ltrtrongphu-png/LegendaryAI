@@ -25,6 +25,13 @@
       if (!user) return null;
       var r = await supabase.from('profiles').select('*').eq('id', user.id).single();
       return r.data || null;
+    },
+    async manualResetTokens() {
+      if (!supabase) return { error: { message: 'Supabase chưa sẵn sàng.' } };
+      var r = await supabase.rpc('manual_reset_tokens');
+      if (r.error) return { error: r.error };
+      var row = Array.isArray(r.data) ? r.data[0] : r.data;
+      return { data: row };
     }
   };
 

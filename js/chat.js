@@ -477,12 +477,64 @@
 
   function persistConversations() {
     try {
-      var stored = conversations.filter(function (conv) {
-        return !conv.draft;
-      });
-      localStorage.setItem(CONV_KEY, JSON.stringify(stored));
+      var stored = conversations
+        .filter(function (conv) { return !conv.draft; })
+        .map(function (conv) {
+          var copy = Object.assign({}, conv);
+          copy.messages = (conv.messages || []).map(function (m) {
+            var next = Object.assign({}, m);
+            next.text = String(next.text || '').slice(0, 120000);
+            next.attachments = (next.attachments || []).map(function (a) {
+              var item = Object.assign({}, a);
+              // Base64 images can exhaust localStorage very quickly.
+              // Keep small previews, but strip oversized binary payloads from
+              // persisted history so one large image cannot break all saves.
+              if ((item.kind === 'image' || item.kind === 'generated-image') &&
+                  item.dataUrl && item.dataUrl.length > 180000) {
+                item.dataUrl = '';
+                item.persisted = false;
+              }
+              if ((item.kind === 'text' || item.kind === 'archive') && item.textContent) {
+                item.textContent = String(item.textContent).slice(0, 30000);
+              }
+              return item;
+            });
+            return next;
+          });
+          return copy;
+        });
+
+      var serialized = JSON.stringify(stored);
+
+      // Stay below typical browser localStorage quotas. If a conversation
+      // history is unusually large, retain recent messages rather than
+      // silently losing the entire save.
+      if (serialized.length > 3500000) {
+        stored = stored.map(function (conv) {
+          var copy = Object.assign({}, conv);
+          copy.messages = (conv.messages || []).slice(-60).map(function (m) {
+            var next = Object.assign({}, m);
+            next.text = String(next.text || '').slice(0, 20000);
+            next.attachments = (next.attachments || []).map(function (a) {
+              var item = Object.assign({}, a);
+              if (item.dataUrl) {
+                item.dataUrl = '';
+                item.persisted = false;
+              }
+              if (item.textContent) item.textContent = String(item.textContent).slice(0, 12000);
+              return item;
+            });
+            return next;
+          });
+          return copy;
+        });
+        serialized = JSON.stringify(stored);
+      }
+
+      localStorage.setItem(CONV_KEY, serialized);
     } catch (e) {
-      /* ignore */
+      // Storage quotas, private-mode restrictions, or malformed legacy data
+      // should never break the chat UI.
     }
   }
 
@@ -1507,11 +1559,11 @@
     attachments.forEach(function (a) {
       if (!a) return;
       if (a.kind === 'text' && a.textContent) {
-        parts.push({ type: 'text', text: '\\n\\n[File: ' + (a.name || 'attachment') + ']\\n' + a.textContent });
+        parts.push({ type: 'text', text: '\n\n[File: ' + (a.name || 'attachment') + ']\n' + a.textContent });
       } else if (a.kind === 'image' && a.dataUrl) {
         parts.push({ type: 'image', image: a.dataUrl, name: a.name || 'image' });
       } else {
-        parts.push({ type: 'text', text: '\\n\\n[Attachment: ' + (a.name || 'file') + ']' });
+        parts.push({ type: 'text', text: '\n\n[Attachment: ' + (a.name || 'file') + ']' });
       }
     });
     return parts.length === 1 && parts[0].type === 'text' ? parts[0].text : parts;

@@ -253,8 +253,8 @@
   }
 
   function routeSlug() {
-    var path = window.location.pathname.replace(/\\/+$/, '') || '/';
-    var match = path.match(/^\\/chat\\/([^/]+)$/i);
+    var path = window.location.pathname.replace(/\/+$/, '') || '/';
+    var match = path.match(/^\/chat\/([^/]+)$/i);
     if (!match) return null;
     try {
       return decodeURIComponent(match[1]);
@@ -264,7 +264,7 @@
   }
 
   function isNewRoute() {
-    return /^\\/new\\/?$/i.test(window.location.pathname);
+    return /^\/new\/?$/i.test(window.location.pathname);
   }
 
   function uniqueConversationSlug(conv) {

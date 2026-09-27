@@ -1,5 +1,5 @@
 /* LegendaryAI Hero v11 — containment + composition fix */
-/* Root cause fixed: v10 allowed the oversized hero visual to overflow into stats/features. */
+/* v12 polish: continuous 3D motion + duplicate live-card guard */
 .hero.hero{
   position:relative!important;
   overflow:hidden!important;
@@ -15,12 +15,17 @@
   place-items:center!important;
   padding:0!important;
 }
+
+/* Keep the logo visually solid while it rotates: use a full-plane 360deg turn
+   with a restrained 3D tilt instead of turning the flat SVG edge-on. */
 .hero-visual .legendary-3d-logo.legendary-3d-logo{
   width:410px!important;
   height:410px!important;
   max-width:none!important;
   max-height:none!important;
   z-index:30!important;
+  transform-style:preserve-3d!important;
+  perspective:1800px!important;
 }
 .hero-visual .legendary-3d-logo-img.legendary-3d-logo-img{
   width:360px!important;
@@ -28,6 +33,29 @@
   max-width:none!important;
   max-height:none!important;
   z-index:40!important;
+  object-fit:contain!important;
+  transform-origin:50% 50%!important;
+  transform-style:preserve-3d!important;
+  backface-visibility:visible!important;
+  will-change:transform,filter!important;
+  animation:la12LogoSpin 34s linear infinite,la12LogoGlow 5.8s ease-in-out infinite!important;
+  /* one continuous extrusion-like shadow, rather than separated shadow slices */
+  filter:drop-shadow(0 7px 0 rgba(38,76,158,.24))
+         drop-shadow(0 15px 12px rgba(38,76,158,.16))
+         drop-shadow(0 28px 30px rgba(23,67,151,.25))
+         drop-shadow(0 0 46px rgba(48,158,255,.44))
+         drop-shadow(0 0 30px rgba(145,73,255,.24))!important;
+}
+.hero-visual .legendary-3d-logo::after{
+  content:""!important;
+  position:absolute!important;
+  inset:28px!important;
+  z-index:-1!important;
+  pointer-events:none!important;
+  border-radius:50%!important;
+  background:radial-gradient(circle,rgba(72,158,255,.14),rgba(123,83,255,.08) 42%,transparent 72%)!important;
+  filter:blur(18px)!important;
+  transform:translateZ(-18px)!important;
 }
 .hero-visual .legendary-logo-aura{
   width:370px!important;
@@ -41,6 +69,7 @@
   margin:-63px 0 0 -205px!important;
   max-width:none!important;
 }
+
 /* Keep all capability cards inside the visual frame. */
 .hero-visual.hero-visual::before{
   left:4%!important;
@@ -71,8 +100,43 @@
   transform:rotate(5deg)!important;
   animation:la10Reason 8.2s ease-in-out infinite!important;
 }
+
+/* If an older DOM layer leaves a second live-status badge behind the real one,
+   keep only the first. */
+.hero-visual > .orb-badge ~ .orb-badge{
+  display:none!important;
+}
+.hero-visual .orb-badge + .orb-badge{
+  display:none!important;
+}
+
 /* Prevent decorative layers from escaping the hero into later sections. */
 .hero.hero::before,.hero.hero::after{overflow:hidden!important;}
+
+@keyframes la12LogoSpin{
+  0%{transform:perspective(1800px) rotateX(7deg) rotateY(0deg) rotateZ(0deg) translateZ(8px) scale(1)}
+  25%{transform:perspective(1800px) rotateX(5deg) rotateY(3deg) rotateZ(90deg) translateZ(14px) scale(1.012)}
+  50%{transform:perspective(1800px) rotateX(-5deg) rotateY(-3deg) rotateZ(180deg) translateZ(18px) scale(1.024)}
+  75%{transform:perspective(1800px) rotateX(5deg) rotateY(3deg) rotateZ(270deg) translateZ(14px) scale(1.012)}
+  100%{transform:perspective(1800px) rotateX(7deg) rotateY(0deg) rotateZ(360deg) translateZ(8px) scale(1)}
+}
+@keyframes la12LogoGlow{
+  0%,100%{
+    filter:drop-shadow(0 7px 0 rgba(38,76,158,.24))
+           drop-shadow(0 15px 12px rgba(38,76,158,.16))
+           drop-shadow(0 28px 30px rgba(23,67,151,.25))
+           drop-shadow(0 0 42px rgba(48,158,255,.36))
+           drop-shadow(0 0 26px rgba(145,73,255,.20))
+  }
+  50%{
+    filter:drop-shadow(0 8px 0 rgba(38,76,158,.27))
+           drop-shadow(0 17px 14px rgba(38,76,158,.18))
+           drop-shadow(0 34px 36px rgba(23,67,151,.28))
+           drop-shadow(0 0 62px rgba(48,158,255,.52))
+           drop-shadow(0 0 36px rgba(145,73,255,.30))
+  }
+}
+
 @media(max-width:1100px){
   .hero.hero{min-height:620px!important}
   .hero-visual.hero-visual{min-height:470px!important;height:470px!important}
@@ -104,4 +168,7 @@
   .hero-visual.hero-visual::before{left:0!important;top:4%!important}
   .hero-visual.hero-visual::after{left:0!important;bottom:3%!important}
   .hero-visual .orb-badge{right:0!important;top:1%!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero.hero::after,.hero-visual .legendary-3d-logo-img,.hero-visual .legendary-logo-aura,.hero-visual.hero-visual::before,.hero-visual.hero-visual::after,.hero-visual .orb-badge,.hero-visual .orb-badge::before,.hero-visual .orb-badge::after{animation:none!important}
 }

@@ -146,13 +146,61 @@ Deno.serve(async (req) => {
   if (!messages.length) return json(req, { error: "messages is required", code: "MESSAGES_REQUIRED" }, 400);
 
   const user = authResult.data.user;
-  const { data: profile, error: profileError } = await supabase
+  let { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("role,plan,token_limit,tokens_used,token_reset_at,memory_enabled,vision_enabled")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (profileError || !profile) return json(req, { error: "Profile not found", code: "PROFILE_NOT_FOUND" }, 404);
+  // Self-heal accounts created before the profile trigger was installed, or
+  // accounts where the trigger failed. This prevents a valid authenticated
+  // user from getting stuck at "Profile not found".
+  if (!profile && !profileError) {
+    const email = String(user.email || "").trim().toLowerCase();
+    const isOwner = email === "ltrtrongphu@gmail.com";
+    const { error: createProfileError } = await supabase
+      .from("profiles")
+      .insert({
+        id: user.id,
+        display_name: user.user_metadata?.full_name || user.user_metadata?.name || (email ? email.split("@")[0] : "Legendary User"),
+        avatar_url: user.user_metadata?.avatar_url || null,
+        role: isOwner ? "owner" : "user",
+        plan: "free",
+        token_limit: isOwner ? 6000000 : 150000,
+        memory_enabled: isOwner,
+        vision_enabled: isOwner,
+        web_search_enabled: isOwner,
+      });
+
+    if (!createProfileError) {
+      const refreshed = await supabase
+        .from("profiles")
+        .select("role,plan,token_limit,tokens_used,token_reset_at,memory_enabled,vision_enabled")
+        .eq("id", user.id)
+        .maybeSingle();
+      profile = refreshed.data;
+      profileError = refreshed.error;
+    } else if (createProfileError.code === "23505") {
+      // A concurrent request may have created the row between our read and insert.
+      const refreshed = await supabase
+        .from("profiles")
+        .select("role,plan,token_limit,tokens_used,token_reset_at,memory_enabled,vision_enabled")
+        .eq("id", user.id)
+        .maybeSingle();
+      profile = refreshed.data;
+      profileError = refreshed.error;
+    } else {
+      profileError = createProfileError;
+    }
+  }
+
+  if (profileError || !profile) {
+    return json(req, {
+      error: "Profile could not be loaded or created",
+      code: "PROFILE_NOT_FOUND",
+      details: profileError?.message || null,
+    }, 500);
+  }
 
   const plan = String(profile.plan || "free");
   const role = String(profile.role || "user");
@@ -199,8 +247,25 @@ Deno.serve(async (req) => {
 
     const outputTokens = estimateTokens(answer);
     const actual = inputTokens + outputTokens;
-    const { data: stateRows } = await supabase.rpc("finalize_tokens", { p_reserved: reservation, p_actual: actual });
-    const state = Array.isArray(stateRows) ? stateRows[0] : stateRows;
+
+    // The reservation is made up-front by consume_tokens(). Refund the unused
+    // part instead of depending on a second finalize_tokens RPC that may not
+    // exist on older Supabase projects.
+    if (reservation > actual) {
+      await supabase.rpc("refund_tokens", { p_amount: reservation - actual });
+    }
+
+    const { data: latestProfile } = await supabase
+      .from("profiles")
+      .select("token_limit,tokens_used,token_reset_at")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const state = latestProfile || {
+      token_limit: profile.token_limit,
+      tokens_used: Number(profile.tokens_used || 0) + actual,
+      token_reset_at: profile.token_reset_at,
+    };
 
     await supabase.from("ai_usage_logs").insert({
       user_id: user.id,
@@ -212,7 +277,6 @@ Deno.serve(async (req) => {
       reserved_tokens: reservation,
       request_ms: 0,
       status: "success",
-      tool_key: null,
     });
 
     return json(req, {

@@ -307,6 +307,7 @@ async function ollamaResponse(
 }
 
 const TOOL_PROMPTS: Record<string, string> = {
+  calculator: "Evaluate a basic arithmetic expression safely. Never use eval or execute code.",
   summarize: "Summarize the supplied material. Return the key points, decisions, risks, and next actions. Do not invent missing facts.",
   rewrite: "Rewrite the user's material while preserving meaning. Improve clarity, structure, grammar, and tone. Return only the requested rewritten result unless explanation is requested.",
   plan: "Create an actionable plan with goal, assumptions, ordered steps, dependencies, risks, and a verification checklist.",

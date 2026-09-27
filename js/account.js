@@ -240,8 +240,11 @@
     return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  var accountRenderSeq = 0;
+
   async function renderAccountArea() {
     if (!accountArea) return;
+    var renderSeq = ++accountRenderSeq;
     accountArea.innerHTML = '';
     if (!supabase) {
       var btn = document.createElement('button');
@@ -254,6 +257,7 @@
     }
 
     var user = await LegendaryBackend.getUser();
+    if (renderSeq !== accountRenderSeq) return;
     if (!user) {
       var loginBtn = document.createElement('button');
       loginBtn.type = 'button';
@@ -266,6 +270,7 @@
     }
 
     var profile = await LegendaryBackend.getProfile();
+    if (renderSeq !== accountRenderSeq) return;
     profile = profile || { plan: 'free', token_limit: 150000, tokens_used: 0 };
     var name = (profile.display_name || user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name) || user.email || 'User');
     var menu = document.createElement('div');
@@ -326,7 +331,11 @@
       var open = dropdown.classList.toggle('open');
       trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
-    menu.appendChild(trigger); menu.appendChild(dropdown); accountArea.appendChild(menu);
+    menu.appendChild(trigger);
+    menu.appendChild(dropdown);
+    if (renderSeq !== accountRenderSeq) return;
+    accountArea.innerHTML = '';
+    accountArea.appendChild(menu);
     renderPricingState(profile);
   }
 

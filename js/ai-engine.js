@@ -93,7 +93,8 @@
         messages: options.messages || [],
         system: options.system || '',
         temperature: options.temperature ?? 0.35,
-        max_tokens: options.max_tokens || 4096
+        max_tokens: options.max_tokens || 4096,
+        tool: options.tool || ''
       };
 
       var result = await invokeWithRetry(payload, token);

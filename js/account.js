@@ -289,6 +289,25 @@
     logout.className = 'btn btn-outline btn-sm';
     logout.textContent = 'Đăng xuất';
     logout.addEventListener('click', signOut);
+    if (profile.plan === 'pro' || profile.plan === 'legendary' || profile.role === 'owner') {
+      var quotaBtn = document.createElement('button');
+      quotaBtn.className = 'btn btn-outline btn-sm';
+      quotaBtn.textContent = '↻ Làm mới hạn mức';
+      quotaBtn.style.marginBottom = '8px';
+      quotaBtn.addEventListener('click', async function () {
+        quotaBtn.disabled = true;
+        var result = await window.LegendaryBackend.manualResetTokens();
+        if (!result.data || !result.data.success) {
+          alert((result.error && result.error.message) || (result.data && result.data.message) || 'Không thể làm mới hạn mức.');
+        } else {
+          alert('Đã làm mới hạn mức.');
+          renderAccount();
+        }
+        quotaBtn.disabled = false;
+      });
+      dropdown.appendChild(quotaBtn);
+    }
+
     if (profile.role === 'owner') {
       var ownerBtn = document.createElement('button');
       ownerBtn.className = 'btn btn-primary btn-sm';

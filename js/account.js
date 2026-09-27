@@ -467,7 +467,10 @@
     }, 500);
   }
 
+  // Do not reload the whole page after auth changes. Re-render the account
+  // control in place so the header can update without interrupting the current UI,
+  // scroll position, chat draft, or open sections.
   window.addEventListener('legendary:auth-changed', function () {
-    setTimeout(function () { location.reload(); }, 100);
+    renderAccountArea();
   });
 })();

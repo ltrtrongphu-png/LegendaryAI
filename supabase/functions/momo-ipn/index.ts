@@ -42,6 +42,15 @@ Deno.serve(async (req) => {
 
   if (orderError || !order) return jsonResponse({ error: "Order not found" }, 404);
 
+  const configuredPartnerCode = Deno.env.get("MOMO_PARTNER_CODE")!;
+  if (body.partnerCode !== configuredPartnerCode) {
+    return jsonResponse({ error: "Invalid partnerCode" }, 401);
+  }
+
+  if (Number(body.amount) !== Number(order.amount)) {
+    return jsonResponse({ error: "Amount mismatch" }, 400);
+  }
+
   const success = Number(body.resultCode) === 0;
   const update = {
     status: success ? "paid" : "failed",
@@ -51,7 +60,20 @@ Deno.serve(async (req) => {
     updated_at: new Date().toISOString(),
   };
 
-  await supabase.from("orders").update(update).eq("id", order.id);
+  if (order.status === "paid") {
+    return jsonResponse({ resultCode: 0, message: "already processed" });
+  }
+
+  const { data: claimedOrder, error: updateError } = await supabase
+    .from("orders")
+    .update(update)
+    .eq("id", order.id)
+    .neq("status", "paid")
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) return jsonResponse({ error: "Order update failed" }, 500);
+  if (!claimedOrder) return jsonResponse({ resultCode: 0, message: "already processed" });
 
   if (success) {
     const limits: Record<string, number> = { pro: 2000000, legendary: 6000000 };

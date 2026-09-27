@@ -1145,7 +1145,7 @@
     var html = '<div class="msg-attachments">';
 
     attachments.forEach(function (a) {
-      if (a.kind === 'image') {
+      if (a.kind === 'image' || a.kind === 'generated-image') {
         html +=
           '<img class="att-thumb" src="' +
           a.dataUrl +
@@ -1607,10 +1607,74 @@
       });
   }
 
+  function isImageGenerationPrompt(text) {
+    return /(?:\\b(?:tạo|vẽ|generate|draw|create)\\b.*\\b(?:ảnh|hình|image|picture)\\b|\\b(?:ảnh|hình|image|picture)\\b.*\\b(?:tạo|vẽ|generate|draw|create)\\b)/i.test(String(text || ''));
+  }
+
+  function callImageProvider(conv) {
+    var typing = addTypingBubble();
+    var controller = new AbortController();
+    activeController = controller;
+    toggleBusyUI(true);
+
+    if (streamStatus) streamStatus.textContent = 'Image Provider đang tạo ảnh…';
+
+    var prompt = getLastUserMessageText(conv);
+    window.LegendaryAIEngine.image({
+      prompt: prompt,
+      size: 'auto',
+      quality: 'auto',
+      background: 'auto',
+      signal: controller.signal
+    })
+      .then(function (result) {
+        var dataUrl = result && result.imageDataUrl;
+        if (!dataUrl) throw new Error('Image Provider không trả về dữ liệu ảnh.');
+
+        typing.bubble.classList.remove('typing');
+        typing.bubble.innerHTML =
+          '<div class="generated-image-wrap">' +
+          '<img class="generated-image" src="' + dataUrl + '" alt="' + escapeHtml(prompt) + '">' +
+          '<div class="generated-image-meta">GPT Image 2 · Image Provider</div>' +
+          '</div>';
+
+        var savedText = 'Đã tạo ảnh bằng GPT Image 2.\n\nPrompt: ' + prompt;
+        var convSaved = findConv(typing.convId) || getActiveConv();
+        convSaved.messages.push({
+          role: 'ai',
+          text: savedText,
+          attachments: [{ kind: 'generated-image', dataUrl: dataUrl, name: 'legendary-image.png' }]
+        });
+        persistConversations();
+
+        if (streamStatus) streamStatus.textContent = '✓ GPT Image 2 · Image Provider';
+        if (chatModeLabel) chatModeLabel.textContent = 'Image Provider · GPT Image 2';
+        toggleBusyUI(false);
+      })
+      .catch(function (err) {
+        if (err && err.name === 'AbortError') {
+          setErrorBubble(typing, 'Đã dừng tạo ảnh.');
+        } else {
+          setErrorBubble(typing, 'Image Provider: ' + (err && err.message ? err.message : err));
+        }
+        toggleBusyUI(false);
+        if (streamStatus) streamStatus.textContent = '';
+      })
+      .finally(function () {
+        if (activeController === controller) activeController = null;
+      });
+  }
+
   function triggerAssistantResponse() {
     var conv = getActiveConv();
+    var prompt = getLastUserMessageText(conv);
+
     if (window.LegendaryAIEngine) {
-      callLegendaryEngine(conv);
+      if (isImageGenerationPrompt(prompt)) {
+        callImageProvider(conv);
+      } else {
+        callLegendaryEngine(conv);
+      }
       return;
     }
 

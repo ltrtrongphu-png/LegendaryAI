@@ -116,6 +116,10 @@ function constraints(s:string){
  if(/không|don't|đừng/i.test(s))a.push("có ràng buộc phủ định");
  return a;
 }
+function outputBudget(i:string, configured:number) {
+ const caps:Record<string,number> = {greeting:1024,math:2048,rewrite:4096,translate:4096,summarize:6144,code:12288,plan:8192,compare:8192,explain:8192,brainstorm:6144,general:8192};
+ return Math.min(configured, caps[i] || 8192);
+}
 function codeReview(src:string,prompt:string){
  const findings:string[]=[];
  if(/api[_-]?key|service[_-]?role|password|secret/i.test(src))findings.push("Có dấu hiệu secret/credential; giữ ở server-side secret store.");
@@ -179,18 +183,29 @@ if(messageChars>SHIELD_MAX_MESSAGE_CHARS)return out(req,{error:"Nội dung reque
  }
  const {data:model}=await sb.from("ai_models").select("key,display_name,tier,provider,model_id,max_output_tokens,capabilities,system_prompt,enabled").eq("key",mk).eq("enabled",true).maybeSingle();
  if(!model)return out(req,{error:"Legendary model is not configured",code:"MODEL_NOT_CONFIGURED"},503);
- const input=tokens(ms.map((m:any)=>textOf(m.content)).join("\n")),max=Math.min(Math.max(Number(body?.max_tokens)||Number(model.max_output_tokens)||8192,256),Number(model.max_output_tokens)||8192),reserve=Math.max(1,Math.min(input+max,Number(p.token_limit||150000)));
+ const userPrompt=textOf([...ms].reverse().find((m:any)=>m?.role==="user")?.content);
+ const requestIntent=intent(userPrompt);
+ const requestedMax=Math.min(Math.max(Number(body?.max_tokens)||Number(model.max_output_tokens)||8192,256),Number(model.max_output_tokens)||8192);
+ const max=outputBudget(requestIntent,requestedMax);
+ const input=tokens(ms.map((m:any)=>textOf(m.content)).join("\n"));
+ const reserve=Math.max(1,Math.min(input+max,Number(p.token_limit||150000)));
  const {data:ok,error:te}=await sb.rpc("consume_tokens",{p_amount:reserve});if(te)return out(req,{error:te.message,code:"TOKEN_RPC_ERROR"},500);if(!ok)return out(req,{error:"Bạn đã chạm hạn mức token của gói hiện tại.",code:"TOKEN_LIMIT",tokenLimit:Number(p.token_limit||0),tokensUsed:Number(p.tokens_used||0),tokenResetAt:p.token_reset_at},429);
  try{
   const startedAt=Date.now();
   const system=typeof body?.system==="string"?body.system.trim():String(model.system_prompt||"");
   const gateway=Deno.env.get("LEGENDARY_LOCAL_AI_URL")||"";
-  const cacheKey=await stableHash(JSON.stringify({user:u.data.user.id,model:model.key,system,messages:ms,temperature:Number(body?.temperature??0.3),max}));
+  const canUseLocalAI=Boolean(gateway&&model.provider==="ollama-compatible"&&model.model_id);
+  const cacheKey=await stableHash(JSON.stringify({user:u.data.user.id,model:model.key,system,messages:ms,temperature:Number(body?.temperature??0.3),max,routeMode:canUseLocalAI?"local-ai":"native-core"}));
   let text=cacheGet(cacheKey);
   const cacheHit=Boolean(text);
+  let fallbackUsed=false;
+  let route=canUseLocalAI?"local-ai":"native-core";
   if(!text){
-    text=gateway&&model.provider==="ollama-compatible"&&model.model_id?await ollama(gateway,model.model_id,ms,system,max,Number(body?.temperature??0.3)):answer(model.display_name||mk,ms,system);
-    if(!text)text=answer(model.display_name||mk,ms,system);
+    if(canUseLocalAI){
+      try{text=await ollama(gateway,model.model_id,ms,system,max,Number(body?.temperature??0.3));}
+      catch{fallbackUsed=true;route="native-fallback";text="";}
+    }
+    if(!text){text=answer(model.display_name||mk,ms,system);route=fallbackUsed?"native-fallback":"native-core";}
     if(text)cacheSet(cacheKey,text);
   }
   const output=tokens(text),actual=input+output;if(reserve>actual)await sb.rpc("refund_tokens",{p_amount:reserve-actual});
@@ -198,7 +213,7 @@ if(messageChars>SHIELD_MAX_MESSAGE_CHARS)return out(req,{error:"Nội dung reque
   const latencyMs=Date.now()-startedAt;
   await sb.from("ai_usage_logs").insert({user_id:u.data.user.id,model_key:model.key,provider_model:model.model_id,plan,input_tokens:input,output_tokens:output,reserved_tokens:reserve,request_ms:0,status:"success"});
   const i=intent(textOf([...ms].reverse().find((m:any)=>m.role==="user")?.content));
-  return out(req,{model:model.key,displayModel:model.display_name||mk,providerModel:model.model_id,tier:model.tier,capabilities:Array.isArray(model.capabilities)?model.capabilities:[],fallbackUsed:false,local:true,native:true,text,plan,brain:{version:"1.1.1",engine:"Legendary Brain 9.0",shield:"Legendary Shield 1.1.0",adaptive:"Adaptive Intelligence 1.1.1",intent:i,memory:Boolean(p.memory_enabled),vision:Boolean(p.vision_enabled),route:model.provider==="ollama-compatible"&&gateway?"local-ai":"native-core",contextMessages:ms.length,rawContextMessages:rawMessages.length,contextChars:ms.map((m:any)=>textOf(m.content)).join("").length,cacheHit,selfCheck:true,reasoning:"structured",tool:null},performance:{latency_ms:latencyMs,cache_hit:cacheHit,context_compacted:rawMessages.length!==ms.length},usage:{input_tokens:input,output_tokens:output,total_tokens:actual,tokens_used:Number(latest?.tokens_used??Number(p.tokens_used||0)+actual),token_limit:Number(latest?.token_limit??p.token_limit),remaining_tokens:Math.max(0,Number(latest?.token_limit??p.token_limit)-Number(latest?.tokens_used??0))}});
+  return out(req,{requestId:reqId,model:model.key,displayModel:model.display_name||mk,providerModel:model.model_id,tier:model.tier,capabilities:Array.isArray(model.capabilities)?model.capabilities:[],fallbackUsed,local:true,native:true,text,plan,brain:{version:"1.1.2",engine:"Legendary Brain 9.0",shield:"Legendary Shield 1.1.0",adaptive:"Adaptive Intelligence 1.1.2",intent:i,memory:Boolean(p.memory_enabled),vision:Boolean(p.vision_enabled),route,fallbackUsed,contextMessages:ms.length,rawContextMessages:rawMessages.length,contextChars:ms.map((m:any)=>textOf(m.content)).join("").length,cacheHit,selfCheck:true,reasoning:"structured",tool:null,outputBudget:max},performance:{latency_ms:latencyMs,cache_hit:cacheHit,context_compacted:rawMessages.length!==ms.length},usage:{input_tokens:input,output_tokens:output,total_tokens:actual,tokens_used:Number(latest?.tokens_used??Number(p.tokens_used||0)+actual),token_limit:Number(latest?.token_limit??p.token_limit),remaining_tokens:Math.max(0,Number(latest?.token_limit??p.token_limit)-Number(latest?.tokens_used??0))}});
  }catch(e){
   await sb.rpc("refund_tokens",{p_amount:reserve});
   return out(req,{error:e instanceof Error?e.message:String(e),code:"AI_ENGINE_ERROR"},502);

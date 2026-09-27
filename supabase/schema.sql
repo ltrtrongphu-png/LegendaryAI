@@ -265,6 +265,11 @@ values
   'Native Legendary reasoning profile backed by a self-hosted Qwen3-class model.',false
 ),
 (
+  'legendary-vision-pro-11b','Legendary Vision Pro 11B','pro','ollama-compatible','llama3.2-vision:11b','LEGENDARY_LOCAL_AI_URL',null,131072,8192,
+  '["chat","vision","files","ocr","image_reasoning","memory"]'::jsonb,
+  'Native Pro multimodal profile backed by a self-hosted Llama 3.2 Vision 11B model.',false
+),
+(
   'legendary-ultra-120b','Legendary Ultra 120B','legendary','ollama-compatible','gpt-oss:120b','LEGENDARY_LOCAL_AI_URL',null,131072,32768,
   '["chat","code","reasoning","math","writing","vision","tools","memory"]'::jsonb,
   'Native Legendary high-end reasoning profile backed by a self-hosted open-weight model.',false

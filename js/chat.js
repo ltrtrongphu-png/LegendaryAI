@@ -36,6 +36,51 @@
   var streamToggle = document.getElementById('streamToggle');
   var engineModelSelect = document.getElementById('engineModelSelect');
   var promptPresetSelect = document.getElementById('promptPresetSelect');
+  var tokenHud = document.getElementById('chatTokenHud');
+  var tokensRemainingEl = document.getElementById('chatTokensRemaining');
+  var tokenResetEl = document.getElementById('chatTokenReset');
+
+  function formatTokenNumber(value) {
+    return Number(value || 0).toLocaleString('vi-VN');
+  }
+
+  function formatResetCountdown(iso) {
+    if (!iso) return '';
+    var ms = new Date(iso).getTime() - Date.now();
+    if (ms <= 0) return 'đang hồi…';
+    var mins = Math.ceil(ms / 60000);
+    var h = Math.floor(mins / 60);
+    var m = mins % 60;
+    return '· hồi sau ' + h + 'h ' + String(m).padStart(2, '0') + 'm';
+  }
+
+  function updateTokenHud(state) {
+    if (!tokensRemainingEl) return;
+    if (!state) {
+      tokensRemainingEl.textContent = '—';
+      if (tokenResetEl) tokenResetEl.textContent = '';
+      return;
+    }
+    var remaining = state.tokens_remaining;
+    if (remaining == null && state.token_limit != null) {
+      remaining = Math.max(Number(state.token_limit) - Number(state.tokens_used || 0), 0);
+    }
+    tokensRemainingEl.textContent = formatTokenNumber(remaining);
+    if (tokenResetEl) tokenResetEl.textContent = formatResetCountdown(state.token_reset_at);
+  }
+
+  async function refreshTokenHud() {
+    try {
+      if (!window.LegendaryBackend || !window.LegendaryBackend.getProfile) return;
+      var profile = await window.LegendaryBackend.getProfile();
+      updateTokenHud(profile ? {
+        tokens_remaining: Math.max(Number(profile.token_limit || 0) - Number(profile.tokens_used || 0), 0),
+        token_limit: profile.token_limit,
+        tokens_used: profile.tokens_used,
+        token_reset_at: profile.token_reset_at
+      } : null);
+    } catch (_) {}
+  }
 
   var SETTINGS_KEY = 'legendaryai_settings';
   var CONV_KEY = 'legendaryai_conversations_v2';
@@ -44,6 +89,9 @@
   var pendingAttachments = [];
 
   // External AI provider configuration intentionally removed: Legendary Engine only.
+
+  refreshTokenHud();
+  window.setInterval(refreshTokenHud, 30000);
 
   // ---------------------------------------------------------------------
   // Settings (global, shared across conversations)
@@ -1477,6 +1525,10 @@
               ' · ' + (brain.intent || 'general') +
               (brain.memory ? ' · memory' : '')
             : '';
+        }
+
+        if (result && result.usage) {
+          updateTokenHud(result.usage);
         }
 
         if (chatModeLabel && result && result.displayModel) {

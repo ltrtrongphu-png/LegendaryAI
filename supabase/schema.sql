@@ -240,9 +240,9 @@ insert into public.ai_models
   (key, display_name, tier, provider, model_id, base_url_env, api_key_env, context_window, max_output_tokens, capabilities, system_prompt, enabled)
 values
 (
-  'legendary-lite-1','LegendaryLite-1','free','local','legendary-lite-local',null,null,32768,4096,
-  '["chat","code","writing","files"]'::jsonb,
-  'You are LegendaryLite-1, the Free-tier assistant of LegendaryAI. Be concise, accurate, helpful, and efficient.',true
+  'legendary-lite-1','LegendaryLite-1','free','local','legendary-lite-local',null,null,49152,6144,
+  '["chat","code","writing","arithmetic","smart_formatting","session_context"]'::jsonb,
+  'You are LegendaryLite-1, the fast Free-tier assistant of LegendaryAI. Be concise, accurate, practical, structured, and efficient. Use the conversation context aggressively, solve basic arithmetic reliably, help with everyday code and writing, and never invent external sources.',true
 ),
 (
   'legendary-pro-1','LegendaryPro-1','pro','local','legendary-pro-local',null,null,65536,8192,

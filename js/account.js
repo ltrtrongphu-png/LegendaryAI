@@ -265,6 +265,12 @@
       loginBtn.textContent = 'Đăng nhập';
       loginBtn.addEventListener('click', function () { openAuthModal('login'); });
       accountArea.appendChild(loginBtn);
+      var headerCta = document.getElementById('headerTrialCta');
+      if (headerCta) {
+        headerCta.textContent = 'Dùng thử ngay';
+        headerCta.href = '#demo';
+        headerCta.title = 'Dùng thử Legendary AI';
+      }
       renderPricingState(null);
       return;
     }
@@ -273,6 +279,14 @@
     if (renderSeq !== accountRenderSeq) return;
     profile = profile || { plan: 'free', token_limit: 150000, tokens_used: 0 };
     var name = (profile.display_name || user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name) || user.email || 'User');
+    // The main header CTA becomes the signed-in account name.
+    var headerCta = document.getElementById('headerTrialCta');
+    if (headerCta) {
+      headerCta.textContent = name;
+      headerCta.href = '#demo';
+      headerCta.title = 'Mở khu vực dùng thử';
+    }
+
     var menu = document.createElement('div');
     menu.className = 'account-menu';
 
@@ -429,7 +443,12 @@
 
   if (supabase) {
     supabase.auth.onAuthStateChange(function (_event) {
-      setTimeout(function () { renderAccountArea(); }, 0);
+      // Update account UI and notify the chat HUD after the profile is ready.
+      // This prevents the token pill from getting stuck at "—" after login.
+      setTimeout(async function () {
+        await renderAccountArea();
+        window.dispatchEvent(new CustomEvent('legendary:profile-ready'));
+      }, 0);
     });
   }
 

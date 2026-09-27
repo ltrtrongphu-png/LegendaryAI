@@ -237,112 +237,56 @@ create policy "ai models owner write" on public.ai_models
   ));
 
 insert into public.ai_models
-  (key, display_name, tier, provider, model_id, base_url_env, api_key_env, context_window, max_output_tokens, capabilities, system_prompt)
+  (key, display_name, tier, provider, model_id, base_url_env, api_key_env, context_window, max_output_tokens, capabilities, system_prompt, enabled)
 values
 (
-  'legendary-lite-1',
-  'LegendaryLite-1',
-  'free',
-  'local',
-  'legendary-lite-local',
-  null,
-  null,
-  32768,
-  4096,
+  'legendary-lite-1','LegendaryLite-1','free','local','legendary-lite-local',null,null,32768,4096,
   '["chat","code","writing","files"]'::jsonb,
-  'You are LegendaryLite-1, the Free-tier assistant of LegendaryAI. Be concise, accurate, helpful, and efficient.'
+  'You are LegendaryLite-1, the Free-tier assistant of LegendaryAI. Be concise, accurate, helpful, and efficient.',true
 ),
 (
-  'legendary-pro-1',
-  'LegendaryPro-1',
-  'pro',
-  'local',
-  'legendary-pro-local',
-  null,
-  null,
-  65536,
-  8192,
+  'legendary-pro-1','LegendaryPro-1','pro','local','legendary-pro-local',null,null,65536,8192,
   '["chat","code","writing","files","vision","memory"]'::jsonb,
-  'You are LegendaryPro-1, the Pro-tier assistant of LegendaryAI. Reason carefully, preserve context, produce production-ready code, and explain trade-offs clearly.'
+  'You are LegendaryPro-1, the Pro-tier assistant of LegendaryAI. Reason carefully and preserve context.',true
 ),
 (
-  'legendary-ultra-1',
-  'LegendaryUltra-1',
-  'legendary',
-  'local',
-  'legendary-ultra-local',
-  null,
-  null,
-  131072,
-  16384,
+  'legendary-ultra-1','LegendaryUltra-1','legendary','local','legendary-ultra-local',null,null,131072,16384,
   '["chat","code","writing","files","vision","memory","web_search","tools"]'::jsonb,
-  'You are LegendaryUltra-1, the highest-tier assistant of LegendaryAI. Prioritize deep reasoning, robust code, long-context synthesis, tool planning, and explicit uncertainty handling.'
+  'You are LegendaryUltra-1, the highest-tier assistant of LegendaryAI. Prioritize deep reasoning, robust code and long-context synthesis.',true
 ),
 (
-  'custom',
-  'Custom Model',
-  'system',
-  'local',
-  'legendary-custom-local',
-  null,
-  null,
-  131072,
-  16384,
+  'custom','Custom Model','system','local','legendary-custom-local',null,null,131072,16384,
   '["chat","code","writing","files","vision","memory","tools"]'::jsonb,
-  'You are a custom model integrated into LegendaryAI. Follow system instructions precisely and preserve context.'
+  'You are a custom model integrated into LegendaryAI. Follow system instructions precisely.',true
+),
+(
+  'legendary-reasoner-32b','Legendary Reasoner 32B','pro','ollama-compatible','qwen3:30b','LEGENDARY_LOCAL_AI_URL',null,131072,16384,
+  '["chat","code","reasoning","math","writing","tools"]'::jsonb,
+  'Native Legendary reasoning profile backed by a self-hosted Qwen3-class model.',false
+),
+(
+  'legendary-ultra-120b','Legendary Ultra 120B','legendary','ollama-compatible','gpt-oss:120b','LEGENDARY_LOCAL_AI_URL',null,131072,32768,
+  '["chat","code","reasoning","math","writing","vision","tools","memory"]'::jsonb,
+  'Native Legendary high-end reasoning profile backed by a self-hosted open-weight model.',false
+),
+(
+  'legendary-vision-109b','Legendary Vision 109B','legendary','ollama-compatible','llama4:scout','LEGENDARY_LOCAL_AI_URL',null,1048576,16384,
+  '["chat","code","vision","files","reasoning","multimodal","memory"]'::jsonb,
+  'Native Legendary multimodal profile backed by a self-hosted Llama 4-class model.',false
 )
 on conflict (key) do update set
-  display_name = excluded.display_name,
-  tier = excluded.tier,
-  provider = excluded.provider,
-  base_url_env = excluded.base_url_env,
-  api_key_env = excluded.api_key_env,
-  context_window = excluded.context_window,
-  max_output_tokens = excluded.max_output_tokens,
-  capabilities = excluded.capabilities,
-  model_id = excluded.model_id,
-  base_url = excluded.base_url,
-  system_prompt = excluded.system_prompt,
-  updated_at = now(),
-(
-  'legendary-reasoner-32b',
-  'Legendary Reasoner 32B',
-  'pro',
-  'ollama-compatible',
-  'qwen3:30b',
-  'LEGENDARY_LOCAL_AI_URL',
-  null,
-  131072,
-  16384,
-  '["chat","code","reasoning","math","writing","tools"]'::jsonb,
-  'Native Legendary reasoning profile powered by a self-hosted Qwen3-class model.'
-),
-(
-  'legendary-ultra-120b',
-  'Legendary Ultra 120B',
-  'legendary',
-  'ollama-compatible',
-  'gpt-oss:120b',
-  'LEGENDARY_LOCAL_AI_URL',
-  null,
-  131072,
-  32768,
-  '["chat","code","reasoning","math","writing","vision","tools","memory"]'::jsonb,
-  'Native Legendary high-end reasoning profile powered by a self-hosted open-weight model.'
-),
-(
-  'legendary-vision-109b',
-  'Legendary Vision 109B',
-  'legendary',
-  'ollama-compatible',
-  'llama4:scout',
-  'LEGENDARY_LOCAL_AI_URL',
-  null,
-  1048576,
-  16384,
-  '["chat","code","vision","files","reasoning","multimodal","memory"]'::jsonb,
-  'Native Legendary multimodal profile powered by a self-hosted Llama 4 Scout-class model.'
-);
+  display_name=excluded.display_name,
+  tier=excluded.tier,
+  provider=excluded.provider,
+  model_id=excluded.model_id,
+  base_url_env=excluded.base_url_env,
+  api_key_env=excluded.api_key_env,
+  context_window=excluded.context_window,
+  max_output_tokens=excluded.max_output_tokens,
+  capabilities=excluded.capabilities,
+  system_prompt=excluded.system_prompt,
+  enabled=excluded.enabled,
+  updated_at=now();
 
 -- Owner can list users and orders only through the owner-only edge function.
 

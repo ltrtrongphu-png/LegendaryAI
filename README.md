@@ -201,7 +201,7 @@ Then enable the desired `ai_models` row. Do not put this URL or any private infe
 
 - **Pro — 149.000đ/tháng:** 2.000.000 token/ngày, Reasoner 32B*, Vision Pro 11B*, long context, memory, Prompt Studio và export Markdown.
 - **Legendary — 399.000đ/tháng:** 6.000.000 token/ngày, Ultra 120B*, Vision 109B*, Advanced Memory và routing model cao cấp.
-- **Free — 0đ/tháng:** 100.000 token/ngày và LegendaryLite-1.
+- **Free — 0đ/tháng: 150.000 token/ngày, LegendaryLite-1 nâng cấp, Quick Mode, máy tính và session context.
 
 ### Conversation URLs
 

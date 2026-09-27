@@ -263,7 +263,7 @@
     }
 
     var profile = await LegendaryBackend.getProfile();
-    profile = profile || { plan: 'free', token_limit: 100000, tokens_used: 0 };
+    profile = profile || { plan: 'free', token_limit: 150000, tokens_used: 0 };
     var name = (profile.display_name || user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name) || user.email || 'User');
     var menu = document.createElement('div');
     menu.className = 'account-menu';
@@ -281,7 +281,7 @@
     dropdown.className = 'account-dropdown';
     dropdown.innerHTML = '<p class="acc-email">' + escapeHtml(user.email || '') + '</p>' +
       '<p class="acc-plan-line">Gói hiện tại: <strong>' + PLAN_LABEL[profile.plan] + '</strong></p>' +
-      '<p class="acc-plan-line">Token: <strong>' + Number(profile.tokens_used || 0).toLocaleString('vi-VN') + ' / ' + Number(profile.token_limit || 100000).toLocaleString('vi-VN') + '</strong></p>' +
+      '<p class="acc-plan-line">Token còn lại: <strong>' + Math.max(Number(profile.token_limit || 0) - Number(profile.tokens_used || 0), 0).toLocaleString('vi-VN') + ' / ' + Number(profile.token_limit || 150000).toLocaleString('vi-VN') + '</strong></p>' +
       (profile.role === 'owner' ? '<p class="acc-plan-line"><strong>Quyền Owner</strong> · Quản trị hệ thống</p>' : '') +
       '<div class="acc-features"><strong>Quyền gói</strong>' + (PLAN_FEATURES[profile.plan] || PLAN_FEATURES.free).map(function (f) { return '<span>' + escapeHtml(f) + '</span>'; }).join('') + '</div>';
 

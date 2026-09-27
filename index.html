@@ -45,7 +45,11 @@
   ]
 }
 </script>
-</head>
+<style id="chat-token-upgrade-style">
+.chat-token-hud{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid rgba(120,140,180,.22);border-radius:12px;background:rgba(12,18,30,.72);font-size:13px;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:3;white-space:nowrap}
+.chat-token-icon{font-size:14px}.chat-token-hud strong{font-variant-numeric:tabular-nums}.chat-token-reset{opacity:.7;font-size:11px;margin-left:4px}
+@media(max-width:760px){.chat-token-hud{position:static;transform:none;margin:8px auto;width:max-content;max-width:calc(100% - 20px);font-size:12px}.chat-topbar{position:relative}}
+</style></head>
 <body>
 
 <a href="#main-content" class="skip-link">Bỏ qua tới nội dung chính</a>
@@ -221,6 +225,11 @@
         <p class="chat-sidebar-note">Lịch sử chat lưu cục bộ trong trình duyệt của bạn, không gửi lên máy chủ nào.</p>
       </aside>
       <div class="chat-shell" id="chatShell">
+        <div class="chat-token-hud" id="chatTokenHud" aria-live="polite">
+          <span class="chat-token-icon">◈</span>
+          <span><strong id="chatTokensRemaining">—</strong> token còn lại</span>
+          <span class="chat-token-reset" id="chatTokenReset"></span>
+        </div>
         <div class="chat-topbar">
           <div class="chat-topbar-left">
             <button type="button" id="sidebarToggle" class="btn btn-ghost btn-sm chat-icon-btn" aria-label="Danh sách hội thoại" aria-expanded="false" title="Danh sách hội thoại">☰</button>
@@ -238,7 +247,10 @@
         <div class="chat-suggestions" id="chatSuggestions">
           <button type="button" data-suggest="Giúp tôi debug một đoạn mã JavaScript">Debug mã JS</button>
           <button type="button" data-suggest="Viết giúp tôi một email xin nghỉ phép lịch sự">Soạn email</button>
-          <button type="button" data-suggest="Tóm tắt ưu nhược điểm của các gói dùng của Legendary AI">So sánh gói dùng</button>
+          <button type="button" data-suggest="Tóm tắt nội dung sau và rút ra 5 ý chính: ">Tóm tắt</button>
+          <button type="button" data-suggest="Viết lại nội dung sau theo văn phong chuyên nghiệp, rõ ràng: ">Viết lại</button>
+          <button type="button" data-suggest="Lập kế hoạch từng bước để hoàn thành mục tiêu sau: ">Lập kế hoạch</button>
+          <button type="button" data-suggest="Phân tích đoạn code sau, tìm bug và đề xuất cách sửa: ">Code Review</button>
         </div>
         <form id="chatForm" class="chat-input-row">
           <input type="file" id="fileInput" accept="image/*,.txt,.md,.csv,.json,.log" multiple hidden>

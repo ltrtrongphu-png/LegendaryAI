@@ -30,14 +30,47 @@ function json(body: unknown, status = 200, req?: Request) {
 
 const MODEL_BY_PLAN: Record<string, string> = {
   free: "legendary-lite-1",
-  pro: "legendary-pro-1",
-  legendary: "legendary-ultra-1",
+  pro: "legendary-reasoner-32b",
+  legendary: "legendary-ultra-120b",
+};
+
+const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> = {
+  free: {
+    token_limit: 100000,
+    memory: false,
+    vision: false,
+    file_analysis: false,
+    advanced_reasoning: false,
+    advanced_memory: false,
+    long_context: false,
+    priority: false,
+  },
+  pro: {
+    token_limit: 2000000,
+    memory: true,
+    vision: true,
+    file_analysis: true,
+    advanced_reasoning: true,
+    advanced_memory: false,
+    long_context: true,
+    priority: true,
+  },
+  legendary: {
+    token_limit: 6000000,
+    memory: true,
+    vision: true,
+    file_analysis: true,
+    advanced_reasoning: true,
+    advanced_memory: true,
+    long_context: true,
+    priority: true,
+  },
 };
 
 function routeModelByTask(plan: string, role: string, prompt: string): string {
   const text = (prompt || "").toLowerCase();
 
-  if (role === "owner" && /vision|ảnh|image|hình ảnh|screenshot|camera|ocr/.test(text)) {
+  if ((role === "owner" || plan === "legendary") && /vision|ảnh|image|hình ảnh|screenshot|camera|ocr/.test(text)) {
     return "legendary-vision-109b";
   }
 
@@ -413,6 +446,7 @@ Deno.serve(async (req) => {
   const capabilities = Array.isArray(selectedModel.capabilities)
     ? selectedModel.capabilities
     : [];
+  const planFeatures = PLAN_FEATURES[profile.plan] || PLAN_FEATURES.free;
 
   const maxContextChars = Math.min(
     Math.max(12000, Number(selectedModel.context_window || 32768) * 3),
@@ -550,8 +584,10 @@ Deno.serve(async (req) => {
       local: true,
       native: true,
       text,
+      plan: profile.plan,
+      planFeatures,
       brain: {
-        version: "3.0",
+        version: "4.0",
         intent,
         route: selectedModel.key,
         memory: profile.memory_enabled,

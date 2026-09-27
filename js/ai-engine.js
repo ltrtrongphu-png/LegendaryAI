@@ -1,9 +1,8 @@
 (function () {
   'use strict';
 
-  var sb = window.LegendaryBackend && window.LegendaryBackend.client;
-  if (!sb) return;
-
+  // Do not abort initialization when Supabase is still becoming available.
+  // The engine resolves the current backend/token lazily when chat() is called.
   function sleep(ms) {
     return new Promise(function (resolve) {
       setTimeout(resolve, ms);

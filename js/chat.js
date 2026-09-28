@@ -18,12 +18,6 @@
   var charCount = document.getElementById('chatCharCount');
   var streamStatus = document.getElementById('chatStreamStatus');
   var suggestionsWrap = document.getElementById('chatSuggestions');
-  var chatModelControl = document.getElementById('chatModelControl');
-  var chatModelBtn = document.getElementById('chatModelBtn');
-  var chatModelLabel = document.getElementById('chatModelLabel');
-  var chatModelMenu = document.getElementById('chatModelMenu');
-  var reasoningBtn = document.getElementById('reasoningBtn');
-
   var attachBtn = document.getElementById('attachBtn');
   var fileInput = document.getElementById('fileInput');
   var attachPreview = document.getElementById('attachPreview');
@@ -239,7 +233,6 @@
     }
 
     engineModelSelect.value = desired;
-    renderModelPicker();
   }
 
   function effectiveModelKey() {
@@ -249,80 +242,15 @@
     return 'legendary-lite-1';
   }
 
-  function renderModelPicker() {
-    if (!chatModelLabel || !chatModelMenu || !engineModelSelect) return;
-    var effective = effectiveModelKey();
-    chatModelLabel.textContent = MODEL_LABELS[effective] || effective;
-    chatModelMenu.innerHTML = '';
-
-    Array.prototype.forEach.call(engineModelSelect.options, function (option) {
-      var item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'chat-model-option';
-      if (option.disabled) item.classList.add('is-locked');
-      if (option.value === (settings.engineModel || 'auto')) item.classList.add('is-selected');
-      item.disabled = option.disabled;
-      item.innerHTML = '<span><strong>' + escapeHtml(MODEL_LABELS[option.value] || option.textContent) + '</strong><small>' +
-        (option.value === 'auto' ? 'Tự động theo gói' : option.textContent.split('·').slice(1).join('·').trim()) +
-        '</small></span><span class="chat-model-check">' + (option.value === (settings.engineModel || 'auto') ? '✓' : (option.disabled ? '🔒' : '')) + '</span>';
-      item.addEventListener('click', function () {
-        settings.engineModel = option.value;
-        saveSettingsToStorage(settings);
-        engineModelSelect.value = option.value;
-        updateModeLabel();
-        renderModelPicker();
-        closeModelMenu();
-      });
-      chatModelMenu.appendChild(item);
-    });
-  }
-
-  function closeModelMenu() {
-    if (!chatModelMenu || !chatModelBtn) return;
-    chatModelMenu.hidden = true;
-    chatModelBtn.setAttribute('aria-expanded', 'false');
-  }
-
-  function toggleModelMenu() {
-    if (!chatModelMenu || !chatModelBtn) return;
-    chatModelMenu.hidden = !chatModelMenu.hidden;
-    chatModelBtn.setAttribute('aria-expanded', chatModelMenu.hidden ? 'false' : 'true');
-    if (!chatModelMenu.hidden) renderModelPicker();
-  }
-
-  if (chatModelBtn) {
-    chatModelBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      toggleModelMenu();
-    });
-    document.addEventListener('click', function (e) {
-      if (chatModelControl && !chatModelControl.contains(e.target)) closeModelMenu();
-    });
-  }
-
-  if (reasoningBtn) {
-    reasoningBtn.addEventListener('click', function () {
-      reasoningEnabled = !reasoningEnabled;
-      settings.reasoning = reasoningEnabled;
-      saveSettingsToStorage(settings);
-      reasoningBtn.classList.toggle('is-active', reasoningEnabled);
-      reasoningBtn.setAttribute('aria-pressed', reasoningEnabled ? 'true' : 'false');
-      if (streamStatus) streamStatus.textContent = reasoningEnabled
-        ? 'Suy luận sâu: đã bật'
-        : 'Suy luận: đã tắt';
-    });
-  }
-
   function applySettingsToForm() {
     modeSelect.value = "legendary";
     if (engineModelSelect) engineModelSelect.value = settings.engineModel || "auto";
     if (systemPrompt) systemPrompt.value = settings.system || "";
     if (promptPresetSelect) promptPresetSelect.value = settings.preset || "default";
-    reasoningEnabled = !!settings.reasoning;
-    if (reasoningBtn) {
-      reasoningBtn.classList.toggle('is-active', reasoningEnabled);
-      reasoningBtn.setAttribute('aria-pressed', reasoningEnabled ? 'true' : 'false');
-    }
+    // The compact reasoning toggle was removed from the chat composer.
+    // Migrate any older saved setting to the default off state.
+    reasoningEnabled = false;
+    settings.reasoning = false;
     if (streamToggle) streamToggle.checked = false;
     if (providerSelect) { providerSelect.value = "legendary"; providerSelect.disabled = true; }
     if (apiEndpoint) { apiEndpoint.value = ""; apiEndpoint.disabled = true; }
@@ -336,12 +264,7 @@
       (settings.engineModel === "auto"
         ? (MODEL_LABELS[effectiveModelKey()] || "Auto")
         : (MODEL_LABELS[settings.engineModel] || settings.engineModel));
-    if (chatModelLabel) chatModelLabel.textContent = MODEL_LABELS[effectiveModelKey()] || effectiveModelKey();
     if (chatDot) chatDot.classList.add("live");
-    if (reasoningBtn) {
-      reasoningBtn.classList.toggle('is-active', reasoningEnabled);
-      reasoningBtn.setAttribute('aria-pressed', reasoningEnabled ? 'true' : 'false');
-    }
   }
 
   settingsBtn.addEventListener('click', function () {
@@ -402,7 +325,7 @@
       system: systemPrompt ? systemPrompt.value.trim() : "",
       preset: promptPresetSelect ? promptPresetSelect.value : "default",
       stream: false,
-      reasoning: reasoningEnabled
+      reasoning: false
     };
     saveSettingsToStorage(settings);
     updateModeLabel();
@@ -1703,10 +1626,9 @@
         'auto',
       messages: messages,
       system: settings.system || '',
-      temperature: reasoningEnabled ? 0.2 : 0.35,
-      max_tokens: reasoningEnabled ? 12288 : 8192,
-      reasoning: reasoningEnabled,
-      reasoningTier: currentPlan === 'legendary' || currentRole === 'owner' ? 'deep-plus' : currentPlan === 'pro' ? 'deep' : currentPlan === 'free' ? 'basic' : 'none',
+      temperature: 0.35,
+      max_tokens: 8192,
+      reasoning: false,
       signal: controller.signal
     })
       .then(function (result) {

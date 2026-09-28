@@ -160,10 +160,10 @@ export function nativeAgent(text, messages = []) {
     : nativeAnswerLegacy(text, messages);
   const verification = verifyNativeResult({tool:plan.steps[0]?.tool}, result);
   if (!verification.passed && plan.mode === 'native-tools') {
+    const fallback = nativeAnswerLegacy(text, messages);
     return {
-      ...result,
-      text:'Native Core không vượt qua bước kiểm tra an toàn cho tác vụ này; cần text model hoặc input rõ hơn.',
-      agent:{version:'12.0',plan,verification,latency_ms:Date.now()-started}
+      ...fallback,
+      agent:{version:'12.0',plan,verification,executorFallback:true,latency_ms:Date.now()-started}
     };
   }
   return {...result,agent:{version:'12.0',plan,verification,latency_ms:Date.now()-started}};

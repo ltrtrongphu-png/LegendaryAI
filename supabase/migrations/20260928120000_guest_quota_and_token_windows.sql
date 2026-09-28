@@ -30,7 +30,7 @@ begin
   return coalesce(allowed,false);
 end;
 $$;
-revoke all on function public.consume_tokens(integer,uuid) from public;
+drop function if exists public.consume_tokens(integer,uuid);
 revoke all on function public.consume_tokens(integer,uuid,boolean) from public;
 grant execute on function public.consume_tokens(integer,uuid,boolean) to service_role;
 update public.profiles set token_reset_at=case when role='owner' or plan='legendary' then now()+interval '18 hours' when plan='pro' then now()+interval '12 hours' else now()+interval '6 hours' end where token_reset_at is null or token_reset_at<=now();

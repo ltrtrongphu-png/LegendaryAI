@@ -1,6 +1,12 @@
 (function () {
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // Load the latest hero visual layer after the main stylesheet stack so its 3D scene overrides are intentional.
+  var hero3dStyle = document.createElement('link');
+  hero3dStyle.rel = 'stylesheet';
+  hero3dStyle.href = '/css/hero-3d.css';
+  document.head.appendChild(hero3dStyle);
+
   // ---------------------------------------------------------------------
   // Chat image-routing hotfix
   // The legacy chat.js classifier can be served from an older cached build.

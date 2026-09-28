@@ -265,6 +265,28 @@
 
     var user = await LegendaryBackend.getUser();
     if (renderSeq !== accountRenderSeq) return;
+    if (user.is_anonymous) {
+      var guestBtn = document.createElement('button');
+      guestBtn.type = 'button';
+      guestBtn.className = 'btn btn-outline account-login-btn guest-account-btn';
+      guestBtn.textContent = 'Đăng nhập';
+      guestBtn.title = 'Đăng nhập để lưu lịch sử và nâng hạn mức';
+      guestBtn.addEventListener('click', function () { openAuthModal('login'); });
+      accountArea.appendChild(guestBtn);
+      var guestLabel = document.createElement('span');
+      guestLabel.className = 'guest-plan-chip';
+      guestLabel.textContent = 'Khách · 1K';
+      accountArea.appendChild(guestLabel);
+      var guestCta = document.getElementById('headerTrialCta');
+      if (guestCta) {
+        guestCta.textContent = 'Khách · 1K';
+        guestCta.href = '#demo';
+        guestCta.title = 'Phiên khách: tối đa 1.000 token';
+      }
+      renderPricingState(null);
+      return;
+    }
+
     if (!user) {
       var loginBtn = document.createElement('button');
       loginBtn.type = 'button';

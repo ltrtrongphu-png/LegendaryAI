@@ -9,14 +9,14 @@
   camera.position.z = 9;
 
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   // Particle sphere ("neural orb")
   var group = new THREE.Group();
   scene.add(group);
 
-  var particleCount = window.innerWidth < 700 ? 420 : 900;
+  var particleCount = window.innerWidth < 700 ? 280 : 650;
   var radius = 3.4;
   var positions = new Float32Array(particleCount * 3);
   var pts = [];
@@ -49,7 +49,7 @@
   var lineGeom = new THREE.BufferGeometry();
   var linePositions = [];
   var maxDist = 0.9;
-  var maxLines = 500;
+  var maxLines = 320;
   var lineCount = 0;
   for (var a = 0; a < pts.length && lineCount < maxLines; a += 3) {
     for (var b = a + 1; b < pts.length && lineCount < maxLines; b += 7) {

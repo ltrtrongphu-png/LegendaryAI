@@ -21,3 +21,156 @@ details.faq-item{background:rgba(255,255,255,.025);border:1px solid var(--la-bor
 @media(max-width:800px){.hero{padding-top:56px}.hero h1{font-size:clamp(42px,12vw,72px)}.chat-app{border-radius:18px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 .guest-plan-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid rgba(148,163,184,.16);border-radius:999px;background:rgba(255,255,255,.035);color:#a9b8d1;font-size:12px;font-weight:700}.guest-account-btn{font-size:12px}
+
+/* -------------------------------------------------------------------------
+   PREMIUM PRO MAX LIMITED — hero polish
+   ------------------------------------------------------------------------- */
+.hero-visual{
+  isolation:isolate;
+  overflow:visible;
+  min-height:440px;
+}
+.hero-visual::before,
+.hero-visual::after{
+  content:"";
+  position:absolute;
+  pointer-events:none;
+}
+.hero-visual::before{
+  inset:8% 4%;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 45%,rgba(79,209,255,.16),transparent 25%),
+    radial-gradient(circle at 50% 50%,rgba(92,82,255,.14),transparent 56%);
+  filter:blur(18px);
+  z-index:-2;
+}
+.hero-visual::after{
+  width:360px;height:360px;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(62,123,250,.10),transparent 68%);
+  filter:blur(20px);
+  z-index:-1;
+}
+.hero-logo-single-piece{
+  width:430px!important;height:430px!important;
+  transform-style:preserve-3d;
+  animation:la-logo-float 8s ease-in-out infinite;
+  will-change:transform;
+}
+.legendary-3d-logo-img{
+  width:300px!important;height:300px!important;
+  transform:translateZ(42px)!important;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+  filter:
+    drop-shadow(0 24px 36px rgba(0,0,0,.30))
+    drop-shadow(0 0 34px rgba(62,123,250,.26))
+    drop-shadow(0 0 80px rgba(155,92,255,.12));
+}
+.legendary-logo-aura{
+  position:absolute;inset:18%;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(79,209,255,.12),rgba(155,92,255,.07) 38%,transparent 70%);
+  filter:blur(16px);
+  z-index:0;
+  animation:la-aura-pulse 4.5s ease-in-out infinite;
+  pointer-events:none;
+}
+.logo-orbit{
+  border-color:rgba(126,200,255,.28)!important;
+  box-shadow:0 0 22px rgba(62,123,250,.08);
+}
+.logo-orbit-a{animation:la-orbit-a 11s linear infinite;}
+.logo-orbit-b{animation:la-orbit-b 15s linear infinite reverse;}
+.logo-orbit-c{
+  transform:rotateX(72deg) rotateZ(74deg) translateZ(-22px);
+  border-color:rgba(155,92,255,.20)!important;
+  animation:la-orbit-c 18s linear infinite;
+}
+.hero-float-layer{z-index:8;pointer-events:none;}
+.hero-float-card{
+  border:1px solid rgba(190,215,255,.34)!important;
+  background:linear-gradient(145deg,rgba(248,251,255,.96),rgba(219,231,250,.86))!important;
+  box-shadow:
+    0 18px 42px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 0 30px rgba(79,209,255,.07);
+  backdrop-filter:blur(16px) saturate(135%);
+  -webkit-backdrop-filter:blur(16px) saturate(135%);
+  border-radius:18px!important;
+  color:#10224a!important;
+}
+.hero-float-card .hero-card-sub{color:#5b6d90!important;}
+.hero-float-card::after{
+  content:"";
+  position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(120deg,transparent 20%,rgba(255,255,255,.45) 50%,transparent 80%);
+  transform:translateX(-120%);
+  animation:la-card-shine 7s ease-in-out infinite;
+  pointer-events:none;
+}
+.orb-badge{
+  z-index:12;
+  border:1px solid rgba(190,215,255,.5)!important;
+  background:linear-gradient(145deg,rgba(248,251,255,.97),rgba(219,231,250,.88))!important;
+  color:#10224a!important;
+  box-shadow:0 18px 50px rgba(0,0,0,.20),0 0 24px rgba(62,123,250,.12)!important;
+  backdrop-filter:blur(18px);
+}
+.hero-trust>div{
+  padding:12px 16px;
+  border:1px solid var(--la-border);
+  border-radius:16px;
+  background:rgba(255,255,255,.025);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+@keyframes la-logo-float{
+  0%,100%{transform:translateY(0) rotateX(7deg) rotateY(-8deg);}
+  50%{transform:translateY(-10px) rotateX(10deg) rotateY(8deg);}
+}
+@keyframes la-aura-pulse{
+  0%,100%{opacity:.55;transform:scale(.94);}
+  50%{opacity:1;transform:scale(1.04);}
+}
+@keyframes la-orbit-a{to{transform:rotateX(68deg) rotateZ(376deg) translateZ(55px);}}
+@keyframes la-orbit-b{to{transform:rotateY(66deg) rotateZ(-382deg) translateZ(24px);}}
+@keyframes la-orbit-c{to{transform:rotateX(72deg) rotateZ(434deg) translateZ(-22px);}}
+@keyframes la-card-shine{0%,62%{transform:translateX(-120%)}78%,100%{transform:translateX(120%)}}
+
+.engine-panel,.capacity-panel,.compare-table-wrap,.chat-app,.price-card,.feature-cell{
+  box-shadow:
+    0 30px 100px rgba(0,0,0,.26),
+    inset 0 1px 0 rgba(255,255,255,.035);
+}
+.feature-cell:hover,.price-card:hover{
+  box-shadow:
+    0 34px 110px rgba(0,0,0,.34),
+    0 0 0 1px rgba(126,200,255,.08),
+    inset 0 1px 0 rgba(255,255,255,.05);
+}
+.btn-primary{
+  background:linear-gradient(135deg,#3e7bfa 0%,#596dff 52%,#8b5cff 100%)!important;
+  border-color:rgba(166,194,255,.34)!important;
+  box-shadow:0 14px 38px rgba(62,123,250,.28),0 0 28px rgba(139,92,255,.10)!important;
+}
+.btn-primary:hover{
+  box-shadow:0 18px 48px rgba(62,123,250,.34),0 0 38px rgba(139,92,255,.14)!important;
+}
+.site-header{
+  box-shadow:0 14px 50px rgba(0,0,0,.14),inset 0 -1px 0 rgba(255,255,255,.035);
+}
+@media(max-width:920px){
+  .hero-logo-single-piece{width:330px!important;height:330px!important;}
+  .legendary-3d-logo-img{width:240px!important;height:240px!important;}
+}
+@media(max-width:760px){
+  .hero-visual{min-height:340px;}
+  .hero-logo-single-piece{width:290px!important;height:290px!important;}
+  .legendary-3d-logo-img{width:205px!important;height:205px!important;}
+  .hero-float-card{transform:scale(.82)!important;}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-logo-single-piece,.legendary-logo-aura,.logo-orbit-a,.logo-orbit-b,.logo-orbit-c,.hero-float-card::after{animation:none!important;}
+}

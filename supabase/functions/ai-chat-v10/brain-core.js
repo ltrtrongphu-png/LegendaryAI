@@ -119,16 +119,56 @@ function verifyNativeResult(plan, result) {
   return {passed:checks.every(x=>x.pass),checks};
 }
 
+function executeNativeTool(tool, prompt, messages = []) {
+  if (!NATIVE_TOOL_ALLOWLIST.has(tool)) return {text:'', tool, error:'TOOL_NOT_ALLOWED'};
+  if (tool === 'safe_math') {
+    const value = safeMath(prompt);
+    return value === null ? {text:'', tool, error:'MATH_UNRESOLVED'} : {text:String(value), tool};
+  }
+  if (tool === 'unit_convert') {
+    const value = convertUnits(prompt);
+    return value === null ? {text:'', tool, error:'UNIT_UNRESOLVED'} : {text:String(value), tool};
+  }
+  if (tool === 'json_format') {
+    const value = formatJson(prompt);
+    return value === null ? {text:'', tool, error:'JSON_UNRESOLVED'} : {text:value, tool};
+  }
+  if (tool === 'extractive_summary') {
+    const explicit=prompt.replace(/^(tóm tắt|tóm lược|summarize|summary)[:\\-]?/i,'').trim();
+    const recent=messages.filter(m=>m&&(m.role==='user'||m.role==='ai'||m.role==='assistant')).slice(-8).map(m=>String(m.content||m.text||'').trim()).filter(Boolean);
+    const source=explicit.length>60?explicit:recent.join('\\n');
+    const value=source?extractiveSummary(source,5):'';
+    return value?{text:'Tóm tắt nhanh (extractive):\\n'+value,tool}:{text:'',tool,error:'SUMMARY_UNRESOLVED'};
+  }
+  if (tool === 'code_diagnostics') {
+    const value=codeDiagnostics(prompt);
+    return value?{text:value,tool}:{text:'',tool,error:'CODE_UNRESOLVED'};
+  }
+  if (tool === 'safe_template') {
+    return {text:'Tiêu đề: Xin nghỉ phép\\n\\nKính gửi Anh/Chị,\\n\\nEm xin phép nghỉ vào [ngày/thời gian] vì [lý do]. Em sẽ chủ động hoàn thành hoặc bàn giao các công việc cần thiết trước thời gian nghỉ.\\n\\nMong Anh/Chị xem xét và phê duyệt. Em cảm ơn Anh/Chị.\\n\\nTrân trọng,\\n[Tên]',tool};
+  }
+  return {text:'',tool,error:'NO_NATIVE_EXECUTOR'};
+}
+
+function verifyNativeResult(plan, result) {
+  const text = String(result?.text || '').trim();
+  const checks = [
+    {name:'non_empty',pass:Boolean(text)},
+    {name:'bounded_tool',pass:NATIVE_TOOL_ALLOWLIST.has(plan.tool) || plan.tool === 'native_answer'},
+    {name:'math_finite',pass:plan.tool!=='safe_math' || /^-?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[+-]?\\d+)?$/i.test(text)}
+  ];
+  return {passed:checks.every(x=>x.pass),checks};
+}
+
 export function nativeAgent(text, messages = []) {
   const plan = createNativePlan(text, messages);
   const started = Date.now();
-  let result;
-  if (plan.mode === 'model') {
-    result = nativeAnswerLegacy(text, messages);
-  } else {
-    result = nativeAnswerLegacy(text, messages);
-  }
-  const verification = verifyNativeResult({...plan, tool:plan.steps[0]?.tool}, result);
+  const result = plan.mode === 'native-tools'
+    ? (plan.steps[0]?.tool === 'native_answer'
+      ? nativeAnswerLegacy(text, messages)
+      : executeNativeTool(plan.steps[0]?.tool, String(text||''), messages))
+    : nativeAnswerLegacy(text, messages);
+  const verification = verifyNativeResult({tool:plan.steps[0]?.tool}, result);
   if (!verification.passed && plan.mode === 'native-tools') {
     return {
       ...result,
@@ -136,10 +176,7 @@ export function nativeAgent(text, messages = []) {
       agent:{version:'12.0',plan,verification,latency_ms:Date.now()-started}
     };
   }
-  return {
-    ...result,
-    agent:{version:'12.0',plan,verification,latency_ms:Date.now()-started}
-  };
+  return {...result,agent:{version:'12.0',plan,verification,latency_ms:Date.now()-started}};
 }
 
 export function nativeAnswer(text, messages = []) {

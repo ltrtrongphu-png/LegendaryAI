@@ -64,13 +64,13 @@
   var confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
 
   var PLAN_INFO = {
-    free: { name: 'Gói Free', price: '0đ / tháng', amount: 0, limit: 150000 },
+    free: { name: 'Gói Free', price: '0đ / tháng', amount: 0, limit: 500000 },
     pro: { name: 'Gói Pro', price: '149.000đ / tháng', amount: 149000, limit: 2000000 },
     legendary: { name: 'Gói Legendary', price: '399.000đ / tháng', amount: 399000, limit: 6000000 }
   };
   var PLAN_LABEL = { free: 'Free', pro: 'Pro', legendary: 'Legendary' };
   var PLAN_FEATURES = {
-    free: ['LegendaryLite-1 nâng cấp', 'Quick Mode + máy tính', 'Context phiên tốt hơn', '150.000 token / 6 giờ'],
+    free: ['LegendaryLite-1 nâng cấp', 'Quick Mode + máy tính', 'Context phiên tốt hơn', '500.000 token / 6 giờ'],
     pro: ['Reasoner 32B*', 'Memory dài hạn', 'Vision + phân tích tệp', '2.000.000 token / 12 giờ', 'Prompt Studio + xuất chat'],
     legendary: ['Ultra 120B*', 'Vision 109B*', 'Context siêu dài', 'Advanced Memory', '6.000.000 token / 18 giờ', 'Ưu tiên tài nguyên']
   };
@@ -284,7 +284,7 @@
 
     var profile = await LegendaryBackend.getProfile();
     if (renderSeq !== accountRenderSeq) return;
-    profile = profile || { plan: 'free', token_limit: 150000, tokens_used: 0 };
+    profile = profile || { plan: 'free', token_limit: 500000, tokens_used: 0 };
     var name = (profile.display_name || user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name) || user.email || 'User');
     // The main header CTA becomes the signed-in account name.
     var headerCta = document.getElementById('headerTrialCta');
@@ -310,7 +310,7 @@
     dropdown.className = 'account-dropdown';
     dropdown.innerHTML = '<p class="acc-email">' + escapeHtml(user.email || '') + '</p>' +
       '<p class="acc-plan-line">Gói hiện tại: <strong>' + PLAN_LABEL[profile.plan] + '</strong></p>' +
-      '<p class="acc-plan-line">Token còn lại: <strong>' + Math.max(Number(profile.token_limit || 0) - Number(profile.tokens_used || 0), 0).toLocaleString('vi-VN') + ' / ' + Number(profile.token_limit || 150000).toLocaleString('vi-VN') + '</strong></p>' +
+      '<p class="acc-plan-line">Token còn lại: <strong>' + Math.max(Number(profile.token_limit || 0) - Number(profile.tokens_used || 0), 0).toLocaleString('vi-VN') + ' / ' + Number(profile.token_limit || 500000).toLocaleString('vi-VN') + '</strong></p>' +
       (profile.role === 'owner' ? '<p class="acc-plan-line"><strong>Quyền Owner</strong> · Quản trị hệ thống</p>' : '') +
       '<div class="acc-features"><strong>Quyền gói</strong>' + (PLAN_FEATURES[profile.plan] || PLAN_FEATURES.free).map(function (f) { return '<span>' + escapeHtml(f) + '</span>'; }).join('') + '</div>';
 

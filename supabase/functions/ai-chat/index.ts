@@ -1058,7 +1058,7 @@ Deno.serve(async (req) => {
     ),
   );
 
-  const { data: allowed, error: tokenError } = await supabase.rpc("consume_tokens", { p_amount: reservation, p_user_id: user.id });
+  const { data: allowed, error: tokenError } = await supabase.rpc("consume_tokens", { p_amount: reservation, p_user_id: user.id, p_is_guest: user.is_anonymous === true });
 
   if (tokenError) return json({ error: tokenError.message, code: "TOKEN_RPC_ERROR" }, 500, req);
 

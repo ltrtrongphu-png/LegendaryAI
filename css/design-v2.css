@@ -174,3 +174,29 @@ details.faq-item{background:rgba(255,255,255,.025);border:1px solid var(--la-bor
 @media(prefers-reduced-motion:reduce){
   .hero-logo-single-piece,.legendary-logo-aura,.logo-orbit-a,.logo-orbit-b,.logo-orbit-c,.hero-float-card::after{animation:none!important;}
 }
+
+.turbo-brain{padding:20px 24px 96px;}
+.turbo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.turbo-card{
+  position:relative;display:flex;gap:14px;align-items:flex-start;
+  padding:22px;border:1px solid var(--la-border);border-radius:20px;
+  background:
+    radial-gradient(220px 100px at 0% 0%,rgba(79,209,255,.08),transparent 72%),
+    linear-gradient(145deg,rgba(16,24,44,.72),rgba(8,13,27,.68));
+  box-shadow:0 22px 70px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.035);
+  backdrop-filter:blur(16px);
+  transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;
+}
+.turbo-card:hover{transform:translateY(-4px);border-color:rgba(126,200,255,.34);box-shadow:0 30px 90px rgba(0,0,0,.32),0 0 30px rgba(62,123,250,.08);}
+.turbo-icon{
+  flex:0 0 42px;width:42px;height:42px;display:grid;place-items:center;
+  border-radius:14px;font-size:19px;color:#dff5ff;
+  background:linear-gradient(145deg,rgba(79,209,255,.16),rgba(139,92,255,.16));
+  border:1px solid rgba(126,200,255,.20);
+  box-shadow:0 0 24px rgba(62,123,250,.10);
+}
+.turbo-card h3{margin:0 0 5px;font-size:1rem;}
+.turbo-card p{margin:0;font-size:.84rem;line-height:1.6;}
+.turbo-note{text-align:center;margin:18px auto 0;max-width:70ch;font-size:.76rem;color:var(--text-muted);}
+@media(max-width:900px){.turbo-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:560px){.turbo-grid{grid-template-columns:1fr;}.turbo-brain{padding-left:14px;padding-right:14px;}}

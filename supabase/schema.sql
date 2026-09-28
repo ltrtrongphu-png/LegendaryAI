@@ -9,7 +9,7 @@ create table if not exists public.profiles (
   avatar_url text,
   role text not null default 'user' check (role in ('user','admin','owner')),
   plan text not null default 'free' check (plan in ('free','pro','legendary')),
-  token_limit integer not null default 150000,
+  token_limit integer not null default 500000,
   memory_enabled boolean not null default false,
   vision_enabled boolean not null default false,
   web_search_enabled boolean not null default false,
@@ -158,38 +158,31 @@ create policy "chat attachments own delete" on storage.objects
   using (bucket_id = 'chat-attachments' and (storage.foldername(name))[1] = auth.uid()::text);
 
 -- Atomic token debit helper. The AI backend should call this before generating a response.
-create or replace function public.consume_tokens(p_amount integer)
+create or replace function public.consume_tokens(p_amount integer, p_user_id uuid)
 returns boolean
 language plpgsql
 security definer set search_path = public
-as $$
+as $
 declare
-  uid uuid := auth.uid();
+  uid uuid := coalesce(p_user_id, auth.uid());
+  caller_uid uuid := auth.uid();
   allowed boolean;
 begin
   if uid is null or p_amount <= 0 then return false; end if;
+  if caller_uid is not null and caller_uid <> uid then return false; end if;
   update public.profiles
-     set tokens_used = case
-       when token_reset_at <= now() then p_amount
-       else tokens_used + p_amount
-     end,
-     token_reset_at = case
-       when token_reset_at <= now() then now() + interval '1 day'
-       else token_reset_at
-     end,
-     updated_at = now()
+     set tokens_used = case when token_reset_at <= now() then p_amount else tokens_used + p_amount end,
+         token_reset_at = case when token_reset_at <= now() then now() + interval '1 day' else token_reset_at end,
+         updated_at = now()
    where id = uid
-     and case
-       when token_reset_at <= now() then p_amount <= token_limit
-       else tokens_used + p_amount <= token_limit
-     end
+     and case when token_reset_at <= now() then p_amount <= token_limit else tokens_used + p_amount <= token_limit end
    returning true into allowed;
   return coalesce(allowed, false);
 end;
-$$;
+$;
 
-revoke all on function public.consume_tokens(integer) from public;
-grant execute on function public.consume_tokens(integer) to authenticated;
+revoke all on function public.consume_tokens(integer, uuid) from public;
+grant execute on function public.consume_tokens(integer, uuid) to service_role;
 
 
 -- Optional model registry for Owner-controlled model profiles.
@@ -355,7 +348,7 @@ set
     when role = 'owner' then greatest(token_limit, 6000000)
     when plan = 'legendary' then 6000000
     when plan = 'pro' then 2000000
-    else 150000
+    else 500000
   end,
   vision_enabled = (plan in ('pro','legendary') or role = 'owner'),
   memory_enabled = (plan in ('pro','legendary') or role = 'owner'),
@@ -363,26 +356,26 @@ set
 where true;
 
 
-create or replace function public.refund_tokens(p_amount integer)
+create or replace function public.refund_tokens(p_amount integer, p_user_id uuid)
 returns boolean
 language plpgsql
 security definer set search_path = public
-as $$
+as $
 declare
-  uid uuid := auth.uid();
+  uid uuid := coalesce(p_user_id, auth.uid());
+  caller_uid uuid := auth.uid();
 begin
   if uid is null or p_amount <= 0 then return false; end if;
+  if caller_uid is not null and caller_uid <> uid then return false; end if;
   update public.profiles
-     set tokens_used = greatest(tokens_used - p_amount, 0),
-         updated_at = now()
-   where id = uid
-     and token_reset_at > now();
+     set tokens_used = greatest(tokens_used - p_amount, 0), updated_at = now()
+   where id = uid;
   return found;
 end;
-$$;
+$;
 
-revoke all on function public.refund_tokens(integer) from public;
-grant execute on function public.refund_tokens(integer) to authenticated;
+revoke all on function public.refund_tokens(integer, uuid) from public;
+grant execute on function public.refund_tokens(integer, uuid) to service_role;
 
 -- Was missing entirely: supabase/functions/ai-chat/index.ts calls this after
 -- every successful reply to true the reservation made by consume_tokens()

@@ -131,9 +131,6 @@
   }
   var savedTheme = null;
   try { savedTheme = localStorage.getItem(THEME_KEY); } catch (e) { /* ignore */ }
-  if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-    savedTheme = 'light';
-  }
   applyTheme(savedTheme);
   if (themeToggle) {
     themeToggle.addEventListener('click', function () {

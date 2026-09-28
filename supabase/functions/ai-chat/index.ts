@@ -1054,13 +1054,11 @@ Deno.serve(async (req) => {
     1,
     Math.min(
       estimatedInputTokens + maxTokens,
-      Number(profile.token_limit || 150000),
+      Number(profile.token_limit || 500000),
     ),
   );
 
-  const { data: allowed, error: tokenError } = await supabase.rpc("consume_tokens", {
-    p_amount: reservation,
-  });
+  const { data: allowed, error: tokenError } = await supabase.rpc("consume_tokens", { p_amount: reservation, p_user_id: user.id });
 
   if (tokenError) return json({ error: tokenError.message, code: "TOKEN_RPC_ERROR" }, 500, req);
 

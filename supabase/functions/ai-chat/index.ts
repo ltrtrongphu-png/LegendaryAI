@@ -51,7 +51,7 @@ const FALLBACK_BY_PLAN: Record<string, string> = {
 
 const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> = {
   free: {
-    token_limit: 150000,
+    token_limit: 500000,
     memory: false,
     session_context: true,
     vision: false,
@@ -1214,7 +1214,7 @@ Deno.serve(async (req) => {
       },
     }, 200, req);
   } catch (error) {
-    await supabase.rpc("refund_tokens", { p_amount: reservation }).catch(() => null);
+    await supabase.rpc("refund_tokens", { p_amount: reservation, p_user_id: user.id }).catch(() => null);
     const message = error instanceof Error ? error.message : "Legendary Engine failed.";
     return json({ error: message, code: "LEGENDARY_ENGINE_ERROR" }, 500, req);
   }

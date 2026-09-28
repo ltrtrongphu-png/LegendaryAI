@@ -463,3 +463,177 @@ details.faq-item p{padding:0 20px 18px!important;color:#8292ae!important}
 @media(prefers-reduced-motion:reduce){
   .legendary-3d-logo,.legendary-3d-logo-img{animation:none!important}
 }
+
+
+/* -------------------------------------------------------------------------
+   UI polish — aligned header + redesigned Legendary Sandbox
+   ------------------------------------------------------------------------- */
+.site-header .wrap{
+  max-width:1400px!important;
+}
+.site-header .header-row{
+  display:grid!important;
+  grid-template-columns:auto minmax(0,1fr) auto!important;
+  gap:24px!important;
+}
+.site-header .brand{
+  min-width:max-content;
+}
+.site-header .main-nav{
+  justify-content:center!important;
+  min-width:0;
+}
+.site-header .header-actions{
+  justify-content:flex-end!important;
+  min-width:max-content;
+}
+@media(max-width:1120px){
+  .site-header .header-row{
+    grid-template-columns:auto 1fr auto!important;
+    gap:12px!important;
+  }
+  .site-header .main-nav{gap:2px!important}
+  .site-header .main-nav a{padding-left:9px;padding-right:9px}
+}
+@media(max-width:820px){
+  .site-header .header-row{
+    display:flex!important;
+  }
+}
+
+/* The sandbox is a single product surface rather than a dense utility panel. */
+.chat-app{
+  width:100%!important;
+  max-width:1160px!important;
+  height:670px!important;
+  border-radius:26px!important;
+  overflow:hidden!important;
+}
+.chat-shell{
+  min-width:0;
+  background:rgba(255,255,255,.02);
+}
+.chat-topbar{
+  min-height:66px!important;
+  padding:13px 18px!important;
+  flex-wrap:nowrap!important;
+}
+.chat-topbar-left{
+  min-width:0;
+  flex:1 1 auto;
+}
+.chat-topbar-left #chatModeLabel{
+  font-weight:700;
+  color:var(--text);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.chat-topbar-right{
+  flex:0 0 auto;
+  margin-left:auto;
+}
+.chat-window{
+  min-height:0!important;
+  padding:28px!important;
+}
+.chat-suggestions{
+  min-height:56px;
+  padding:11px 18px!important;
+  gap:8px!important;
+  border-top:1px solid rgba(28,64,126,.08)!important;
+  background:rgba(248,250,255,.88)!important;
+}
+.chat-suggestions button{
+  padding:9px 13px!important;
+  border-radius:999px!important;
+  background:#fff!important;
+  color:#4f607d!important;
+  border:1px solid #fff!important;
+  box-shadow:0 2px 10px rgba(31,61,112,.06)!important;
+  font-weight:600;
+}
+.chat-suggestions button:hover{
+  color:#234b91!important;
+  border-color:#dce8fb!important;
+  background:#fff!important;
+  box-shadow:0 6px 18px rgba(31,61,112,.10)!important;
+}
+.chat-input-row{
+  padding:14px 18px 10px!important;
+  gap:10px!important;
+  background:rgba(248,250,255,.94)!important;
+  border-top:0!important;
+}
+.chat-input-row textarea{
+  min-height:48px;
+  padding:13px 15px!important;
+  border-radius:16px!important;
+  background:#fff!important;
+  border:1px solid rgba(28,64,126,.12)!important;
+  box-shadow:0 4px 16px rgba(31,61,112,.05);
+}
+.chat-input-row textarea:focus{
+  border-color:rgba(79,132,226,.42)!important;
+  box-shadow:0 0 0 4px rgba(79,132,226,.08),0 6px 20px rgba(31,61,112,.07)!important;
+}
+.chat-input-row .btn-primary{
+  min-height:48px;
+  padding-left:18px!important;
+  padding-right:18px!important;
+}
+.chat-meta{
+  padding:0 18px 12px!important;
+  background:rgba(248,250,255,.94)!important;
+}
+
+/* Light mode: keep the sandbox visually attached to the page background. */
+:root[data-theme="light"] .chat-app{
+  background:#fff!important;
+  border-color:rgba(28,64,126,.10)!important;
+  box-shadow:0 24px 70px rgba(39,67,112,.12)!important;
+}
+:root[data-theme="light"] .chat-sidebar{
+  background:#f8faff!important;
+  border-right-color:rgba(28,64,126,.08)!important;
+}
+:root[data-theme="light"] .chat-topbar{
+  background:#fff!important;
+  border-bottom-color:rgba(28,64,126,.08)!important;
+}
+:root[data-theme="light"] .chat-window{
+  background:linear-gradient(180deg,#ffffff 0%,#fbfcff 100%)!important;
+}
+:root[data-theme="light"] .chat-suggestions{
+  background:#f8faff!important;
+  border-top-color:rgba(28,64,126,.07)!important;
+}
+:root[data-theme="light"] .chat-suggestions button{
+  border-color:#fff!important;
+  background:#fff!important;
+}
+:root[data-theme="light"] .chat-input-row,
+:root[data-theme="light"] .chat-meta{
+  background:#f8faff!important;
+}
+:root[data-theme="light"] .msg-bubble{
+  border-color:rgba(28,64,126,.08)!important;
+  box-shadow:0 4px 18px rgba(39,67,112,.045);
+}
+:root[data-theme="light"] .msg-user .msg-bubble{
+  border-color:rgba(92,117,190,.14)!important;
+}
+
+/* Keep the compact control bar clean after removing the old model/reasoning buttons. */
+.chat-topbar-right .btn{
+  min-height:34px;
+}
+@media(max-width:760px){
+  .chat-app{height:650px!important;border-radius:20px!important}
+  .chat-topbar{min-height:60px!important;padding:10px 12px!important}
+  .chat-topbar-right .btn:not(#expandChatBtn):not(#settingsBtn){display:none}
+  .chat-window{padding:18px!important}
+  .chat-suggestions{padding:9px 10px!important}
+  .chat-input-row{padding:10px!important}
+  .chat-meta{padding:0 10px 10px!important}
+}

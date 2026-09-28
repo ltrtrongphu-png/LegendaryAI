@@ -64,12 +64,8 @@
   var lines = new THREE.LineSegments(lineGeom, lineMat);
   group.add(lines);
 
-  // subtle outer wire sphere
-  var wireGeom = new THREE.IcosahedronGeometry(4.4, 1);
-  var wireMat = new THREE.MeshBasicMaterial({ color: 0x3E7BFA, wireframe: true, transparent: true, opacity: 0.08 });
-  var wireSphere = new THREE.Mesh(wireGeom, wireMat);
-  group.add(wireSphere);
-
+  // The particle network is the hero atmosphere. Avoid a second wireframe shell
+  // behind the pointer: it visually competes with the logo and made the hero feel boxed-in.
   group.position.set(2.6, 0, 0);
 
   var mouseX = 0, mouseY = 0;
@@ -104,7 +100,6 @@
     if (!reduceMotion) {
       group.rotation.y = t * 0.09 + mouseX * 0.4;
       group.rotation.x = mouseY * 0.25;
-      wireSphere.rotation.y = -t * 0.05;
     }
     renderer.render(scene, camera);
   }

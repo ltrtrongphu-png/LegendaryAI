@@ -70,7 +70,7 @@ export function buildModelSystemPrompt(basePrompt) {
   return ['You are LegendaryAI. Return only the final answer intended for the user.','Never reveal chain-of-thought, hidden reasoning, internal routing, intent labels, keywords, constraints, token counts, backend details, or self-check logs.','Do not claim to have used a tool, source, file, model, or capability unless it actually happened.','If information is missing or uncertain, say what is missing and ask the smallest useful clarification.','For code: provide runnable code when the request is sufficiently specified; otherwise ask for the missing environment/version.','For factual claims: separate known facts from uncertainty and avoid invented specifics.','For writing requests: return the finished text directly, without a preamble about your process.','Prefer concise answers by default; expand when the user asks for detail.',base].filter(Boolean).join('\n');
 }
 
-export function nativeAnswer(text,messages=[]) {
+function nativeAnswerLegacy(text,messages=[]) {
   const p=String(text||'').trim(),intent=detectIntent(p); if(!p)return{intent:'empty',text:'Mình sẵn sàng. Hãy gửi yêu cầu cụ thể.'};
   if(intent==='greeting')return{intent,text:'Xin chào 👋 Mình là LegendaryAI. Bạn muốn làm gì hôm nay?'};
   if(intent==='math'){const value=safeMath(p);if(value!==null)return{intent,text:String(value)};}
@@ -82,4 +82,66 @@ export function nativeAnswer(text,messages=[]) {
   if(intent==='plan')return{intent,text:'Kế hoạch nhanh:\n1. Xác định mục tiêu và tiêu chí hoàn thành.\n2. Chia việc thành các bước nhỏ, có đầu ra rõ ràng.\n3. Ưu tiên bước có rủi ro/phụ thuộc cao trước.\n4. Thực hiện và kiểm tra từng mốc; ghi lại lỗi và quyết định.\n5. Tổng kiểm tra, tối ưu và chốt bước tiếp theo.\n\nĐể lập kế hoạch cụ thể, hãy gửi mục tiêu, deadline và các ràng buộc chính.'};
   if(intent==='compare')return{intent,text:'Khung so sánh nhanh:\n- Mục tiêu: hai lựa chọn cần đạt điều gì?\n- Chi phí: tiền, thời gian, tài nguyên.\n- Hiệu năng: tốc độ, độ ổn định, khả năng mở rộng.\n- Rủi ro: điểm thất bại và mức độ phục hồi.\n- Phù hợp: lựa chọn nào đáp ứng các ràng buộc thực tế của bạn.\n\nGửi hai phương án cụ thể để mình điền bảng so sánh.'};
   return{intent,text:'Yêu cầu này cần một text model để tạo câu trả lời đáng tin cậy. Hiện LegendaryAI chưa có text model local được bật, nên mình không muốn giả vờ đã suy luận hoặc bịa nội dung. Fast Native Core hiện hỗ trợ greeting, tính toán, chuyển đổi đơn vị, JSON formatting, tóm tắt extractive, code diagnostics, lập kế hoạch và khung so sánh; khi local inference gateway được bật, các tác vụ ngôn ngữ mở sẽ được chuyển sang model thật.'};
+}
+
+const NATIVE_TOOL_ALLOWLIST = new Set(['safe_math','unit_convert','json_format','extractive_summary','code_diagnostics','safe_template']);
+const AGENT_INTENTS = new Set(['math','utility','summarize','code','writing','greeting','image','plan','compare']);
+
+export function createNativePlan(text, messages = []) {
+  const prompt = String(text || '').trim();
+  const intent = detectIntent(prompt);
+  const steps = [];
+  if (intent === 'math') steps.push({id:'s1',tool:'safe_math',goal:'Resolve arithmetic safely'});
+  else if (intent === 'utility') {
+    if (/(json|yaml|yml)/i.test(prompt)) steps.push({id:'s1',tool:'json_format',goal:'Parse or format structured data'});
+    else steps.push({id:'s1',tool:'unit_convert',goal:'Convert the requested unit'});
+  } else if (intent === 'summarize') steps.push({id:'s1',tool:'extractive_summary',goal:'Extract the highest-signal sentences'});
+  else if (intent === 'code') steps.push({id:'s1',tool:'code_diagnostics',goal:'Run bounded static diagnostics'});
+  else if (intent === 'writing' && /email.*nghỉ phép|xin nghỉ phép/i.test(prompt)) steps.push({id:'s1',tool:'safe_template',goal:'Use the bounded leave-email template'});
+  else if (AGENT_INTENTS.has(intent)) steps.push({id:'s1',tool:'native_answer',goal:'Generate a bounded Native Core response'});
+  else steps.push({id:'s1',tool:'model_required',goal:'Use a configured text model for open-ended generation'});
+  return {
+    version:'12.0',
+    intent,
+    mode: steps[0]?.tool === 'model_required' ? 'model' : 'native-tools',
+    steps: steps.map(s => ({...s, allowed:NATIVE_TOOL_ALLOWLIST.has(s.tool) || s.tool === 'native_answer' ? 'bounded' : 'model'})),
+    contextMessages:Array.isArray(messages) ? messages.length : 0
+  };
+}
+
+function verifyNativeResult(plan, result) {
+  const text = String(result?.text || '').trim();
+  const checks = [
+    {name:'non_empty',pass:Boolean(text)},
+    {name:'bounded_tool',pass:!result?.tool || NATIVE_TOOL_ALLOWLIST.has(result.tool)},
+    {name:'math_finite',pass:plan.tool!=='safe_math' || /^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text)}
+  ];
+  return {passed:checks.every(x=>x.pass),checks};
+}
+
+export function nativeAgent(text, messages = []) {
+  const plan = createNativePlan(text, messages);
+  const started = Date.now();
+  let result;
+  if (plan.mode === 'model') {
+    result = nativeAnswerLegacy(text, messages);
+  } else {
+    result = nativeAnswerLegacy(text, messages);
+  }
+  const verification = verifyNativeResult({...plan, tool:plan.steps[0]?.tool}, result);
+  if (!verification.passed && plan.mode === 'native-tools') {
+    return {
+      ...result,
+      text:'Native Core không vượt qua bước kiểm tra an toàn cho tác vụ này; cần text model hoặc input rõ hơn.',
+      agent:{version:'12.0',plan,verification,latency_ms:Date.now()-started}
+    };
+  }
+  return {
+    ...result,
+    agent:{version:'12.0',plan,verification,latency_ms:Date.now()-started}
+  };
+}
+
+export function nativeAnswer(text, messages = []) {
+  return nativeAgent(text, messages);
 }

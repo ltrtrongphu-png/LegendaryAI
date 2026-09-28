@@ -20,3 +20,4 @@ details.faq-item{background:rgba(255,255,255,.025);border:1px solid var(--la-bor
 @keyframes la-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 @media(max-width:800px){.hero{padding-top:56px}.hero h1{font-size:clamp(42px,12vw,72px)}.chat-app{border-radius:18px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.guest-plan-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid rgba(148,163,184,.16);border-radius:999px;background:rgba(255,255,255,.035);color:#a9b8d1;font-size:12px;font-weight:700}.guest-account-btn{font-size:12px}

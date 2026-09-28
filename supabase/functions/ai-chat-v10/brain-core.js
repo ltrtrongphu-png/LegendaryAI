@@ -109,16 +109,6 @@ export function createNativePlan(text, messages = []) {
   };
 }
 
-function verifyNativeResult(plan, result) {
-  const text = String(result?.text || '').trim();
-  const checks = [
-    {name:'non_empty',pass:Boolean(text)},
-    {name:'bounded_tool',pass:!result?.tool || NATIVE_TOOL_ALLOWLIST.has(result.tool)},
-    {name:'math_finite',pass:plan.tool!=='safe_math' || /^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text)}
-  ];
-  return {passed:checks.every(x=>x.pass),checks};
-}
-
 function executeNativeTool(tool, prompt, messages = []) {
   if (!NATIVE_TOOL_ALLOWLIST.has(tool)) return {text:'', tool, error:'TOOL_NOT_ALLOWED'};
   if (tool === 'safe_math') {

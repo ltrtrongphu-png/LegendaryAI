@@ -18,6 +18,11 @@
   var charCount = document.getElementById('chatCharCount');
   var streamStatus = document.getElementById('chatStreamStatus');
   var suggestionsWrap = document.getElementById('chatSuggestions');
+  var chatModelControl = document.getElementById('chatModelControl');
+  var chatModelBtn = document.getElementById('chatModelBtn');
+  var chatModelLabel = document.getElementById('chatModelLabel');
+  var chatModelMenu = document.getElementById('chatModelMenu');
+  var reasoningBtn = document.getElementById('reasoningBtn');
 
   var attachBtn = document.getElementById('attachBtn');
   var fileInput = document.getElementById('fileInput');
@@ -114,6 +119,20 @@
 
   var SETTINGS_KEY = 'legendaryai_settings';
   var CONV_KEY = 'legendaryai_conversations_v2';
+  var currentPlan = 'free';
+  var currentRole = 'user';
+  var reasoningEnabled = false;
+  var MODEL_LABELS = {
+    auto: 'Tự động · theo gói',
+    'legendary-lite-1': 'LegendaryLite-1',
+    'legendary-pro-1': 'LegendaryPro-1',
+    'legendary-vision-pro-11b': 'Legendary Vision Pro 11B',
+    'legendary-ultra-1': 'LegendaryUltra-1',
+    custom: 'Custom Core',
+    'legendary-reasoner-32b': 'Legendary Reasoner 32B',
+    'legendary-ultra-120b': 'Legendary Ultra 120B',
+    'legendary-vision-109b': 'Legendary Vision 109B'
+  };
   var ACTIVE_KEY = 'legendaryai_active_conv_v2';
   var activeController = null;
   var pendingAttachments = [];
@@ -134,7 +153,8 @@
         mode: 'legendary',
         engineModel: 'auto',
         provider: 'legendary', endpoint: '', key: '', model: '', system: '',
-        stream: true
+        stream: true,
+        reasoning: false
       }, parsed || {});
     } catch (e) {
       return {
@@ -182,6 +202,8 @@
 
     var plan = profile ? profile.plan : null;
     var role = profile ? profile.role : null;
+    currentPlan = plan || 'free';
+    currentRole = role || 'user';
     var options = engineModelSelect.options;
 
     for (var i = 0; i < options.length; i++) {
@@ -217,6 +239,78 @@
     }
 
     engineModelSelect.value = desired;
+    renderModelPicker();
+  }
+
+  function effectiveModelKey() {
+    if (settings.engineModel && settings.engineModel !== 'auto') return settings.engineModel;
+    if (currentRole === 'owner' || currentPlan === 'legendary') return 'legendary-ultra-1';
+    if (currentPlan === 'pro') return 'legendary-pro-1';
+    return 'legendary-lite-1';
+  }
+
+  function renderModelPicker() {
+    if (!chatModelLabel || !chatModelMenu || !engineModelSelect) return;
+    var effective = effectiveModelKey();
+    chatModelLabel.textContent = MODEL_LABELS[effective] || effective;
+    chatModelMenu.innerHTML = '';
+
+    Array.prototype.forEach.call(engineModelSelect.options, function (option) {
+      var item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'chat-model-option';
+      if (option.disabled) item.classList.add('is-locked');
+      if (option.value === (settings.engineModel || 'auto')) item.classList.add('is-selected');
+      item.disabled = option.disabled;
+      item.innerHTML = '<span><strong>' + escapeHtml(MODEL_LABELS[option.value] || option.textContent) + '</strong><small>' +
+        (option.value === 'auto' ? 'Tự động theo gói' : option.textContent.split('·').slice(1).join('·').trim()) +
+        '</small></span><span class="chat-model-check">' + (option.value === (settings.engineModel || 'auto') ? '✓' : (option.disabled ? '🔒' : '')) + '</span>';
+      item.addEventListener('click', function () {
+        settings.engineModel = option.value;
+        saveSettingsToStorage(settings);
+        engineModelSelect.value = option.value;
+        updateModeLabel();
+        renderModelPicker();
+        closeModelMenu();
+      });
+      chatModelMenu.appendChild(item);
+    });
+  }
+
+  function closeModelMenu() {
+    if (!chatModelMenu || !chatModelBtn) return;
+    chatModelMenu.hidden = true;
+    chatModelBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function toggleModelMenu() {
+    if (!chatModelMenu || !chatModelBtn) return;
+    chatModelMenu.hidden = !chatModelMenu.hidden;
+    chatModelBtn.setAttribute('aria-expanded', chatModelMenu.hidden ? 'false' : 'true');
+    if (!chatModelMenu.hidden) renderModelPicker();
+  }
+
+  if (chatModelBtn) {
+    chatModelBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      toggleModelMenu();
+    });
+    document.addEventListener('click', function (e) {
+      if (chatModelControl && !chatModelControl.contains(e.target)) closeModelMenu();
+    });
+  }
+
+  if (reasoningBtn) {
+    reasoningBtn.addEventListener('click', function () {
+      reasoningEnabled = !reasoningEnabled;
+      settings.reasoning = reasoningEnabled;
+      saveSettingsToStorage(settings);
+      reasoningBtn.classList.toggle('is-active', reasoningEnabled);
+      reasoningBtn.setAttribute('aria-pressed', reasoningEnabled ? 'true' : 'false');
+      if (streamStatus) streamStatus.textContent = reasoningEnabled
+        ? 'Suy luận sâu: đã bật'
+        : 'Suy luận: đã tắt';
+    });
   }
 
   function applySettingsToForm() {
@@ -224,6 +318,11 @@
     if (engineModelSelect) engineModelSelect.value = settings.engineModel || "auto";
     if (systemPrompt) systemPrompt.value = settings.system || "";
     if (promptPresetSelect) promptPresetSelect.value = settings.preset || "default";
+    reasoningEnabled = !!settings.reasoning;
+    if (reasoningBtn) {
+      reasoningBtn.classList.toggle('is-active', reasoningEnabled);
+      reasoningBtn.setAttribute('aria-pressed', reasoningEnabled ? 'true' : 'false');
+    }
     if (streamToggle) streamToggle.checked = false;
     if (providerSelect) { providerSelect.value = "legendary"; providerSelect.disabled = true; }
     if (apiEndpoint) { apiEndpoint.value = ""; apiEndpoint.disabled = true; }
@@ -235,11 +334,14 @@
     chatModeLabel.textContent =
       "Legendary Engine · " +
       (settings.engineModel === "auto"
-        ? "Auto · Native Core"
-        : settings.engineModel === "custom"
-          ? "Custom Core"
-          : settings.engineModel);
+        ? (MODEL_LABELS[effectiveModelKey()] || "Auto")
+        : (MODEL_LABELS[settings.engineModel] || settings.engineModel));
+    if (chatModelLabel) chatModelLabel.textContent = MODEL_LABELS[effectiveModelKey()] || effectiveModelKey();
     if (chatDot) chatDot.classList.add("live");
+    if (reasoningBtn) {
+      reasoningBtn.classList.toggle('is-active', reasoningEnabled);
+      reasoningBtn.setAttribute('aria-pressed', reasoningEnabled ? 'true' : 'false');
+    }
   }
 
   settingsBtn.addEventListener('click', function () {
@@ -299,7 +401,8 @@
       model: "",
       system: systemPrompt ? systemPrompt.value.trim() : "",
       preset: promptPresetSelect ? promptPresetSelect.value : "default",
-      stream: false
+      stream: false,
+      reasoning: reasoningEnabled
     };
     saveSettingsToStorage(settings);
     updateModeLabel();
@@ -1600,8 +1703,10 @@
         'auto',
       messages: messages,
       system: settings.system || '',
-      temperature: 0.35,
-      max_tokens: 8192,
+      temperature: reasoningEnabled ? 0.2 : 0.35,
+      max_tokens: reasoningEnabled ? 12288 : 8192,
+      reasoning: reasoningEnabled,
+      reasoningTier: currentPlan === 'legendary' || currentRole === 'owner' ? 'deep-plus' : currentPlan === 'pro' ? 'deep' : currentPlan === 'free' ? 'basic' : 'none',
       signal: controller.signal
     })
       .then(function (result) {

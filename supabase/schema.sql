@@ -201,7 +201,6 @@ begin
 end;
 $$;
 
-revoke all on function public.consume_tokens(integer, uuid) from public;
 revoke all on function public.consume_tokens(integer, uuid, boolean) from public;
 grant execute on function public.consume_tokens(integer, uuid, boolean) to service_role;
 

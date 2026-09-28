@@ -249,10 +249,21 @@
     accountArea.innerHTML = '';
     if (!supabase) {
       var btn = document.createElement('button');
-      btn.className = 'btn btn-outline account-login-btn';
-      btn.textContent = 'Đăng nhập';
-      btn.addEventListener('click', function () { openAuthModal('login'); });
-      accountArea.appendChild(btn);
+      var authGroup = document.createElement('div');
+      authGroup.className = 'account-auth-group';
+      var loginBtn = document.createElement('button');
+      loginBtn.type = 'button';
+      loginBtn.className = 'btn btn-outline account-login-btn';
+      loginBtn.textContent = 'Đăng nhập';
+      loginBtn.addEventListener('click', function () { openAuthModal('login'); });
+      var registerBtn = document.createElement('button');
+      registerBtn.type = 'button';
+      registerBtn.className = 'btn btn-primary account-register-btn';
+      registerBtn.textContent = 'Đăng ký';
+      registerBtn.addEventListener('click', function () { openAuthModal('register'); });
+      authGroup.appendChild(loginBtn);
+      authGroup.appendChild(registerBtn);
+      accountArea.appendChild(authGroup);
       var headerCta = document.getElementById('headerTrialCta');
       if (headerCta) {
         headerCta.textContent = 'Dùng thử ngay';
@@ -268,11 +279,23 @@
     if (user.is_anonymous) {
       var guestBtn = document.createElement('button');
       guestBtn.type = 'button';
-      guestBtn.className = 'btn btn-outline account-login-btn guest-account-btn';
-      guestBtn.textContent = 'Đăng nhập';
-      guestBtn.title = 'Đăng nhập để lưu lịch sử và nâng hạn mức';
-      guestBtn.addEventListener('click', function () { openAuthModal('login'); });
-      accountArea.appendChild(guestBtn);
+      var guestAuthGroup = document.createElement('div');
+      guestAuthGroup.className = 'account-auth-group';
+      var guestLoginBtn = document.createElement('button');
+      guestLoginBtn.type = 'button';
+      guestLoginBtn.className = 'btn btn-outline account-login-btn guest-account-btn';
+      guestLoginBtn.textContent = 'Đăng nhập';
+      guestLoginBtn.title = 'Đăng nhập để lưu lịch sử và nâng hạn mức';
+      guestLoginBtn.addEventListener('click', function () { openAuthModal('login'); });
+      var guestRegisterBtn = document.createElement('button');
+      guestRegisterBtn.type = 'button';
+      guestRegisterBtn.className = 'btn btn-primary account-register-btn';
+      guestRegisterBtn.textContent = 'Đăng ký';
+      guestRegisterBtn.title = 'Tạo tài khoản LegendaryAI';
+      guestRegisterBtn.addEventListener('click', function () { openAuthModal('register'); });
+      guestAuthGroup.appendChild(guestLoginBtn);
+      guestAuthGroup.appendChild(guestRegisterBtn);
+      accountArea.appendChild(guestAuthGroup);
       var guestLabel = document.createElement('span');
       guestLabel.className = 'guest-plan-chip';
       guestLabel.textContent = 'Khách · 1K';
@@ -290,10 +313,20 @@
     if (!user) {
       var loginBtn = document.createElement('button');
       loginBtn.type = 'button';
+      var loggedOutAuthGroup = document.createElement('div');
+      loggedOutAuthGroup.className = 'account-auth-group';
+      loginBtn.type = 'button';
       loginBtn.className = 'btn btn-outline account-login-btn';
       loginBtn.textContent = 'Đăng nhập';
       loginBtn.addEventListener('click', function () { openAuthModal('login'); });
-      accountArea.appendChild(loginBtn);
+      var loggedOutRegisterBtn = document.createElement('button');
+      loggedOutRegisterBtn.type = 'button';
+      loggedOutRegisterBtn.className = 'btn btn-primary account-register-btn';
+      loggedOutRegisterBtn.textContent = 'Đăng ký';
+      loggedOutRegisterBtn.addEventListener('click', function () { openAuthModal('register'); });
+      loggedOutAuthGroup.appendChild(loginBtn);
+      loggedOutAuthGroup.appendChild(loggedOutRegisterBtn);
+      accountArea.appendChild(loggedOutAuthGroup);
       var headerCta = document.getElementById('headerTrialCta');
       if (headerCta) {
         headerCta.textContent = 'Dùng thử ngay';

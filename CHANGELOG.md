@@ -1,5 +1,13 @@
 # LegendaryAI Changelog
 
+## 1.2.0 — Legendary Brain V12
+- Added bounded **Planner → Executor → Verifier → Finalizer** pipeline to Native Core.
+- Added an explicit native-tool allowlist for math, unit conversion, JSON formatting, extractive summary, code diagnostics and safe templates.
+- Added verification gates so unresolved native tasks fall back cleanly instead of fabricating an answer.
+- Added V12 agent-plan telemetry to the ai-chat-v10 response.
+- Kept local inference optional; no external AI provider is enabled by this release.
+- Preserved Guest 1K/session and existing plan-aware token windows.
+
 ## 1.1.3
 - Hardened client retry behavior: **429 rate-limit responses are no longer automatically retried**, preventing retry amplification.
 - Added bounded client request retry/backoff behavior for transient server failures.

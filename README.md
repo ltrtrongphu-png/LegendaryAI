@@ -101,6 +101,7 @@ hoặc chỉnh các bản ghi trong bảng public.ai_models bằng Owner.
 
 Các model mặc định là product profiles, không phải tên của một foundation model do repo tự huấn luyện:
 
+Guest     → Native Core / 1K token mỗi session
 Free      → legendary-lite-1
 Pro       → auto → Reasoner 32B* / Vision Pro 11B* → fallback LegendaryPro-1
 Legendary → auto → Ultra 120B* / Vision 109B* → fallback LegendaryUltra-1
@@ -199,8 +200,8 @@ Then enable the desired `ai_models` row. Do not put this URL or any private infe
 
 ### Paid plans
 
-- **Pro — 149.000đ/tháng:** 2.000.000 token/ngày, Reasoner 32B*, Vision Pro 11B*, long context, memory, Prompt Studio và export Markdown.
-- **Legendary — 399.000đ/tháng:** 6.000.000 token/ngày, Ultra 120B*, Vision 109B*, Advanced Memory và routing model cao cấp.
+- **Pro — 149.000đ/tháng:** 2.000.000 token / 12 giờ, Reasoner 32B*, Vision Pro 11B*, long context, memory, Prompt Studio và export Markdown.
+- **Legendary — 399.000đ/tháng:** 6.000.000 token / 18 giờ, Ultra 120B*, Vision 109B*, Advanced Memory và routing model cao cấp.
 - **Free — 0đ/tháng: 150.000 token/ngày, LegendaryLite-1 nâng cấp, Quick Mode, máy tính và session context.
 
 ### Conversation URLs
@@ -243,3 +244,14 @@ The web_search capability flag is not a fake search implementation. A real searc
 
 ### Security
 Token accounting RPCs are restricted and the browser-facing manual reset uses the JWT-protected token-reset Edge Function. RLS policies use initplan-safe (select auth.uid()) expressions and model-owner writes are separated from public model reads.
+
+
+### Legendary Brain V12
+
+V12 adds a bounded agent pipeline to the Native Core:
+
+Planner → Executor → Verifier → Finalizer
+
+The executor is allowlisted to deterministic internal tools only: safe arithmetic, unit conversion, JSON formatting, extractive summarization, bounded code diagnostics and safe templates. If a native tool cannot resolve a request, V12 falls back to the existing model-required response instead of inventing an answer.
+
+V12 does not enable external AI providers and does not claim foundation-model capabilities when no local inference backend is configured.

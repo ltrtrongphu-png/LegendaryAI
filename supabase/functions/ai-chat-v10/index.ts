@@ -25,13 +25,13 @@ async function relevantMemories(admin:any,userId:string,prompt:string,enabled:bo
   const cached=memoryCache.get(userId);if(cached&&Date.now()-cached.created<MEMORY_TTL_MS)return cached.items;
   const {data,error}=await admin.from("ai_memories").select("memory,importance,updated_at").eq("user_id",userId).order("importance",{ascending:false}).order("updated_at",{ascending:false}).limit(24);
   if(error||!Array.isArray(data))return [];
-  const terms=new Set((prompt.toLowerCase().match(/[\\p{L}\\p{N}]{3,}/gu)||[]).slice(0,24));
+  const terms=new Set((prompt.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]).slice(0,24));
   const ranked=data.map((m:any)=>{const words=String(m.memory||"").toLowerCase();let score=Number(m.importance||5)*0.15;for(const t of terms)if(words.includes(t))score+=1;return{memory:String(m.memory||"").trim(),score}}).filter((m:any)=>m.memory).sort((a:any,b:any)=>b.score-a.score).slice(0,6).map((m:any)=>m.memory);
   memoryCache.set(userId,{created:Date.now(),items:ranked});if(memoryCache.size>500)memoryCache.delete(memoryCache.keys().next().value!);return ranked;
 }
 async function maybeSaveExplicitMemory(admin:any,userId:string,prompt:string,enabled:boolean){
   if(!enabled||!userId)return false;
-  const match=String(prompt||'').match(/(?:hãy nhớ rằng|hãy ghi nhớ|ghi nhớ rằng|remember that|my preference is)[:\\s]+(.{3,280})$/i);
+  const match=String(prompt||'').match(/(?:hãy nhớ rằng|hãy ghi nhớ|ghi nhớ rằng|remember that|my preference is)[:\s]+(.{3,280})$/i);
   if(!match)return false;
   const memory=match[1].trim();
   if(/mật khẩu|password|api[ _-]?key|secret|access token|refresh token|cccd|số thẻ|bank account/i.test(memory))return false;

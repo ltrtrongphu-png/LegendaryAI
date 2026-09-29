@@ -148,10 +148,13 @@ Core principles:
 - For code, prefer secure, maintainable, production-ready solutions and explain important trade-offs.
 - For writing, follow the requested audience, tone, structure, and language.
 - For reasoning, work step-by-step internally and present a clear, useful result.
-- If information is uncertain or unavailable, say so plainly and give the best supported next step.
+- For Grade 12/THPT school problems, act like a rigorous tutor: identify the subject and problem type, state the needed formula/theorem, show decisive transformations and substitutions, then conclude. Explain why each non-obvious step is valid.
+- Keep school solutions compact: Nhận dạng -> Công thức/ý tưởng -> Giải từng bước -> Kết luận. Do not repeat the prompt or add generic encouragement.
+- For advanced problems, do not skip the key proof/derivation. For multiple-choice, show the shortest valid derivation before the selected option.
+- If a statement is missing a necessary value or condition, ask for that exact missing item. Never invent data.
+- If the Native Core deterministic solver does not support a problem type, say so briefly rather than pretending it solved it.
 - Keep answers concise by default, but go deep when the task requires it.
 - LegendaryAI does not call Claude, OpenAI, ChatGPT, Anthropic, or other external AI providers.`;
-
 function estimateTokens(text: string): number {
   return Math.max(1, Math.ceil((text || "").length / 4));
 }
@@ -560,6 +563,41 @@ function dateReasoning(input: string): string | null {
   return null;
 }
 
+/* ============================================================
+ * NATIVE ACADEMIC SOLVER
+ * Conservative deterministic solvers for common Vietnamese THPT/Grade 12 forms.
+ * Unsupported statements never receive fabricated answers.
+ * ============================================================ */
+
+function normalizeSchoolText(input: string): string {
+  return String(input || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/đ/g, 'd').replace(/\\s+/g, ' ').trim();
+}
+function isAcademicPrompt(input: string): boolean {
+  const t=normalizeSchoolText(input);
+  return /lop 12|thpt|pho thong|bai tap|bai toan|giai bai|dao ham|nguyen ham|tich phan|xac suat|hinh hoc|mon toan|vat ly|hoa hoc|sinh hoc|ngu van|tieng anh/.test(t);
+}
+function fmt(n:number):string { if(!Number.isFinite(n)) return 'không xác định'; const x=Math.abs(n)<1e-10?0:Number(n.toFixed(10)); return String(x); }
+
+function solveQuadraticAcademic(input:string):string|null {
+  const t=normalizeSchoolText(input).replace(/\\s+/g,'').replace(/x\\^2/g,'x2'); if(!t.includes('=')||!t.includes('x2')) return null; const sides=t.split('='); if(sides.length!==2) return null;
+  const parse=(s:string)=>{const terms=s.replace(/-/g,'+-').split('+').filter(Boolean);let a=0,b=0,c=0;for(const raw of terms){const q=raw.replace(/\\*/g,'');if(/^[+-]?[\\d.]*x2$/.test(q)){const z=q.slice(0,-2);a+=z===''||z==='+'?1:z==='-'?-1:Number(z);}else if(/^[+-]?[\\d.]*x$/.test(q)){const z=q.slice(0,-1);b+=z===''||z==='+'?1:z==='-'?-1:Number(z);}else if(/^[+-]?[\\d.]+$/.test(q))c+=Number(q);else throw 0;}return [a,b,c] as const;};
+  try{const [a1,b1,c1]=parse(sides[0]),[a2,b2,c2]=parse(sides[1]);const a=a1-a2,b=b1-b2,c=c1-c2;if(!a) return null;const d=b*b-4*a*c;
+    if(d>0){const x1=(-b+Math.sqrt(d))/(2*a),x2=(-b-Math.sqrt(d))/(2*a);return '## Toán 12 — phương trình bậc hai\\n\\n**Nhận dạng:** đưa về `ax²+bx+c=0`.\\n\\n**1.** `a='+fmt(a)+', b='+fmt(b)+', c='+fmt(c)+'`.\\n**2.** `Δ=b²-4ac='+fmt(d)+'>0` nên có hai nghiệm phân biệt.\\n**3.** `x=(-b±√Δ)/(2a)`.\\n\\n**Kết luận:** `x₁='+fmt(x1)+', x₂='+fmt(x2)+'`.\\n\\n**Vì sao:** `Δ>0` cho hai giá trị căn khác nhau nên phương trình có hai nghiệm thực.';}
+    if(Math.abs(d)<1e-10){const x=-b/(2*a);return '## Toán 12 — phương trình bậc hai\\n\\n**1.** `Δ=0` nên có nghiệm kép.\\n**2.** `x=-b/(2a)`.\\n\\n**Kết luận:** `x='+fmt(x)+'`.';}
+    return '## Toán 12 — phương trình bậc hai\\n\\n**1.** `Δ='+fmt(d)+'<0`.\\n\\n**Kết luận:** phương trình **vô nghiệm trong R**.\\n\\n**Vì sao:** `Δ<0` nên không tồn tại căn bậc hai thực của `Δ`.';
+  }catch{return null;}
+}
+
+function solveSystemAcademic(input:string):string|null {
+  const t=normalizeSchoolText(input).replace(/\\s+/g,'');const eq=t.split(/[,;\\n]+/).filter(x=>x.includes('=')&&x.includes('x')&&x.includes('y'));if(eq.length!==2)return null;
+  const parse=(s:string)=>{const p=s.split('=');if(p.length!==2)throw 0;const side=(z:string)=>{let a=0,b=0,c=0;for(const r of z.replace(/-/g,'+-').split('+').filter(Boolean)){const q=r.replace(/\\*/g,'');if(/^[+-]?[\\d.]*x$/.test(q)){const n=q.slice(0,-1);a+=n===''||n==='+'?1:n==='-'?-1:Number(n);}else if(/^[+-]?[\\d.]*y$/.test(q)){const n=q.slice(0,-1);b+=n===''||n==='+'?1:n==='-'?-1:Number(n);}else if(/^[+-]?[\\d.]+$/.test(q))c+=Number(q);else throw 0;}return[a,b,c]as const;};const [a,b,c]=side(p[0]);return[a,b,Number(p[1])-c]as const;};
+  try{const [a1,b1,c1]=parse(eq[0]),[a2,b2,c2]=parse(eq[1]);const d=a1*b2-a2*b1;if(!d)return null;const x=(c1*b2-c2*b1)/d,y=(a1*c2-a2*c1)/d;return '## Toán 12 — hệ 2 ẩn\\n\\nDùng Cramer vì `D='+fmt(d)+'≠0`.\\n\\n**1.** `D='+fmt(d)+'`.\\n**2.** `Dₓ='+fmt(c1*b2-c2*b1)+'`, `Dᵧ='+fmt(a1*c2-a2*c1)+'`.\\n**3.** `x=Dₓ/D='+fmt(x)+'`, `y=Dᵧ/D='+fmt(y)+'`.\\n\\n**Kết luận:** `x='+fmt(x)+', y='+fmt(y)+'`.';}catch{return null;}
+}
+
+function academicNativeResponse(prompt:string):string|null {
+  if(!isAcademicPrompt(prompt)) return null;
+  return solveQuadraticAcademic(prompt)||solveSystemAcademic(prompt)||'## Bài tập THPT\\n\\nMình nhận diện đây là bài học tập nhưng Native Core chưa có bộ giải xác định cho đúng dạng này.\\n\\nGửi **toàn bộ đề bài** (và hình nếu có). Mình sẽ xử lý theo: **nhận dạng → công thức/định lý → giải từng bước → kết luận**, giải thích lý do ở các bước quan trọng và không tự đoán dữ kiện.';
+}
 // ---- Extractive summarization: word-frequency sentence scoring (TextRank-lite) ----
 const VI_STOPWORDS = new Set(["là","của","và","có","cho","một","các","này","đó","với","được","trong","để","không","những","khi","như","đã","sẽ","về","tôi","bạn","mình","thì","nên","rằng","nếu","the","a","an","is","are","of","to","in","and","for","on","with","that","this"]);
 
@@ -809,6 +847,9 @@ function localLegendaryResponse(
   const memoryText = memories.length
     ? memories.slice(0, 8).map((m) => "- " + m).join("\n")
     : "";
+
+  const academic = academicNativeResponse(prompt);
+  if (academic) return academic;
 
   if (!prompt) {
     return "Mình đã sẵn sàng. Hãy gửi yêu cầu cụ thể để Legendary Engine xử lý.";

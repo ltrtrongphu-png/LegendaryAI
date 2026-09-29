@@ -4,5 +4,6 @@
  */
 window.LEGENDARY_SUPABASE_CONFIG = {
   url: "https://ampddcztjvejwjirqoer.supabase.co",
-  anonKey: "sb_publishable_my-CId5cv5NNM0iH_mCo5Q_eNjeg2nw"
+  anonKey: "sb_publishable_my-CId5cv5NNM0iH_mCo5Q_eNjeg2nw",
+  hcaptchaSiteKey: "924adca4-a496-4cd0-9672-25962bd05004"
 };

@@ -23,11 +23,6 @@ function cors(body: unknown, status = 200, req?: Request): Response {
   });
 }
 
-const PLAN = {
-  pro: { amount: 149000, name: "Legendary AI Pro" },
-  legendary: { amount: 399000, name: "Legendary AI Legendary" },
-} as const;
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCorsHeaders(req) });
   if (req.method !== "POST") return cors({ error: "Method not allowed" }, 405, req);
@@ -50,9 +45,16 @@ Deno.serve(async (req) => {
   if (userError || !user) return cors({ error: "Unauthorized" }, 401, req);
 
   const body = await req.json().catch(() => ({}));
-  const planKey = body.plan as keyof typeof PLAN;
-  const plan = PLAN[planKey];
-  if (!plan) return cors({ error: "Invalid plan" }, 400, req);
+  const planKey = String(body.plan || "").trim().toLowerCase();
+  const { data: plan, error: planError } = await supabase
+    .from("plans")
+    .select("id,key,name,price_vnd,enabled")
+    .eq("key", planKey)
+    .eq("enabled", true)
+    .maybeSingle();
+  if (planError || !plan || Number(plan.price_vnd || 0) <= 0) {
+    return cors({ error: "Gói không tồn tại, đang tắt hoặc không hỗ trợ thanh toán." }, 400, req);
+  }
 
   const orderId = "LAI_" + crypto.randomUUID().replaceAll("-", "").slice(0, 30);
   const requestId = crypto.randomUUID().replaceAll("-", "").slice(0, 32);
@@ -61,7 +63,7 @@ Deno.serve(async (req) => {
   const { error: insertError } = await supabase.from("orders").insert({
     user_id: user.id,
     plan: planKey,
-    amount: plan.amount,
+    amount: plan.price_vnd,
     provider_order_id: orderId,
     provider_request_id: requestId,
     status: "pending",
@@ -73,7 +75,7 @@ Deno.serve(async (req) => {
 
   const signatureText =
     "accessKey=" + accessKey +
-    "&amount=" + plan.amount +
+    "&amount=" + plan.price_vnd +
     "&extraData=" + extraData +
     "&ipnUrl=" + ipnUrl +
     "&orderId=" + orderId +
@@ -91,7 +93,7 @@ Deno.serve(async (req) => {
     ipnUrl,
     redirectUrl,
     orderId,
-    amount: String(plan.amount),
+    amount: String(plan.price_vnd),
     orderInfo: plan.name,
     requestId,
     extraData,

@@ -94,6 +94,8 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     file_analysis: true,
     advanced_reasoning: true,
     quick_reasoning: true,
+    verification: true,
+    education: true,
     smart_math: true,
     smart_formatting: true,
     advanced_memory: true,

@@ -1186,6 +1186,7 @@ Deno.serve(async (req) => {
       capabilities,
       fallbackUsed,
       local: true,
+      selfHosted: selectedModel.provider === "ollama-compatible",
       reasoning: reasoningRequested,
       reasoningMultiplier,
       native: true,
@@ -1227,6 +1228,8 @@ Deno.serve(async (req) => {
         tokens_remaining: Number(tokenState?.tokens_remaining ?? Math.max(Number(profile.token_limit) - Number(profile.tokens_used), 0)),
         token_limit: Number(tokenState?.token_limit ?? profile.token_limit),
         token_reset_at: tokenState?.token_reset_at ?? null,
+        reasoning: reasoningRequested,
+        reasoning_multiplier: reasoningMultiplier,
         request_ms: Date.now() - requestStarted,
       },
     }, 200, req);

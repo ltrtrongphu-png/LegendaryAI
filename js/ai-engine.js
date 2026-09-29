@@ -43,6 +43,7 @@
         model:options.model||'auto', messages:options.messages||[], system:options.system||'',
         temperature:options.temperature??0.35, max_tokens:options.max_tokens||4096,
         tool:options.tool||'', reasoning:!!options.reasoning, reasoningTier:options.reasoningTier||'none',
+        analysis_level:options.analysisLevel||0, mode:options.mode||'general',
         capability:options.capability||'', signal:options.signal||null
       };
       var result=await invokeWithRetry(payload,token);

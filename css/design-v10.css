@@ -1,0 +1,16 @@
+/* LegendaryAI V10 — balanced sandbox controls and readable responsive chat UI */
+.chat-shell{min-width:0;overflow:hidden}
+.chat-window{min-width:0;overflow-x:hidden}
+.chat-mode-switcher{width:100%;box-sizing:border-box;min-width:0;overscroll-behavior-x:contain}
+.chat-mode-switcher::-webkit-scrollbar{height:5px}
+.chat-mode-switcher::-webkit-scrollbar-thumb{border-radius:999px;background:rgba(120,150,200,.28)}
+.chat-input-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto auto;gap:8px;align-items:end;min-width:0}
+.chat-input-row textarea{min-width:0;width:100%;box-sizing:border-box;resize:none;overflow-y:auto}
+.chat-input-row button{flex:0 0 auto;white-space:nowrap}
+.chat-meta{min-width:0;display:flex;align-items:center;justify-content:space-between;gap:10px;overflow:hidden}
+#chatStreamStatus{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-suggestions{display:flex;gap:7px;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;min-width:0;padding:5px 0 6px;scrollbar-width:thin}
+.chat-suggestions button{flex:0 0 auto;white-space:nowrap}
+@media(max-width:900px){.chat-input-row{grid-template-columns:auto minmax(0,1fr) auto}#reasoningToggle{grid-column:2}#sendBtn{grid-column:3;grid-row:1}#stopBtn{grid-column:3;grid-row:2}.chat-input-row textarea{grid-column:2;grid-row:1;min-height:44px}.chat-meta{font-size:11px}}
+@media(max-width:620px){.chat-input-row{grid-template-columns:auto minmax(0,1fr)}.chat-input-row textarea{font-size:14px}#reasoningToggle{padding-inline:10px}}
+@media(max-width:480px){.chat-input-row{grid-template-columns:auto minmax(0,1fr)}#sendBtn,#stopBtn{grid-column:2}#sendBtn{justify-self:end}#reasoningToggle{grid-column:2;justify-self:start}}

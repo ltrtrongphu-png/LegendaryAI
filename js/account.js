@@ -90,6 +90,7 @@
 
   function applyPlanCatalog(plans) {
     PLAN_ROWS = Array.isArray(plans) ? plans.slice().sort(function(a,b){ return Number(b.priority||0)-Number(a.priority||0); }) : [];
+    if (window.LegendaryPlan && typeof window.LegendaryPlan.setCatalog === 'function') window.LegendaryPlan.setCatalog(PLAN_ROWS);
     PLAN_INFO = {};
     PLAN_LABEL = {};
     PLAN_FEATURES = {};

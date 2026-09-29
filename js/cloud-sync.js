@@ -114,6 +114,14 @@
     setTimeout(loadCloud, 400);
   });
 
+  // Persist chat changes to Supabase quickly after each message/rename.
+  // The 3s interval below remains as a safety net for transient failures.
+  var syncTimer = null;
+  window.addEventListener('legendary:conversation-changed', function () {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncNow, 250);
+  });
+
   setTimeout(loadCloud, 900);
   setInterval(syncNow, 3000);
 })();

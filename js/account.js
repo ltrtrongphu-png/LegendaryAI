@@ -213,6 +213,10 @@
   function openAuthModal(tab) {
     setAuthTab(tab || 'login');
     authBackdrop.classList.add('open');
+    setTimeout(function () {
+      ensureCaptcha('login', 'loginCaptcha');
+      ensureCaptcha('register', 'registerCaptcha');
+    }, 100);
   }
   function closeAuthModal() { authBackdrop.classList.remove('open'); }
 

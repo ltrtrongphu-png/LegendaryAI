@@ -1690,7 +1690,7 @@
           var brain = result && result.brain;
           streamStatus.textContent = brain
             ? '✓ ' + (result.displayModel || 'Legendary Engine') +
-              (result.local ? ' · Local' : '') +
+              (result.selfHosted ? ' · Local' : ' · Core') +
               (result.providerModel ? ' · ' + result.providerModel : '') +
               ' · ' + (brain.intent || 'general') +
               (brain.memory ? ' · memory' : '') +

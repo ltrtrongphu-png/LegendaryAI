@@ -715,15 +715,17 @@ function analysisDepth(prompt: string, reasoningRequested: boolean, plan: string
 
 function buildIntelligenceInstruction(prompt: string, tier: number, reasoningRequested: boolean): string {
   const academic = isAcademicPrompt(prompt);
-  return `\n\nINTELLIGENCE ORCHESTRATION:
-    + `\n- Quality tier: ${tier}x. Treat this as an internal quality budget, not a claim of benchmark performance.`
-    + `\n- Analyze intent, constraints, ambiguity, and required output before answering.`
-    + `\n- Prefer exact reasoning over plausible wording. Check arithmetic, units, assumptions, edge cases, and contradictions.`
-    + (reasoningRequested ? `\n- Reasoning mode: perform a deeper internal verification pass before the final answer.` : '')
-    + (academic ? `\n- Academic mode: level=${detectSchoolLevel(prompt)}, subject=${detectSchoolSubject(prompt)}. Identify the exact topic, choose the correct method, derive only what is needed, explain WHY at decisive steps, and finish with a clear answer. For Grades 1-12, adapt vocabulary, notation, difficulty, and explanation depth to the student's level. Never use university-level machinery when a school-level method is sufficient.` : '')
-    + `\n- Never expose hidden chain-of-thought. Give concise, useful reasoning summaries and the decisive derivation only.`;
+  const lines = [
+    "INTELLIGENCE ORCHESTRATION:",
+    `- Quality tier: ${tier}x. Treat this as an internal quality budget, not a claim of benchmark performance.`,
+    "- Analyze intent, constraints, ambiguity, and required output before answering.",
+    "- Prefer exact reasoning over plausible wording. Check arithmetic, units, assumptions, edge cases, and contradictions.",
+    ...(reasoningRequested ? ["- Reasoning mode: perform a deeper internal verification pass before the final answer."] : []),
+    ...(academic ? [`- Academic mode: level=${detectSchoolLevel(prompt)}, subject=${detectSchoolSubject(prompt)}. Identify the exact topic, choose the correct method, derive only what is needed, explain WHY at decisive steps, and finish with a clear answer. For Grades 1-12, adapt vocabulary, notation, difficulty, and explanation depth to the student's level. Never use university-level machinery when a school-level method is sufficient.`] : []),
+    "- Never expose hidden chain-of-thought. Give concise, useful reasoning summaries and the decisive derivation only.",
+  ];
+  return "\n\n" + lines.join("\n");
 }
-
 async function ollamaResponse(
   baseUrl: string,
   modelId: string,

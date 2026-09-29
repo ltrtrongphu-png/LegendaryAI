@@ -119,12 +119,12 @@ function routeModelByTask(plan: string, role: string, prompt: string, reasoningR
   }
 
   if (localGatewayReady && (plan === "legendary" || role === "owner") &&
-      /reason|reasoning|suy luận|chứng minh|toán|math|logic|debug|kiến trúc|architecture|phân tích sâu/.test(text)) {
+      /reason|reasoning|suy luận|chứng minh|toán|math|logic|debug|kiến trúc|architecture|phân tích sâu|bài tập|bài toán|lớp|thpt|thcs|tiểu học|vật lý|hóa học|sinh học|ngữ văn|tiếng anh|lịch sử|địa lý|tin học/.test(text)) {
     return "legendary-ultra-120b";
   }
 
   if (localGatewayReady && (plan === "pro" || plan === "legendary" || role === "owner") &&
-      /code|coding|javascript|typescript|python|sql|supabase|github|debug|lỗi|bug|api|backend|frontend/.test(text)) {
+      /code|coding|javascript|typescript|python|sql|supabase|github|debug|lỗi|bug|api|backend|frontend|bài tập|bài toán|lớp|thpt|thcs|tiểu học|tiểu học|vật lý|hóa học|sinh học|ngữ văn|tiếng anh|lịch sử|địa lý|tin học/.test(text)) {
     return "legendary-reasoner-32b";
   }
 
@@ -596,7 +596,25 @@ function detectSchoolSubject(input: string): string {
   if(/lich su/.test(t)) return 'Lịch sử';
   if(/dia ly/.test(t)) return 'Địa lý';
   if(/tin hoc|lap trinh|python|algorithm/.test(t)) return 'Tin học';
+  if(/cong nghe|ky thuat|thiet ke|nong nghiep|co khi/.test(t)) return 'Công nghệ';
+  if(/giao duc cong dan|gdcd|kinh te|phap luat/.test(t)) return 'GDCD/Kinh tế & Pháp luật';
   return 'không xác định';
+}
+function schoolTaskProfile(input: string): { level: string; subject: string; mode: string; difficulty: string } {
+  const t = normalizeSchoolText(input);
+  const level = detectSchoolLevel(input);
+  const subject = detectSchoolSubject(input);
+  const mode = /de thi|trac nghiem|multiple choice|chon dap an/.test(t)
+    ? "trắc nghiệm"
+    : /chung minh|giai thich|tai sao|vi sao|proof|essay|nghi luan/.test(t)
+      ? "tự luận/giải thích"
+      : "bài tập";
+  const difficulty = /olympic|hoc sinh gioi|chuyen|nang cao|van dung cao|thach thuc/.test(t)
+    ? "nâng cao"
+    : /co ban|de|can ban|on tap/.test(t)
+      ? "cơ bản"
+      : "tiêu chuẩn";
+  return { level, subject, mode, difficulty };
 }
 function fmt(n:number):string { if(!Number.isFinite(n)) return 'không xác định'; const x=Math.abs(n)<1e-10?0:Number(n.toFixed(10)); return String(x); }
 
@@ -618,8 +636,11 @@ function solveSystemAcademic(input:string):string|null {
 
 function academicNativeResponse(prompt:string):string|null {
   if(!isAcademicPrompt(prompt)) return null;
-  return solveQuadraticAcademic(prompt)||solveSystemAcademic(prompt)||'## Bài tập THPT\n\nMình nhận diện đây là bài học tập nhưng Native Core chưa có bộ giải xác định cho đúng dạng này.\n\nGửi **toàn bộ đề bài** (và hình nếu có). Mình sẽ xử lý theo: **nhận dạng → công thức/định lý → giải từng bước → kết luận**, giải thích lý do ở các bước quan trọng và không tự đoán dữ kiện.';
+  // Deterministic native solvers take precedence only when they can prove the result.
+  // Otherwise return null so an available local model can solve the full problem.
+  return solveQuadraticAcademic(prompt) || solveSystemAcademic(prompt) || null;
 }
+
 // ---- Extractive summarization: word-frequency sentence scoring (TextRank-lite) ----
 const VI_STOPWORDS = new Set(["là","của","và","có","cho","một","các","này","đó","với","được","trong","để","không","những","khi","như","đã","sẽ","về","tôi","bạn","mình","thì","nên","rằng","nếu","the","a","an","is","are","of","to","in","and","for","on","with","that","this"]);
 
@@ -703,26 +724,39 @@ function staticCodeReview(code: string): string[] {
   return findings;
 }
 
-function analysisDepth(prompt: string, reasoningRequested: boolean, plan: string, localReady: boolean): { tier: number; label: string } {
+function analysisDepth(prompt: string, reasoningRequested: boolean, plan: string, localReady: boolean, requestedLevel?: unknown): { tier: number; label: string } {
   if (!localReady) return { tier: 1, label: 'Native Core' };
   const t = normalizeSchoolText(prompt);
-  const complex = /chung minh|chứng minh|bai nang cao|nang cao|olympic|thi hoc sinh gioi|dai so|giai tich|hinh khong gian|xac suat|vat ly|hoa hoc|sinh hoc|logic|thuat toan|kien truc|debug|phan tich sau|multi-step|research/.test(t);
-  if ((plan === 'legendary' || reasoningRequested) && complex) return { tier: 4, label: 'Local Deep ×4' };
-  if (plan === 'legendary' || reasoningRequested) return { tier: 3, label: 'Local Deep ×3' };
-  if (plan === 'pro') return { tier: 2, label: 'Local Enhanced ×2' };
-  return { tier: 2, label: 'Local Enhanced ×2' };
+  const explicit = Number(requestedLevel);
+  const complex = /chung minh|chung minh|bai nang cao|nang cao|olympic|thi hoc sinh gioi|dai so|giai tich|hinh khong gian|xac suat|vat ly|hoa hoc|sinh hoc|logic|thuat toan|kien truc|debug|phan tich sau|multi-step|research|de thi|trac nghiem/.test(t);
+  let tier = complex ? 4 : (reasoningRequested ? 3 : (plan === 'pro' ? 2 : 2));
+  if (Number.isFinite(explicit)) tier = Math.max(tier, Math.min(4, Math.max(1, Math.floor(explicit))));
+  const maxTier = plan === 'legendary' || plan === 'pro' || plan === 'owner' ? 4 : 2;
+  tier = Math.min(tier, maxTier);
+  return { tier, label: tier === 4 ? 'Local Deep ×4' : tier === 3 ? 'Local Deep ×3' : tier === 2 ? 'Local Enhanced ×2' : 'Local Core ×1' };
 }
 
 function buildIntelligenceInstruction(prompt: string, tier: number, reasoningRequested: boolean): string {
   const academic = isAcademicPrompt(prompt);
+  const profile = academic ? schoolTaskProfile(prompt) : null;
   const lines = [
     "INTELLIGENCE ORCHESTRATION:",
-    `- Quality tier: ${tier}x. Treat this as an internal quality budget, not a claim of benchmark performance.`,
-    "- Analyze intent, constraints, ambiguity, and required output before answering.",
-    "- Prefer exact reasoning over plausible wording. Check arithmetic, units, assumptions, edge cases, and contradictions.",
-    ...(reasoningRequested ? ["- Reasoning mode: perform a deeper internal verification pass before the final answer."] : []),
-    ...(academic ? [`- Academic mode: level=${detectSchoolLevel(prompt)}, subject=${detectSchoolSubject(prompt)}. Identify the exact topic, choose the correct method, derive only what is needed, explain WHY at decisive steps, and finish with a clear answer. For Grades 1-12, adapt vocabulary, notation, difficulty, and explanation depth to the student's level. Never use university-level machinery when a school-level method is sufficient.`] : []),
-    "- Never expose hidden chain-of-thought. Give concise, useful reasoning summaries and the decisive derivation only.",
+    `- Quality tier: ${tier}x. This is an internal quality budget, not a benchmark claim.`,
+    "- First classify intent, constraints, ambiguity, assumptions, and the required output.",
+    "- Prefer exact reasoning over plausible wording. Verify arithmetic, units, definitions, assumptions, edge cases, and contradictions.",
+    "- If the request contains multiple tasks, decompose them, solve each, then reconcile the result.",
+    "- If evidence is insufficient, identify exactly what is missing instead of guessing.",
+    ...(reasoningRequested ? ["- Reasoning mode: perform deeper internal verification before the final answer."] : []),
+    ...(academic && profile ? [
+      `- ACADEMIC TUTOR MODE: ${profile.level} | ${profile.subject} | ${profile.mode} | ${profile.difficulty}.`,
+      "- Adapt vocabulary, notation, examples, and explanation depth to the student's level from Grade 1 through Grade 12.",
+      "- Prefer the simplest school-appropriate method before advanced machinery. For advanced problems, preserve the key proof/derivation.",
+      "- Solution contract: Nhận dạng → Dữ kiện → Công thức/ý tưởng → Giải từng bước → Kiểm tra → Kết luận.",
+      "- Explain WHY at every decisive transformation, but never pad the answer with generic commentary.",
+      "- For multiple choice: derive the shortest valid proof, then state the selected option and why the others do not fit when useful.",
+      "- For essays/language subjects: separate thesis, evidence, reasoning, and conclusion; do not invent quotations, facts, or sources.",
+    ] : []),
+    "- Never expose hidden chain-of-thought. Provide concise reasoning summaries and the decisive derivation only.",
   ];
   return "\n\n" + lines.join("\n");
 }
@@ -1138,8 +1172,16 @@ Deno.serve(async (req) => {
   const lastUserText = textFromContent(lastUser?.content);
 
   const requestedTool = normalizeTool(body.tool) || inferTool(lastUserText);
+  const localReady = Boolean(Deno.env.get("LEGENDARY_LOCAL_AI_URL"));
+  const depth = analysisDepth(
+    lastUserText,
+    reasoningRequested,
+    profile.plan,
+    localReady,
+    body.analysis_level ?? body.intelligence_level ?? body.reasoning_depth,
+  );
   const effectiveSystem = memoryAugmentedSystem(
-    system + toolInstruction(requestedTool),
+    system + buildIntelligenceInstruction(lastUserText, depth.tier, reasoningRequested) + toolInstruction(requestedTool),
     memories,
     profile.plan === "legendary" || profile.role === "owner" ? 24 : 10,
   );
@@ -1171,8 +1213,8 @@ Deno.serve(async (req) => {
   );
   // Reasoning is intentionally more expensive: reserve and bill a larger
   // token budget so the UI toggle has a real quota cost, not just a label.
-  const localReadyForBudget = Boolean(Deno.env.get('LEGENDARY_LOCAL_AI_URL')) && selectedModel.provider === 'ollama-compatible';
-  const localDepthForBudget = analysisDepth(lastUserText, reasoningRequested, profile.plan, localReadyForBudget);
+  const localReadyForBudget = localReady && selectedModel.provider === 'ollama-compatible';
+  const localDepthForBudget = analysisDepth(lastUserText, reasoningRequested, profile.plan, localReadyForBudget, body.analysis_level ?? body.intelligence_level ?? body.reasoning_depth);
   const qualityMultiplier = localReadyForBudget ? Math.max(1, localDepthForBudget.tier) : 1;
   const reasoningMultiplier = reasoningRequested ? 1.75 : 1;
   const estimatedRequestTokens = Math.ceil(
@@ -1247,8 +1289,8 @@ Deno.serve(async (req) => {
         );
       }
 
-      const localDepth = analysisDepth(lastUserText, reasoningRequested, profile.plan, true);
-      const enhancedSystem = effectiveSystem + buildIntelligenceInstruction(lastUserText, localDepth.tier, reasoningRequested);
+      const localDepth = depth.tier > 1 ? depth : analysisDepth(lastUserText, reasoningRequested, profile.plan, true, body.analysis_level ?? body.intelligence_level ?? body.reasoning_depth);
+      const enhancedSystem = effectiveSystem;
       text = await ollamaEnhancedResponse(
         baseUrl,
         selectedModel.model_id,
@@ -1305,6 +1347,9 @@ Deno.serve(async (req) => {
       selfHosted: selectedModel.provider === "ollama-compatible",
       reasoning: reasoningRequested,
       reasoningMultiplier,
+      analysisLevel: depth.tier,
+      analysisLabel: depth.label,
+      qualityMultiplier,
       native: true,
       text,
       plan: profile.plan,
@@ -1314,6 +1359,9 @@ Deno.serve(async (req) => {
         intent,
         tool: requestedTool || null,
         route: selectedModel.key,
+        analysis_level: depth.tier,
+        analysis_label: depth.label,
+        cognitive_pipeline: depth.tier > 1 ? "multi-pass" : "single-pass",
         memory: profile.memory_enabled,
         session_context: !!planFeatures.session_context,
         memory_count: memories.length,
@@ -1346,6 +1394,9 @@ Deno.serve(async (req) => {
         token_reset_at: tokenState?.token_reset_at ?? null,
         reasoning: reasoningRequested,
         reasoning_multiplier: reasoningMultiplier,
+        analysis_level: depth.tier,
+        analysis_label: depth.label,
+        quality_multiplier: qualityMultiplier,
         request_ms: Date.now() - requestStarted,
       },
     }, 200, req);

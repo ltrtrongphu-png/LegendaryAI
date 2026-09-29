@@ -123,8 +123,11 @@
   var ASSISTANT_MODE_LABELS = {
     general: 'General',
     education: 'Giáo dục',
-    hacker: 'Hacker Audit',
-    debug: 'Debug & Fix'
+    coding: 'Coding',
+    debug: 'Debug & Fix',
+    writing: 'Viết nội dung',
+    analysis: 'Phân tích',
+    creative: 'Sáng tạo'
   };
   var assistantModeButtons = document.querySelectorAll('[data-assistant-mode]');
   var MODEL_LABELS = {
@@ -270,8 +273,9 @@
     if (systemPrompt) systemPrompt.value = settings.system || "";
     if (promptPresetSelect) promptPresetSelect.value = settings.preset || "default";
     reasoningEnabled = !!settings.reasoning;
-    assistantMode = ['general','education','hacker','debug'].indexOf(settings.assistantMode) >= 0
-      ? settings.assistantMode
+    var savedAssistantMode = settings.assistantMode === 'hacker' ? 'general' : settings.assistantMode;
+    assistantMode = ['general','education','coding','debug','writing','analysis','creative'].indexOf(savedAssistantMode) >= 0
+      ? savedAssistantMode
       : 'general';
     assistantModeButtons.forEach(function (button) {
       var active = button.getAttribute('data-assistant-mode') === assistantMode;
@@ -326,8 +330,11 @@
         var notes = {
           general: 'General · phân tích + kiểm tra trước khi trả lời',
           education: 'Giáo dục · lớp 1–12 · giải bài + hướng dẫn',
-          hacker: 'Hacker Audit · tìm lỗi / lỗ hổng / rủi ro',
-          debug: 'Debug & Fix · tìm nguyên nhân + sửa + kiểm tra'
+          coding: 'Coding · kiến trúc, code sạch, test và tối ưu',
+          debug: 'Debug & Fix · tìm nguyên nhân + sửa + kiểm tra lại',
+          writing: 'Viết nội dung · bài viết, email, tài liệu và biên tập',
+          analysis: 'Phân tích · dữ kiện, lập luận, so sánh và kiểm tra giả định',
+          creative: 'Sáng tạo · ý tưởng, concept, storytelling và brainstorming'
         };
         streamStatus.textContent = notes[assistantMode] || notes.general;
       }
@@ -1722,7 +1729,7 @@
       max_tokens: 8192,
       reasoning: reasoningEnabled,
       mode: assistantMode,
-      analysisLevel: assistantMode === 'hacker' || assistantMode === 'debug' || assistantMode === 'education' ? 4 : 0,
+      analysisLevel: ['education','coding','debug','analysis'].indexOf(assistantMode) >= 0 ? 4 : (assistantMode === 'creative' || assistantMode === 'writing' ? 2 : 1),
       signal: controller.signal
     })
       .then(function (result) {

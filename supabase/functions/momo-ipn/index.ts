@@ -76,15 +76,22 @@ Deno.serve(async (req) => {
   if (!claimedOrder) return jsonResponse({ resultCode: 0, message: "already processed" });
 
   if (success) {
-    const limits: Record<string, number> = { pro: 2000000, legendary: 6000000 };
+    const { data: plan } = await supabase
+      .from("plans")
+      .select("id,key,token_limit,reset_hours,capabilities,enabled")
+      .eq("key", order.plan)
+      .maybeSingle();
+    if (!plan) return jsonResponse({ error: "Plan configuration not found" }, 500);
+    const caps = (plan.capabilities && typeof plan.capabilities === "object") ? plan.capabilities : {};
     await supabase.from("profiles").update({
-      plan: order.plan,
-      token_limit: limits[order.plan] || 250000,
-      memory_enabled: true,
-      vision_enabled: true,
-      web_search_enabled: order.plan === "legendary",
+      plan: plan.key,
+      plan_id: plan.id,
+      token_limit: Number(plan.token_limit || 0),
+      memory_enabled: Boolean(caps.memory),
+      vision_enabled: Boolean(caps.vision),
+      web_search_enabled: Boolean(caps.webSearch),
       tokens_used: 0,
-      token_reset_at: new Date(Date.now() + 86400000).toISOString(),
+      token_reset_at: new Date(Date.now() + Number(plan.reset_hours || 6) * 3600000).toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", order.user_id);
   }

@@ -681,6 +681,27 @@ function staticCodeReview(code: string): string[] {
   return findings;
 }
 
+function analysisDepth(prompt: string, reasoningRequested: boolean, plan: string, localReady: boolean): { tier: number; label: string } {
+  if (!localReady) return { tier: 1, label: 'Native Core' };
+  const t = normalizeSchoolText(prompt);
+  const complex = /chung minh|chứng minh|bai nang cao|nang cao|olympic|thi hoc sinh gioi|dai so|giai tich|hinh khong gian|xac suat|vat ly|hoa hoc|sinh hoc|logic|thuat toan|kien truc|debug|phan tich sau|multi-step|research/.test(t);
+  if ((plan === 'legendary' || reasoningRequested) && complex) return { tier: 4, label: 'Local Deep ×4' };
+  if (plan === 'legendary' || reasoningRequested) return { tier: 3, label: 'Local Deep ×3' };
+  if (plan === 'pro') return { tier: 2, label: 'Local Enhanced ×2' };
+  return { tier: 2, label: 'Local Enhanced ×2' };
+}
+
+function buildIntelligenceInstruction(prompt: string, tier: number, reasoningRequested: boolean): string {
+  const academic = isAcademicPrompt(prompt);
+  return `\n\nINTELLIGENCE ORCHESTRATION:
+    + `\n- Quality tier: ${tier}x. Treat this as an internal quality budget, not a claim of benchmark performance.`
+    + `\n- Analyze intent, constraints, ambiguity, and required output before answering.`
+    + `\n- Prefer exact reasoning over plausible wording. Check arithmetic, units, assumptions, edge cases, and contradictions.`
+    + (reasoningRequested ? `\n- Reasoning mode: perform a deeper internal verification pass before the final answer.` : '')
+    + (academic ? `\n- Academic mode: identify grade/subject/topic, choose the correct method, derive only what is needed, explain WHY at decisive steps, and finish with a clear answer. For Grade 1-12, adapt vocabulary and depth to the student's level.` : '')
+    + `\n- Never expose hidden chain-of-thought. Give concise, useful reasoning summaries and the decisive derivation only.`;
+}
+
 async function ollamaResponse(
   baseUrl: string,
   modelId: string,
@@ -737,6 +758,30 @@ async function ollamaResponse(
   return String(text);
 }
 
+async function ollamaEnhancedResponse(
+  baseUrl: string, modelId: string, messages: any[], system: string, maxTokens: number, temperature: number, tier: number,
+): Promise<string> {
+  const draft = await ollamaResponse(baseUrl, modelId, messages, system, maxTokens, temperature);
+  if (tier <= 1) return draft;
+  const verifierSystem = system + `\n\nVERIFICATION PASS: Review the draft below for factual, mathematical, logical, instructional, and formatting errors. List only concrete corrections. If it is correct, say VERIFIED.`;
+  const verifyMessages = [
+    ...messages,
+    { role: 'assistant', content: draft },
+    { role: 'user', content: 'Kiểm tra đáp án trên thật kỹ. Không viết lại toàn bộ; chỉ nêu lỗi cần sửa hoặc VERIFIED.' },
+  ];
+  const critique = await ollamaResponse(baseUrl, modelId, verifyMessages, verifierSystem, Math.min(2048, maxTokens), 0.15);
+  if (tier === 2) return critique.includes('VERIFIED') ? draft : await ollamaResponse(baseUrl, modelId, messages, system + `\n\nCORRECTION PASS: Fix only the concrete issues identified by this verifier:\n${critique}`, maxTokens, 0.2);
+  const refinement = await ollamaResponse(
+    baseUrl, modelId, messages,
+    system + `\n\nFINAL REVIEW: Produce the final answer using this draft and verifier notes. Keep the useful derivation, remove errors and unnecessary text.\nDRAFT:\n${draft}\nVERIFIER:\n${critique}`,
+    maxTokens, 0.2,
+  );
+  if (tier >= 4) {
+    const audit = await ollamaResponse(baseUrl, modelId, [{ role: 'user', content: refinement }], system + '\n\nFINAL AUDIT: Return AUDIT_OK if the answer is internally consistent; otherwise give only the exact correction.', 1024, 0.1);
+    if (!audit.includes('AUDIT_OK')) return await ollamaResponse(baseUrl, modelId, [{ role: 'user', content: refinement }, { role: 'user', content: 'Apply this final audit correction exactly:\n' + audit }], system, maxTokens, 0.15);
+  }
+  return refinement;
+}
 const TOOL_PROMPTS: Record<string, string> = {
   calculator: "Evaluate a basic arithmetic expression safely. Never use eval or execute code.",
   summarize: "Summarize the supplied material. Return the key points, decisions, risks, and next actions. Do not invent missing facts.",
@@ -1102,9 +1147,12 @@ Deno.serve(async (req) => {
   );
   // Reasoning is intentionally more expensive: reserve and bill a larger
   // token budget so the UI toggle has a real quota cost, not just a label.
+  const localReadyForBudget = Boolean(Deno.env.get('LEGENDARY_LOCAL_AI_URL')) && selectedModel.provider === 'ollama-compatible';
+  const localDepthForBudget = analysisDepth(lastUserText, reasoningRequested, profile.plan, localReadyForBudget);
+  const qualityMultiplier = localReadyForBudget ? Math.max(1, localDepthForBudget.tier) : 1;
   const reasoningMultiplier = reasoningRequested ? 1.75 : 1;
   const estimatedRequestTokens = Math.ceil(
-    (estimatedInputTokens + maxTokens) * reasoningMultiplier,
+    (estimatedInputTokens + maxTokens) * reasoningMultiplier * qualityMultiplier,
   );
   const reservation = Math.max(
     1,
@@ -1175,13 +1223,16 @@ Deno.serve(async (req) => {
         );
       }
 
-      text = await ollamaResponse(
+      const localDepth = analysisDepth(lastUserText, reasoningRequested, profile.plan, true);
+      const enhancedSystem = effectiveSystem + buildIntelligenceInstruction(lastUserText, localDepth.tier, reasoningRequested);
+      text = await ollamaEnhancedResponse(
         baseUrl,
         selectedModel.model_id,
         normalizedMessages,
-        effectiveSystem,
+        enhancedSystem,
         maxTokens,
         temperature,
+        localDepth.tier,
       );
     } else {
       text = localLegendaryResponse(
@@ -1194,7 +1245,7 @@ Deno.serve(async (req) => {
 
     const estimatedOutputTokens = estimateTokens(text);
     const actualTokens = Math.ceil(
-      (estimatedInputTokens + estimatedOutputTokens) * reasoningMultiplier,
+      (estimatedInputTokens + estimatedOutputTokens) * reasoningMultiplier * qualityMultiplier,
     );
     const { data: tokenStateRows } = await supabase.rpc("finalize_tokens", {
       p_reserved: reservation,

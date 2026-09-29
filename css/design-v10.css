@@ -14,3 +14,10 @@
 @media(max-width:900px){.chat-input-row{grid-template-columns:auto minmax(0,1fr) auto}#reasoningToggle{grid-column:2}#sendBtn{grid-column:3;grid-row:1}#stopBtn{grid-column:3;grid-row:2}.chat-input-row textarea{grid-column:2;grid-row:1;min-height:44px}.chat-meta{font-size:11px}}
 @media(max-width:620px){.chat-input-row{grid-template-columns:auto minmax(0,1fr)}.chat-input-row textarea{font-size:14px}#reasoningToggle{padding-inline:10px}}
 @media(max-width:480px){.chat-input-row{grid-template-columns:auto minmax(0,1fr)}#sendBtn,#stopBtn{grid-column:2}#sendBtn{justify-self:end}#reasoningToggle{grid-column:2;justify-self:start}}
+
+/* Auth buttons beside the trial CTA */
+.account-auth-group{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.account-register-btn,.account-login-btn{min-height:38px}
+@media(max-width:1100px){.account-auth-group{gap:5px}.account-register-btn,.account-login-btn{padding:8px 12px;font-size:.8rem}}
+@media(max-width:820px){.header-actions{gap:6px}.account-auth-group .account-login-btn{display:none}.account-auth-group .account-register-btn{padding:8px 11px}.header-actions #headerTrialCta{padding:9px 12px;font-size:.82rem}}
+@media(max-width:560px){.account-auth-group .account-register-btn{font-size:0;width:38px;padding:8px}.account-auth-group .account-register-btn::after{content:'+';font-size:18px;font-weight:700}.header-actions #headerTrialCta{font-size:0;width:38px;padding:9px}.header-actions #headerTrialCta::after{content:'▶';font-size:12px}}

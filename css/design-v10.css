@@ -21,3 +21,25 @@
 @media(max-width:1100px){.account-auth-group{gap:5px}.account-register-btn,.account-login-btn{padding:8px 12px;font-size:.8rem}}
 @media(max-width:820px){.header-actions{gap:6px}.account-auth-group .account-login-btn{display:none}.account-auth-group .account-register-btn{padding:8px 11px}.header-actions #headerTrialCta{padding:9px 12px;font-size:.82rem}}
 @media(max-width:560px){.account-auth-group .account-register-btn{font-size:0;width:38px;padding:8px}.account-auth-group .account-register-btn::after{content:'+';font-size:18px;font-weight:700}.header-actions #headerTrialCta{font-size:0;width:38px;padding:9px}.header-actions #headerTrialCta::after{content:'▶';font-size:12px}}
+
+
+/* Dynamic owner admin + plan management */
+.owner-admin-panel{position:fixed;z-index:10050;left:50%;top:50%;transform:translate(-50%,-50%);width:min(980px,94vw);max-height:88vh;overflow:auto;background:var(--panel,#0f1117);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.45)}
+.owner-admin-sub{margin:4px 0 0;opacity:.72;font-size:.9rem}
+.owner-admin-tabs{display:flex;gap:8px;margin:18px 0}
+.owner-admin-body{min-height:180px}
+.owner-admin-loading{padding:30px;text-align:center;opacity:.7}
+.owner-plan-form{padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:14px;margin-bottom:16px}
+.owner-plan-form h4{margin:0 0 12px}
+.owner-form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.owner-plan-form input,.owner-plan-form textarea{width:100%;box-sizing:border-box;margin:4px 0;padding:10px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit}
+.owner-plan-form textarea{min-height:70px;resize:vertical}
+.owner-plan-list,.owner-user-list{display:grid;gap:8px}
+.owner-plan-row,.owner-user-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid rgba(255,255,255,.08);border-radius:12px}
+.owner-plan-row small,.owner-user-row small{display:block;opacity:.62;margin-top:3px}
+.owner-row-actions{display:flex;gap:6px;flex-wrap:wrap}
+.plan-status{font-size:.78rem;padding:4px 8px;border-radius:999px}
+.plan-status.on{background:rgba(72,200,120,.12);color:#79e2a1}.plan-status.off{background:rgba(255,160,90,.12);color:#ffb276}
+.owner-user-row{grid-template-columns:minmax(0,1fr) 170px auto}
+.owner-user-plan{padding:8px;border-radius:8px;background:rgba(255,255,255,.05);color:inherit;border:1px solid rgba(255,255,255,.12)}
+@media(max-width:700px){.owner-form-grid{grid-template-columns:1fr}.owner-plan-row,.owner-user-row{grid-template-columns:1fr}.owner-row-actions{justify-content:flex-start}}

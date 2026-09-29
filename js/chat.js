@@ -301,7 +301,7 @@
       saveSettingsToStorage(settings);
       if (streamStatus) {
         streamStatus.textContent = reasoningEnabled
-          ? 'Suy luận nâng cao · đang bật'
+          ? 'Suy luận nâng cao · quota ×1.75 token'
           : '';
       }
     });

@@ -2,6 +2,7 @@
   'use strict';
 
   var cfg = window.LEGENDARY_SUPABASE_CONFIG || {};
+  window.LEGENDARY_HCAPTCHA_SITEKEY = cfg.hcaptchaSiteKey || '';
   var supabase = null;
   if (window.supabase && cfg.url && !cfg.url.includes('YOUR_PROJECT_REF') && cfg.anonKey && !cfg.anonKey.includes('YOUR_SUPABASE_ANON_KEY')) {
     supabase = window.supabase.createClient(cfg.url, cfg.anonKey);
@@ -65,6 +66,52 @@
   var resetSuccess = document.getElementById('resetSuccess');
   var googleBtn = document.getElementById('googleAuthBtn');
   var githubBtn = document.getElementById('githubAuthBtn');
+  var hcaptchaWidgets = {};
+
+  function hcaptchaReady() {
+    return !!(window.hcaptcha && typeof window.hcaptcha.render === 'function');
+  }
+
+  function getCaptchaToken(formKey) {
+    var id = hcaptchaWidgets[formKey];
+    if (!hcaptchaReady() || id === undefined || id === null) return '';
+    try { return window.hcaptcha.getResponse(id) || ''; } catch (e) { return ''; }
+  }
+
+  function resetCaptcha(formKey) {
+    var id = hcaptchaWidgets[formKey];
+    if (!hcaptchaReady() || id === undefined || id === null) return;
+    try { window.hcaptcha.reset(id); } catch (e) {}
+  }
+
+  function ensureCaptcha(formKey, containerId) {
+    var sitekey = window.LEGENDARY_HCAPTCHA_SITEKEY || '';
+    if (!sitekey || !hcaptchaReady()) return false;
+    var container = document.getElementById(containerId);
+    if (!container) return false;
+    if (hcaptchaWidgets[formKey] !== undefined) return true;
+    try {
+      hcaptchaWidgets[formKey] = window.hcaptcha.render(container, {
+        sitekey: sitekey,
+        theme: 'dark',
+        size: 'normal'
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function requireCaptcha(formKey, containerId, errorEl) {
+    if (!window.LEGENDARY_HCAPTCHA_SITEKEY) return '';
+    ensureCaptcha(formKey, containerId);
+    var token = getCaptchaToken(formKey);
+    if (!token) {
+      setError(errorEl, 'Hãy hoàn thành CAPTCHA trước khi tiếp tục.');
+      return null;
+    }
+    return token;
+  }
 
   var checkoutBackdrop = document.getElementById('checkoutBackdrop');
   var closeCheckout = document.getElementById('closeCheckout');
@@ -177,6 +224,11 @@
     if (e.target === authBackdrop) closeAuthModal();
   });
 
+  setTimeout(function () {
+    ensureCaptcha('login', 'loginCaptcha');
+    ensureCaptcha('register', 'registerCaptcha');
+  }, 0);
+
   async function signInOAuth(provider) {
     var error = configured();
     if (error) return setError(loginError, error);
@@ -231,8 +283,13 @@
     if (error) return setError(loginError, error);
     var email = document.getElementById('loginEmail').value.trim();
     var password = document.getElementById('loginPassword').value;
-    var r = await supabase.auth.signInWithPassword({ email: email, password: password });
-    if (r.error) return setError(loginError, r.error.message);
+    var captchaToken = requireCaptcha('login', 'loginCaptcha', loginError);
+    if (captchaToken === null) return;
+    var credentials = { email: email, password: password };
+    if (captchaToken) credentials.options = { captchaToken: captchaToken };
+    var r = await supabase.auth.signInWithPassword(credentials);
+    if (r.error) { resetCaptcha('login'); return setError(loginError, r.error.message); }
+    resetCaptcha('login');
     closeAuthModal();
     loginForm.reset();
     await renderAccountArea();
@@ -247,12 +304,17 @@
     var email = document.getElementById('registerEmail').value.trim().toLowerCase();
     var password = document.getElementById('registerPassword').value;
     if (!name || !email || password.length < 6) return setError(registerError, 'Vui lòng nhập họ tên, email và mật khẩu từ 6 ký tự.');
+    var captchaToken = requireCaptcha('register', 'registerCaptcha', registerError);
+    if (captchaToken === null) return;
+    var signupOptions = { data: { full_name: name } };
+    if (captchaToken) signupOptions.captchaToken = captchaToken;
     var r = await supabase.auth.signUp({
       email: email,
       password: password,
-      options: { data: { full_name: name } }
+      options: signupOptions
     });
-    if (r.error) return setError(registerError, r.error.message);
+    if (r.error) { resetCaptcha('register'); return setError(registerError, r.error.message); }
+    resetCaptcha('register');
     registerForm.reset();
     if (r.data.session) {
       closeAuthModal();

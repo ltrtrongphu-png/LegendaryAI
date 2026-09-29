@@ -273,7 +273,7 @@
     if (systemPrompt) systemPrompt.value = settings.system || "";
     if (promptPresetSelect) promptPresetSelect.value = settings.preset || "default";
     reasoningEnabled = !!settings.reasoning;
-    var savedAssistantMode = settings.assistantMode === 'hacker' ? 'general' : settings.assistantMode;
+    var savedAssistantMode = settings.assistantMode;
     assistantMode = ['general','education','coding','debug','writing','analysis','creative'].indexOf(savedAssistantMode) >= 0
       ? savedAssistantMode
       : 'general';

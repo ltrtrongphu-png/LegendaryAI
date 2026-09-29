@@ -1,1 +1,0 @@
-revoke execute on function public.sync_profile_plan_fields() from public,anon,authenticated,service_role;

@@ -1,16 +1,14 @@
 (function () {
   'use strict';
   function sleep(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
-  async function ensureGuestSession() {
-    if (!window.LegendaryBackend || !window.LegendaryBackend.client) return null;
+  async function ensureAuthSession() {
+    if (!window.LegendaryBackend || !window.LegendaryBackend.client) {
+      throw new Error('Supabase chưa sẵn sàng.');
+    }
     var token = await window.LegendaryBackend.getAccessToken();
     if (token) return token;
-    var client = window.LegendaryBackend.client;
-    if (!client.auth || !client.auth.signInAnonymously) return null;
-    var r = await client.auth.signInAnonymously({ data: { source: 'legendary-web-guest' } });
-    if (r.error) throw new Error('Không thể khởi tạo phiên khách: ' + r.error.message);
-    window.dispatchEvent(new CustomEvent('legendary:guest-session-ready'));
-    return r.data && r.data.session ? r.data.session.access_token : null;
+
+    throw new Error('Bạn đang ở chế độ khách. Hãy Đăng nhập hoặc Đăng ký để sử dụng Legendary Engine.');
   }
   async function invokeWithRetry(payload, token) {
     var lastError = null;
@@ -36,7 +34,7 @@
   window.LegendaryAIEngine={
     async chat(options){
       options=options||{};
-      var token=await ensureGuestSession();
+      var token=await ensureAuthSession();
       if(!token) throw new Error('Supabase chưa sẵn sàng.');
       if(!options.messages||!options.messages.length) throw new Error('Không có nội dung để gửi — hãy nhập tin nhắn trước khi gửi.');
       var payload={

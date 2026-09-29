@@ -78,3 +78,179 @@ body{background:radial-gradient(circle at 72% 13%,rgba(39,91,170,.12),transparen
 @media(max-width:1020px){.hero{grid-template-columns:1fr!important;padding-top:54px!important}.hero-copy{max-width:760px}.v8-hero-visual{height:500px!important;min-height:500px!important}.v8-orbit-stage{transform:scale(.82)}}
 @media(max-width:760px){.main-nav{display:none!important}.hero h1{font-size:48px!important}.v8-hero-visual{height:420px!important;min-height:420px!important}.v8-orbit-stage{transform:scale(.62)}.v8-float-card{min-width:150px;padding:10px 12px}.v8-float-card span{display:none}.v8-card-research{left:0}.v8-card-memory{left:28px}.chat-sidebar{position:absolute!important;z-index:50!important;transform:translateX(-105%);transition:transform .2s ease}.chat-app.sidebar-open .chat-sidebar{transform:translateX(0)}.chat-shell{width:100%!important}.chat-model-control{display:none}.chat-reasoning-btn{padding:0 10px!important;font-size:11px!important}}
 @media(prefers-reduced-motion:reduce){.v8-orbit-halo,.v8-atom-wrap,.v8-float-card{animation:none!important}.v8-atom-ring{animation:none!important}}
+
+
+/* -------------------------------------------------------------------------
+   V8.1 — compact density + collision fixes
+   Keep the premium visual language, but remove the oversized spacing and
+   make the chat header/pricing labels deterministic at real viewport sizes.
+   ------------------------------------------------------------------------- */
+
+/* Pricing badges must sit inside the card's visible paint area. */
+.pricing-grid{gap:10px!important;align-items:stretch!important}
+.price-card{
+  padding:23px 22px!important;
+  overflow:visible!important;
+  min-height:0!important;
+}
+.price-card::before{
+  border-radius:inherit!important;
+  pointer-events:none!important;
+}
+.price-card h3{margin:0 0 8px!important}
+.price{font-size:1.72rem!important;margin:0 0 15px!important}
+.price-card ul{gap:7px!important;margin:0 0 17px!important}
+.price-card li{font-size:.81rem!important;line-height:1.45!important}
+.price-tag{
+  position:absolute!important;
+  top:10px!important;
+  left:auto!important;
+  right:12px!important;
+  z-index:20!important;
+  padding:4px 9px!important;
+  font-size:.62rem!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+  box-shadow:0 6px 18px rgba(0,0,0,.16)!important;
+}
+.price-card.is-featured h3{padding-right:88px!important}
+
+/* The active plan badge is intentionally separate from "Phổ biến nhất". */
+.price-card.is-current::after{
+  content:"Gói dùng hiện tại"!important;
+  position:absolute!important;
+  top:10px!important;
+  right:12px!important;
+  z-index:19!important;
+  padding:4px 9px!important;
+  border-radius:999px!important;
+  border:1px solid rgba(114,228,177,.28)!important;
+  background:rgba(52,181,127,.14)!important;
+  color:#72e4b1!important;
+  font-size:.61rem!important;
+  line-height:1!important;
+  font-weight:800!important;
+  letter-spacing:.01em!important;
+  white-space:nowrap!important;
+  box-shadow:0 6px 18px rgba(0,0,0,.14)!important;
+}
+.price-card.is-current.is-featured::after{right:12px!important}
+.price-card.is-current .price-tag{right:auto!important;left:12px!important}
+.price-card.is-current.is-featured h3{padding-right:0!important;padding-top:20px!important}
+
+/* Compact the large product sections without flattening the hierarchy. */
+.features,.engine-showcase,.turbo-brain,.capacity,.compare,.pricing,.faq,.demo{
+  padding-top:58px!important;
+  padding-bottom:58px!important;
+}
+.section-head{margin-bottom:28px!important}
+.section-head h2{font-size:clamp(1.8rem,3vw,2.55rem)!important}
+.feature-grid{gap:10px!important}
+.feature-cell{min-height:178px!important;padding:20px!important;border-radius:17px!important}
+.feature-cell h3{font-size:.98rem!important}
+.feature-cell p{font-size:.8rem!important;line-height:1.55!important}
+.fc-icon{width:38px!important;height:38px!important;border-radius:11px!important}
+.engine-panel{padding:28px!important;border-radius:20px!important}
+.engine-card{padding:14px!important}
+.turbo-card{padding:18px!important;border-radius:17px!important}
+.capacity-panel{padding:30px!important;border-radius:20px!important}
+.compare-table th,.compare-table td{padding:13px 15px!important}
+.faq-list{gap:8px!important}
+
+/* Chat header: reserve a real lane for model + token HUD, no overlap. */
+.chat-topbar{
+  min-height:60px!important;
+  height:auto!important;
+  padding:9px 12px!important;
+  flex-wrap:nowrap!important;
+  gap:8px!important;
+}
+.chat-topbar-left{
+  display:flex!important;
+  align-items:center!important;
+  flex:1 1 auto!important;
+  min-width:0!important;
+  max-width:100%!important;
+  gap:7px!important;
+  overflow:hidden!important;
+}
+.chat-topbar-right{
+  flex:0 0 auto!important;
+  margin-left:auto!important;
+  gap:5px!important;
+}
+.chat-topbar-left #chatModeLabel{
+  flex:0 1 175px!important;
+  min-width:86px!important;
+  max-width:175px!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+.chat-model-control{
+  flex:0 0 145px!important;
+  width:145px!important;
+  min-width:145px!important;
+  max-width:145px!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  white-space:nowrap!important;
+}
+.chat-model-control select{
+  min-width:0!important;
+  width:100%!important;
+  max-width:112px!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.chat-token-hud{
+  flex:0 0 auto!important;
+  min-width:0!important;
+  max-width:182px!important;
+  margin-left:0!important;
+  padding:5px 9px!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+}
+.chat-token-hud strong{flex:0 0 auto!important}
+.chat-token-hud>span:last-child{
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+/* Keep the workspace itself compact and breathable. */
+.chat-app{height:640px!important;border-radius:18px!important}
+.chat-sidebar{width:245px!important;padding:14px!important}
+.chat-new-btn{height:40px!important}
+.chat-window{padding:20px!important}
+.chat-suggestions{padding:8px 12px!important;min-height:0!important}
+.chat-suggestions button{padding:7px 10px!important;font-size:11px!important}
+.chat-input-row{padding:9px 11px 6px!important;gap:7px!important}
+.chat-input-row textarea{min-height:46px!important;padding:12px 14px!important}
+.chat-input-row #sendBtn,.chat-reasoning-btn{height:46px!important}
+.chat-meta{padding:0 12px 7px!important;font-size:10px!important}
+
+@media(max-width:1120px){
+  .chat-topbar-left #chatModeLabel{flex-basis:145px!important;max-width:145px!important}
+  .chat-model-control{flex-basis:132px!important;width:132px!important;min-width:132px!important;max-width:132px!important}
+  .chat-token-hud{max-width:165px!important}
+}
+@media(max-width:900px){
+  .chat-topbar-left #chatModeLabel{flex-basis:125px!important;max-width:125px!important}
+  .chat-token-hud{max-width:150px!important}
+  .chat-token-hud>span:last-child{display:none!important}
+  .chat-topbar-right #clearChatBtn{font-size:0!important;width:32px!important;padding:0!important}
+  .chat-topbar-right #clearChatBtn::after{content:"×";font-size:18px!important}
+}
+@media(max-width:760px){
+  .pricing-grid{grid-template-columns:1fr!important}
+  .price-card{padding:21px 19px!important}
+  .price-card.is-featured h3{padding-right:0!important;padding-top:18px!important}
+  .price-tag,.price-card.is-current::after{top:9px!important}
+  .chat-topbar{padding:8px 9px!important}
+  .chat-topbar-left #chatModeLabel{display:none!important}
+  .chat-token-hud{max-width:142px!important}
+  .chat-token-hud>span:last-child{display:none!important}
+  .chat-model-control{flex-basis:128px!important;width:128px!important;min-width:128px!important;max-width:128px!important}
+}

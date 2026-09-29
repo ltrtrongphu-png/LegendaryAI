@@ -43,3 +43,14 @@
 .owner-user-row{grid-template-columns:minmax(0,1fr) 170px auto}
 .owner-user-plan{padding:8px;border-radius:8px;background:rgba(255,255,255,.05);color:inherit;border:1px solid rgba(255,255,255,.12)}
 @media(max-width:700px){.owner-form-grid{grid-template-columns:1fr}.owner-plan-row,.owner-user-row{grid-template-columns:1fr}.owner-row-actions{justify-content:flex-start}}
+
+
+/* Chat vertical alignment fix: keep the composer stack anchored inside the fixed chat viewport. */
+.chat-app{height:700px!important;min-height:0!important;overflow:hidden!important}
+.chat-shell{display:flex!important;flex-direction:column!important;min-height:0!important;height:100%!important;overflow:hidden!important}
+.chat-topbar{flex:0 0 auto!important}
+.chat-window{flex:1 1 auto!important;min-height:0!important;height:auto!important;overflow-y:auto!important}
+.chat-mode-switcher{flex:0 0 auto!important;margin:0!important;padding:7px 14px 4px!important;overflow-x:auto!important;overflow-y:hidden!important;flex-wrap:nowrap!important}
+.chat-suggestions{flex:0 0 auto!important;margin:0!important}
+.chat-input-row{flex:0 0 auto!important}
+.chat-meta{flex:0 0 auto!important;padding:0 14px 7px!important}

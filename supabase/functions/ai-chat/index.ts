@@ -579,7 +579,7 @@ function isAcademicPrompt(input: string): boolean {
 function fmt(n:number):string { if(!Number.isFinite(n)) return 'không xác định'; const x=Math.abs(n)<1e-10?0:Number(n.toFixed(10)); return String(x); }
 
 function solveQuadraticAcademic(input:string):string|null {
-  const t=normalizeSchoolText(input).replace(/\s+/g,'').replace(/x\^2/g,'x2'); if(!t.includes('=')||!t.includes('x2')) return null; const sides=t.split('='); if(sides.length!==2) return null;
+  let t=normalizeSchoolText(input).replace(/²/g,'^2').replace(/x\s*\^\s*2/g,'x2'); const match=t.match(/([+-]?[0-9.\s*x2*]+)\s*=\s*([+-]?[0-9.\s*x2*]+)/); if(!match||!match[1].includes('x2')) return null; const sides=[match[1].replace(/\s+/g,''),match[2].replace(/\s+/g,'')];
   const parse=(s:string)=>{const terms=s.replace(/-/g,'+-').split('+').filter(Boolean);let a=0,b=0,c=0;for(const raw of terms){const q=raw.replace(/\*/g,'');if(/^[+-]?[\d.]*x2$/.test(q)){const z=q.slice(0,-2);a+=z===''||z==='+'?1:z==='-'?-1:Number(z);}else if(/^[+-]?[\d.]*x$/.test(q)){const z=q.slice(0,-1);b+=z===''||z==='+'?1:z==='-'?-1:Number(z);}else if(/^[+-]?[\d.]+$/.test(q))c+=Number(q);else throw 0;}return [a,b,c] as const;};
   try{const [a1,b1,c1]=parse(sides[0]),[a2,b2,c2]=parse(sides[1]);const a=a1-a2,b=b1-b2,c=c1-c2;if(!a) return null;const d=b*b-4*a*c;
     if(d>0){const x1=(-b+Math.sqrt(d))/(2*a),x2=(-b-Math.sqrt(d))/(2*a);return '## Toán 12 — phương trình bậc hai\n\n**Nhận dạng:** đưa về `ax²+bx+c=0`.\n\n**1.** `a='+fmt(a)+', b='+fmt(b)+', c='+fmt(c)+'`.\n**2.** `Δ=b²-4ac='+fmt(d)+'>0` nên có hai nghiệm phân biệt.\n**3.** `x=(-b±√Δ)/(2a)`.\n\n**Kết luận:** `x₁='+fmt(x1)+', x₂='+fmt(x2)+'`.\n\n**Vì sao:** `Δ>0` cho hai giá trị căn khác nhau nên phương trình có hai nghiệm thực.';}
@@ -589,7 +589,7 @@ function solveQuadraticAcademic(input:string):string|null {
 }
 
 function solveSystemAcademic(input:string):string|null {
-  const t=normalizeSchoolText(input).replace(/\s+/g,'');const eq=t.split(/[,;\n]+/).filter(x=>x.includes('=')&&x.includes('x')&&x.includes('y'));if(eq.length!==2)return null;
+  const t=String(input||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').trim();const eq=t.split(/[,;\n]+/).map(x=>x.replace(/\s+/g,'')).filter(x=>x.includes('=')&&x.includes('x')&&x.includes('y'));if(eq.length!==2)return null;
   const parse=(s:string)=>{const p=s.split('=');if(p.length!==2)throw 0;const side=(z:string)=>{let a=0,b=0,c=0;for(const r of z.replace(/-/g,'+-').split('+').filter(Boolean)){const q=r.replace(/\*/g,'');if(/^[+-]?[\d.]*x$/.test(q)){const n=q.slice(0,-1);a+=n===''||n==='+'?1:n==='-'?-1:Number(n);}else if(/^[+-]?[\d.]*y$/.test(q)){const n=q.slice(0,-1);b+=n===''||n==='+'?1:n==='-'?-1:Number(n);}else if(/^[+-]?[\d.]+$/.test(q))c+=Number(q);else throw 0;}return[a,b,c]as const;};const [a,b,c]=side(p[0]);return[a,b,Number(p[1])-c]as const;};
   try{const [a1,b1,c1]=parse(eq[0]),[a2,b2,c2]=parse(eq[1]);const d=a1*b2-a2*b1;if(!d)return null;const x=(c1*b2-c2*b1)/d,y=(a1*c2-a2*c1)/d;return '## Toán 12 — hệ 2 ẩn\n\nDùng Cramer vì `D='+fmt(d)+'≠0`.\n\n**1.** `D='+fmt(d)+'`.\n**2.** `Dₓ='+fmt(c1*b2-c2*b1)+'`, `Dᵧ='+fmt(a1*c2-a2*c1)+'`.\n**3.** `x=Dₓ/D='+fmt(x)+'`, `y=Dᵧ/D='+fmt(y)+'`.\n\n**Kết luận:** `x='+fmt(x)+', y='+fmt(y)+'`.';}catch{return null;}
 }

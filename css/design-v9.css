@@ -1,0 +1,56 @@
+/* LegendaryAI V9 — chat avatar + local model UX polish */
+.msg-avatar{
+  width:32px!important;
+  height:32px!important;
+  min-width:32px!important;
+  min-height:32px!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:10px!important;
+  border:1px solid rgba(95,151,255,.18)!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+.msg-avatar img{
+  display:block!important;
+  width:28px!important;
+  height:28px!important;
+  object-fit:contain!important;
+  border:0!important;
+  background:transparent!important;
+  filter:drop-shadow(0 0 8px rgba(67,157,255,.28)) drop-shadow(0 0 12px rgba(143,86,255,.12))!important;
+}
+.msg-user .msg-avatar{
+  border-radius:10px!important;
+}
+.chat-model-control{
+  position:relative!important;
+  padding-right:8px!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.025)!important;
+}
+.chat-model-control::after{
+  content:"AUTO / LOCAL ROUTING";
+  position:absolute;
+  right:8px;
+  bottom:-14px;
+  font:700 7px/1 "IBM Plex Mono",monospace;
+  letter-spacing:.08em;
+  color:rgba(119,158,207,.58);
+  pointer-events:none;
+}
+.chat-model-control select{
+  max-width:126px!important;
+}
+.chat-topbar{
+  overflow:visible!important;
+}
+.chat-topbar-left{
+  overflow:visible!important;
+}
+@media(max-width:900px){
+  .chat-model-control::after{display:none!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .msg-avatar img{filter:none!important}
+}

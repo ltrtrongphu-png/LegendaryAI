@@ -574,7 +574,29 @@ function normalizeSchoolText(input: string): string {
 }
 function isAcademicPrompt(input: string): boolean {
   const t=normalizeSchoolText(input);
-  return /lop 12|thpt|pho thong|bai tap|bai toan|giai bai|dao ham|nguyen ham|tich phan|xac suat|hinh hoc|mon toan|vat ly|hoa hoc|sinh hoc|ngu van|tieng anh/.test(t);
+  return /lop\s*(?:[1-9]|1[0-2])|cap\s*1|cap\s*2|cap\s*3|thcs|thpt|tieu hoc|pho thong|bai tap|bai toan|giai bai|dao ham|nguyen ham|tich phan|xac suat|hinh hoc|mon toan|vat ly|hoa hoc|sinh hoc|ngu van|tieng anh|tieng viet|lich su|dia ly|cong nghe|tin hoc/.test(t);
+}
+function detectSchoolLevel(input: string): string {
+  const t=normalizeSchoolText(input);
+  const m=t.match(/lop\s*(1[0-2]|[1-9])/);
+  if(m) return 'Lớp '+m[1];
+  if(/cap\s*1|tieu hoc/.test(t)) return 'Tiểu học';
+  if(/cap\s*2|thcs/.test(t)) return 'THCS';
+  if(/cap\s*3|thpt/.test(t)) return 'THPT';
+  return 'không xác định';
+}
+function detectSchoolSubject(input: string): string {
+  const t=normalizeSchoolText(input);
+  if(/toan|math|dai so|hinh hoc|giai tich|xac suat/.test(t)) return 'Toán';
+  if(/vat ly|co hoc|dien|quang|song|hat nhan/.test(t)) return 'Vật lý';
+  if(/hoa hoc|hoa|mol|pH|oxi hoa|phuong trinh hoa hoc/.test(t)) return 'Hóa học';
+  if(/sinh hoc|di truyen|te bao|sinh thai/.test(t)) return 'Sinh học';
+  if(/ngu van|van hoc|thong diep|nghi luan/.test(t)) return 'Ngữ văn';
+  if(/tieng anh|english|grammar|reading|writing/.test(t)) return 'Tiếng Anh';
+  if(/lich su/.test(t)) return 'Lịch sử';
+  if(/dia ly/.test(t)) return 'Địa lý';
+  if(/tin hoc|lap trinh|python|algorithm/.test(t)) return 'Tin học';
+  return 'không xác định';
 }
 function fmt(n:number):string { if(!Number.isFinite(n)) return 'không xác định'; const x=Math.abs(n)<1e-10?0:Number(n.toFixed(10)); return String(x); }
 
@@ -698,7 +720,7 @@ function buildIntelligenceInstruction(prompt: string, tier: number, reasoningReq
     + `\n- Analyze intent, constraints, ambiguity, and required output before answering.`
     + `\n- Prefer exact reasoning over plausible wording. Check arithmetic, units, assumptions, edge cases, and contradictions.`
     + (reasoningRequested ? `\n- Reasoning mode: perform a deeper internal verification pass before the final answer.` : '')
-    + (academic ? `\n- Academic mode: identify grade/subject/topic, choose the correct method, derive only what is needed, explain WHY at decisive steps, and finish with a clear answer. For Grade 1-12, adapt vocabulary and depth to the student's level.` : '')
+    + (academic ? `\n- Academic mode: level=${detectSchoolLevel(prompt)}, subject=${detectSchoolSubject(prompt)}. Identify the exact topic, choose the correct method, derive only what is needed, explain WHY at decisive steps, and finish with a clear answer. For Grades 1-12, adapt vocabulary, notation, difficulty, and explanation depth to the student's level. Never use university-level machinery when a school-level method is sufficient.` : '')
     + `\n- Never expose hidden chain-of-thought. Give concise, useful reasoning summaries and the decisive derivation only.`;
 }
 

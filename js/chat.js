@@ -637,6 +637,7 @@
       }
 
       localStorage.setItem(CONV_KEY, serialized);
+      window.dispatchEvent(new CustomEvent('legendary:conversation-changed'));
     } catch (e) {
       // Storage quotas, private-mode restrictions, or malformed legacy data
       // should never break the chat UI.

@@ -57,6 +57,8 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     vision: false,
     advanced_reasoning: false,
     quick_reasoning: true,
+    verification: true,
+    education: true,
     smart_math: true,
     smart_formatting: true,
     advanced_memory: false,
@@ -74,6 +76,8 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
     file_analysis: true,
     advanced_reasoning: true,
     quick_reasoning: true,
+    verification: true,
+    education: true,
     smart_math: true,
     smart_formatting: true,
     advanced_memory: false,
@@ -153,7 +157,7 @@ Core principles:
 - For advanced problems, do not skip the key proof/derivation. For multiple-choice, show the shortest valid derivation before the selected option.
 - If a statement is missing a necessary value or condition, ask for that exact missing item. Never invent data.
 - If the Native Core deterministic solver does not support a problem type, say so briefly rather than pretending it solved it.
-- Keep answers concise by default, but go deep when the task requires it.
+- Keep answers concise by default, but go deep when the task requires it. Before sending, silently perform a final correctness pass: check calculations, definitions, logic, requested constraints, and unsupported claims. Never present an unverified guess as a fact.
 - LegendaryAI does not call Claude, OpenAI, ChatGPT, Anthropic, or other external AI providers.`;
 function estimateTokens(text: string): number {
   return Math.max(1, Math.ceil((text || "").length / 4));
@@ -724,6 +728,59 @@ function staticCodeReview(code: string): string[] {
   return findings;
 }
 
+function normalizeAssistantMode(value: unknown): string {
+  const mode = String(value || "").trim().toLowerCase();
+  if (["education", "edu", "giao_duc", "giáo dục"].includes(mode)) return "education";
+  if (["hacker", "audit", "security", "redteam"].includes(mode)) return "hacker";
+  if (["debug", "debug_fix", "debug-fix", "fix"].includes(mode)) return "debug";
+  return "general";
+}
+
+function assistantModeInstruction(mode: string): string {
+  if (mode === "education") {
+    return [
+      "EDUCATION MODE — CHUYÊN SÂU GIÁO DỤC:",
+      "- Treat the user as a student/learner. Adapt to Grade 1–12 and the subject actually present in the prompt.",
+      "- First identify: lớp → môn → dạng bài → dữ kiện → yêu cầu.",
+      "- Prefer the simplest school-appropriate method. Do not jump to university-level machinery unless explicitly requested.",
+      "- Explain the decisive WHY, not every trivial sentence. For calculations, show substitutions and verify the result.",
+      "- For exercises: Nhận dạng → Dữ kiện → Công thức/ý tưởng → Giải → Kiểm tra → Đáp án.",
+      "- For theory: concept → intuition → example → common mistake → short recap.",
+      "- For essays/language: outline → evidence/reasoning → draft/answer → self-check.",
+      "- Never invent a missing value, theorem condition, quotation, source, or diagram detail.",
+      "- If an image/file is provided, use only information actually visible/readable from it.",
+    ].join("\n");
+  }
+  if (mode === "hacker") {
+    return [
+      "HACKER / AI AUDIT MODE — DEFENSIVE ONLY:",
+      "- Act as a security/code/reliability auditor. Find weaknesses, bugs, unsafe assumptions, prompt-injection risks, data leaks, auth/RLS mistakes, dependency/API misuse, and logic flaws.",
+      "- Separate confirmed findings from hypotheses. Give severity and concrete evidence.",
+      "- Do not exploit real targets or provide destructive payloads. Keep testing guidance local, authorized, and defensive.",
+      "- Audit the AI system itself when the user gives prompts, code, architecture, logs, or behavior: identify where it can hallucinate, bypass policy, leak secrets, lose context, or produce inconsistent results.",
+      "- Output: Findings → Evidence → Risk → Reproduction/validation (safe) → Recommended fix.",
+    ].join("\n");
+  }
+  if (mode === "debug") {
+    return [
+      "DEBUG & FIX MODE:",
+      "- Diagnose before editing. Identify the root cause, not just the symptom.",
+      "- Prefer the smallest safe fix that preserves existing behavior.",
+      "- Verify syntax, types, control flow, edge cases, security, and regression risk.",
+      "- If code is supplied, return a corrected implementation or exact patch when possible, then explain what changed and why.",
+      "- If there are multiple bugs, fix them in priority order and re-check the whole flow.",
+      "- Never claim a fix was tested unless actual execution/testing was performed.",
+      "- Output: Diagnosis → Root cause → Fix → Verification → Remaining risk.",
+    ].join("\n");
+  }
+  return [
+    "GENERAL QUALITY MODE:",
+    "- Analyze before answering. Distinguish facts, assumptions, calculations, and uncertainty.",
+    "- Before finalizing, perform a silent consistency check: answer the exact question, re-check arithmetic/logic, and remove unsupported claims.",
+    "- If correctness cannot be established from the available information, say exactly what is uncertain instead of guessing.",
+  ].join("\n");
+}
+
 function analysisDepth(prompt: string, reasoningRequested: boolean, plan: string, localReady: boolean, requestedLevel?: unknown): { tier: number; label: string } {
   if (!localReady) return { tier: 1, label: 'Native Core' };
   const t = normalizeSchoolText(prompt);
@@ -1033,6 +1090,34 @@ function localLegendaryResponse(
   return `## Legendary Engine\n\nMình đã nhận yêu cầu:\n\n> ${prompt}\n\n### Cách mình xử lý\n- Giữ context của các tin nhắn gần nhất.\n- Áp dụng system instruction của LegendaryAI.\n- Ưu tiên câu trả lời có cấu trúc, kiểm chứng được và không bịa nguồn.\n- Dùng memory của tài khoản khi được bật.\n\n**Model core:** ${name}\n**Chế độ:** Native Legendary / Local Core\n\n${memoryText ? "### Memory đang hoạt động\n" + memoryText : "Memory chưa có dữ liệu liên quan."}`;
 }
 
+function extractCodeForAudit(prompt: string): string {
+  const fenced = prompt.match(/\`\`\`(?:[a-zA-Z0-9_+-]+)?\n?([\s\S]*?)\`\`\`/);
+  if (fenced) return fenced[1].trim();
+  return prompt;
+}
+
+function nativeModeResponse(mode: string, prompt: string): string | null {
+  if (mode !== "hacker" && mode !== "debug") return null;
+  const code = extractCodeForAudit(prompt);
+  const looksLikeCode = /\b(function|const|let|var|class|import|export|SELECT|INSERT|UPDATE|CREATE|async|await|def\s+\w+|public\s+class|<script|=>)\b|[{};]{2,}/i.test(code);
+  if (!looksLikeCode) {
+    return mode === "hacker"
+      ? "## Hacker Audit\n\nGửi **code, cấu trúc hệ thống, log hoặc prompt** cần kiểm tra. Mình sẽ tách **lỗi xác nhận được / nghi vấn**, mức độ ảnh hưởng và cách xác thực an toàn."
+      : "## Debug & Fix\n\nGửi **đoạn code, log lỗi hoặc hành vi đang sai**. Mình sẽ chẩn đoán nguyên nhân gốc → sửa → kiểm tra lại và không tự nhận là đã chạy test nếu chưa chạy.";
+  }
+  const findings = staticCodeReview(code);
+  if (mode === "hacker") {
+    const severity = findings.some((x) => /injection|secret|hardcode|key/i.test(x)) ? "CAO" : findings.some((x) => /lỗi|không khớp|rủi ro|rỗng|var/i.test(x)) ? "TRUNG BÌNH" : "THẤP";
+    return "## Hacker Audit\n\n**Mức độ cần chú ý:** " + severity +
+      "\n\n### Findings\n" + findings.map((x, i) => (i + 1) + ". " + x).join("\n") +
+      "\n\n### Xác thực\nĐây là static audit nội bộ; cần chạy test/lint và kiểm tra luồng nghiệp vụ để xác nhận các lỗi logic sâu hơn.";
+  }
+  return "## Debug & Fix\n\n### Chẩn đoán\n" +
+    findings.map((x, i) => (i + 1) + ". " + x).join("\n") +
+    "\n\n### Hướng sửa\nSửa từng finding theo thứ tự ưu tiên, sau đó chạy test/lint và kiểm tra regression. Native Core không tự tuyên bố đã test nếu chưa thực thi code.";
+}
+
+
 Deno.serve(async (req) => {
   const responseCors = getCorsHeaders(req);
 
@@ -1172,6 +1257,7 @@ Deno.serve(async (req) => {
   const lastUserText = textFromContent(lastUser?.content);
 
   const requestedTool = normalizeTool(body.tool) || inferTool(lastUserText);
+  const assistantMode = normalizeAssistantMode(body.mode);
   const localReady = Boolean(Deno.env.get("LEGENDARY_LOCAL_AI_URL"));
   const depth = analysisDepth(
     lastUserText,
@@ -1181,7 +1267,10 @@ Deno.serve(async (req) => {
     body.analysis_level ?? body.intelligence_level ?? body.reasoning_depth,
   );
   const effectiveSystem = memoryAugmentedSystem(
-    system + buildIntelligenceInstruction(lastUserText, depth.tier, reasoningRequested) + toolInstruction(requestedTool),
+    system +
+      assistantModeInstruction(assistantMode) +
+      buildIntelligenceInstruction(lastUserText, depth.tier, reasoningRequested) +
+      toolInstruction(requestedTool),
     memories,
     profile.plan === "legendary" || profile.role === "owner" ? 24 : 10,
   );
@@ -1301,7 +1390,7 @@ Deno.serve(async (req) => {
         localDepth.tier,
       );
     } else {
-      text = localLegendaryResponse(
+      text = nativeModeResponse(assistantMode, lastUserText) || localLegendaryResponse(
         selectedModel.key,
         normalizedMessages,
         effectiveSystem,
@@ -1350,6 +1439,7 @@ Deno.serve(async (req) => {
       analysisLevel: depth.tier,
       analysisLabel: depth.label,
       qualityMultiplier,
+      assistantMode,
       native: true,
       text,
       plan: profile.plan,
@@ -1361,6 +1451,7 @@ Deno.serve(async (req) => {
         route: selectedModel.key,
         analysis_level: depth.tier,
         analysis_label: depth.label,
+        assistant_mode: assistantMode,
         cognitive_pipeline: depth.tier > 1 ? "multi-pass" : "single-pass",
         memory: profile.memory_enabled,
         session_context: !!planFeatures.session_context,
@@ -1396,6 +1487,7 @@ Deno.serve(async (req) => {
         reasoning_multiplier: reasoningMultiplier,
         analysis_level: depth.tier,
         analysis_label: depth.label,
+        assistant_mode: assistantMode,
         quality_multiplier: qualityMultiplier,
         request_ms: Date.now() - requestStarted,
       },

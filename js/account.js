@@ -35,6 +35,17 @@
       if (r.error) return { error: r.error };
       var row = Array.isArray(r.data) ? r.data[0] : r.data;
       return { data: row };
+    },
+    async adminAction(action, payload) {
+      if (!supabase) return { error: { message: 'Supabase chưa sẵn sàng.' } };
+      var token = await this.getAccessToken();
+      var r = await supabase.functions.invoke('owner-admin', {
+        body: Object.assign({ action: action }, payload || {}),
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      if (r.error) return { error: r.error, data: r.data };
+      if (r.data && r.data.error) return { error: { message: r.data.error }, data: r.data };
+      return { data: r.data };
     }
   };
 
@@ -63,17 +74,66 @@
   var checkoutStatus = document.getElementById('checkoutStatus');
   var confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
 
-  var PLAN_INFO = {
-    free: { name: 'Gói Free', price: '0đ / tháng', amount: 0, limit: 500000 },
-    pro: { name: 'Gói Pro', price: '149.000đ / tháng', amount: 149000, limit: 2000000 },
-    legendary: { name: 'Gói Legendary', price: '399.000đ / tháng', amount: 399000, limit: 6000000 }
-  };
-  var PLAN_LABEL = { free: 'Free', pro: 'Pro', legendary: 'Legendary' };
-  var PLAN_FEATURES = {
-    free: ['LegendaryLite-1 nâng cấp', 'Quick Mode + máy tính', 'Context phiên tốt hơn', '500.000 token / 6 giờ'],
-    pro: ['Reasoner 32B*', 'Memory dài hạn', 'Vision + phân tích tệp', '2.000.000 token / 12 giờ', 'Prompt Studio + xuất chat'],
-    legendary: ['Ultra 120B*', 'Vision 109B*', 'Context siêu dài', 'Advanced Memory', '6.000.000 token / 18 giờ', 'Ưu tiên tài nguyên']
-  };
+  var PLAN_INFO = {};
+  var PLAN_LABEL = {};
+  var PLAN_FEATURES = {};
+  var PLAN_ROWS = [];
+
+  function formatVnd(n) {
+    return Number(n || 0).toLocaleString('vi-VN') + 'đ';
+  }
+
+  function formatPlanPrice(plan) {
+    if (Number(plan.price_vnd || 0) <= 0) return '0đ';
+    return formatVnd(plan.price_vnd) + ' / ' + (plan.billing_period === 'year' ? 'năm' : 'tháng');
+  }
+
+  function applyPlanCatalog(plans) {
+    PLAN_ROWS = Array.isArray(plans) ? plans.slice().sort(function(a,b){ return Number(b.priority||0)-Number(a.priority||0); }) : [];
+    PLAN_INFO = {};
+    PLAN_LABEL = {};
+    PLAN_FEATURES = {};
+    PLAN_ROWS.forEach(function (p) {
+      PLAN_INFO[p.key] = {
+        id: p.id, name: p.name, price: formatPlanPrice(p), amount: Number(p.price_vnd || 0),
+        limit: Number(p.token_limit || 0), resetHours: Number(p.reset_hours || 6),
+        enabled: p.enabled !== false, features: Array.isArray(p.features) ? p.features : []
+      };
+      PLAN_LABEL[p.key] = p.name.replace(/^Gói\\s+/i, '');
+      PLAN_FEATURES[p.key] = Array.isArray(p.features) && p.features.length ? p.features : [
+        Number(p.token_limit || 0).toLocaleString('vi-VN') + ' token / ' + Number(p.reset_hours || 6) + ' giờ'
+      ];
+    });
+  }
+
+  async function loadPlanCatalog() {
+    if (!supabase) return [];
+    var r = await supabase.from('plans')
+      .select('id,key,name,description,price_vnd,billing_period,token_limit,reset_hours,reasoning_tier,default_model_key,model_tiers,capabilities,features,enabled,priority')
+      .eq('enabled', true)
+      .order('priority', { ascending: false })
+      .order('created_at', { ascending: true });
+    if (!r.error) applyPlanCatalog(r.data || []);
+    return r.data || [];
+  }
+
+  function renderPricingCards() {
+    var grid = document.querySelector('.pricing-grid');
+    if (!grid || !PLAN_ROWS.length) return;
+    grid.innerHTML = PLAN_ROWS.filter(function(p){ return p.enabled !== false && p.key !== 'guest'; }).map(function(p, i) {
+      var features = Array.isArray(p.features) ? p.features : [];
+      var price = formatPlanPrice(p);
+      var featured = i === 0 && PLAN_ROWS.filter(function(x){return x.key !== 'guest';}).length > 1;
+      return '<div class="price-card ' + (featured ? 'is-featured' : '') + '" data-plan-card="' + escapeHtml(p.key) + '">' +
+        (featured ? '<p class="price-tag">Nổi bật</p>' : '') +
+        '<h3>' + escapeHtml(p.name.replace(/^Gói\\s+/i,'')) + '</h3>' +
+        '<p class="price">' + escapeHtml(price.split(' / ')[0]) + '<span>' + (price.indexOf(' / ') >= 0 ? '/' + escapeHtml(price.split(' / ')[1]) : '') + '</span></p>' +
+        '<ul>' + features.slice(0,7).map(function(f){ return '<li>' + escapeHtml(f) + '</li>'; }).join('') + '</ul>' +
+        '<button type="button" class="btn ' + (featured ? 'btn-primary' : 'btn-outline') + ' plan-select-btn" data-plan="' + escapeHtml(p.key) + '" data-label="' + escapeHtml(p.key === 'free' ? 'Bắt đầu' : 'Chọn ' + p.name.replace(/^Gói\\s+/i,'')) + '">' + escapeHtml(p.key === 'free' ? 'Bắt đầu' : 'Chọn ' + p.name.replace(/^Gói\\s+/i,'')) + '</button>' +
+        '</div>';
+    }).join('');
+    bindPlanButtons();
+  }
   var pendingPlan = null, checkoutPlan = null;
 
   function configured() {
@@ -205,30 +265,125 @@
 
   async function openOwnerDashboard() {
     var note = document.createElement('div');
-    note.className = 'owner-panel';
-    note.innerHTML = '<div class="owner-panel-head"><div><span class="section-tag">OWNER</span><h3>Bảng điều khiển LegendaryAI</h3></div><button class="btn btn-ghost btn-sm owner-close">✕</button></div><div class="owner-stats-grid"><div><span>Đang tải…</span></div></div><div class="owner-orders"></div>';
+    note.className = 'owner-panel owner-admin-panel';
+    note.innerHTML =
+      '<div class="owner-panel-head"><div><span class="section-tag">OWNER ADMIN</span><h3>Quản trị LegendaryAI</h3><p class="owner-admin-sub">Quản lý gói, quyền và hạn mức người dùng.</p></div><button class="btn btn-ghost btn-sm owner-close">✕</button></div>' +
+      '<div class="owner-admin-tabs"><button class="btn btn-primary btn-sm owner-tab active" data-tab="plans">Gói người dùng</button><button class="btn btn-outline btn-sm owner-tab" data-tab="users">Người dùng</button></div>' +
+      '<div class="owner-admin-body"><div class="owner-admin-loading">Đang tải…</div></div>';
     document.body.appendChild(note);
     note.querySelector('.owner-close').addEventListener('click', function(){ note.remove(); });
-    try {
-      var result = await supabase.functions.invoke('owner-stats', {
-        method: 'GET',
-        headers: { Authorization: 'Bearer ' + await window.LegendaryBackend.getAccessToken() }
-      });
-      if (result.error || !result.data) throw new Error((result.data && result.data.error) || result.error.message || 'Không tải được dashboard.');
-      var d = result.data;
-      var stats = note.querySelector('.owner-stats-grid');
-      stats.innerHTML =
-        '<div><strong>' + Number(d.users || 0).toLocaleString('vi-VN') + '</strong><span>Người dùng</span></div>' +
-        '<div><strong>' + Number(d.conversations || 0).toLocaleString('vi-VN') + '</strong><span>Hội thoại</span></div>' +
-        '<div><strong>' + Number(d.paidOrders || 0).toLocaleString('vi-VN') + '</strong><span>Đơn đã thanh toán</span></div>' +
-        '<div><strong>' + Number(d.revenueVnd || 0).toLocaleString('vi-VN') + 'đ</strong><span>Doanh thu</span></div>';
-      note.querySelector('.owner-orders').innerHTML = '<h4>Đơn gần đây</h4>' +
-        '<div class="owner-order-list">' + (d.recentOrders || []).map(function(o) {
-          return '<div><span>' + escapeHtml(o.plan || '') + '</span><span>' + escapeHtml(o.status || '') + '</span><strong>' + Number(o.amount || 0).toLocaleString('vi-VN') + 'đ</strong></div>';
-        }).join('') + '</div>';
-    } catch (e) {
-      note.querySelector('.owner-stats-grid').innerHTML = '<p class="auth-error">' + escapeHtml(e.message) + '</p>';
+    var body=note.querySelector('.owner-admin-body');
+
+    async function getAllPlans() {
+      var r=await window.LegendaryBackend.adminAction('list_plans');
+      if(r.error) throw new Error(r.error.message || 'Không tải được gói.');
+      return r.data.plans || [];
     }
+
+    function planFormHtml() {
+      return '<form class="owner-plan-form">' +
+        '<h4>Thêm gói mới</h4><div class="owner-form-grid">' +
+        '<input name="key" placeholder="key: starter" required>' +
+        '<input name="name" placeholder="Tên gói" required>' +
+        '<input name="price_vnd" type="number" min="0" placeholder="Giá VND">' +
+        '<input name="token_limit" type="number" min="1" placeholder="Token">' +
+        '<input name="reset_hours" type="number" min="1" value="6" placeholder="Reset giờ">' +
+        '<input name="default_model_key" placeholder="Model mặc định" value="legendary-lite-1">' +
+        '</div><textarea name="description" placeholder="Mô tả gói"></textarea>' +
+        '<input name="features" placeholder="Tính năng, ngăn cách bằng dấu |">' +
+        '<div><button class="btn btn-primary btn-sm" type="submit">+ Thêm gói</button></div></form>';
+    }
+
+    async function renderPlans() {
+      body.innerHTML='<div class="owner-admin-loading">Đang tải danh sách gói…</div>';
+      var plans=await getAllPlans();
+      body.innerHTML=planFormHtml()+'<div class="owner-plan-list">'+plans.map(function(p){
+        return '<div class="owner-plan-row" data-id="'+escapeHtml(p.id)+'">' +
+          '<div><strong>'+escapeHtml(p.name)+'</strong><small>'+escapeHtml(p.key)+' · '+formatVnd(p.price_vnd)+' · '+Number(p.token_limit||0).toLocaleString('vi-VN')+' token / '+Number(p.reset_hours||6)+'h</small></div>' +
+          '<span class="plan-status '+(p.enabled?'on':'off')+'">'+(p.enabled?'Đang bật':'Đang tắt')+'</span>' +
+          '<div class="owner-row-actions"><button class="btn btn-outline btn-sm plan-toggle">'+(p.enabled?'Tắt':'Bật')+'</button><button class="btn btn-outline btn-sm plan-edit">Sửa</button><button class="btn btn-ghost btn-sm plan-delete">Xoá</button></div>' +
+          '</div>';
+      }).join('')+'</div>';
+
+      body.querySelector('.owner-plan-form').addEventListener('submit',async function(e){
+        e.preventDefault();
+        var f=e.currentTarget, fd=new FormData(f), features=String(fd.get('features')||'').split('|').map(function(x){return x.trim();}).filter(Boolean);
+        var r=await window.LegendaryBackend.adminAction('create_plan',{
+          key:fd.get('key'),name:fd.get('name'),description:fd.get('description'),price_vnd:Number(fd.get('price_vnd')||0),
+          token_limit:Number(fd.get('token_limit')||500000),reset_hours:Number(fd.get('reset_hours')||6),
+          default_model_key:fd.get('default_model_key'),features:features,model_tiers:['free']
+        });
+        if(r.error) return alert(r.error.message);
+        alert('Đã thêm gói '+r.data.plan.name+'.'); await renderPlans(); await loadPlanCatalog(); renderPricingCards();
+      });
+      body.querySelectorAll('.plan-toggle').forEach(function(btn){
+        btn.addEventListener('click',async function(){
+          var row=btn.closest('.owner-plan-row'), p=plans.find(function(x){return x.id===row.getAttribute('data-id');});
+          var r=await window.LegendaryBackend.adminAction('update_plan',{id:p.id,enabled:!p.enabled});
+          if(r.error) return alert(r.error.message); await renderPlans(); await loadPlanCatalog(); renderPricingCards();
+        });
+      });
+      body.querySelectorAll('.plan-edit').forEach(function(btn){
+        btn.addEventListener('click',async function(){
+          var row=btn.closest('.owner-plan-row'), p=plans.find(function(x){return x.id===row.getAttribute('data-id');});
+          var name=prompt('Tên gói:',p.name); if(name===null) return;
+          var price=prompt('Giá VND:',String(p.price_vnd||0)); if(price===null) return;
+          var tokens=prompt('Token:',String(p.token_limit||500000)); if(tokens===null) return;
+          var hours=prompt('Reset (giờ):',String(p.reset_hours||6)); if(hours===null) return;
+          var r=await window.LegendaryBackend.adminAction('update_plan',{id:p.id,name:name,price_vnd:Number(price),token_limit:Number(tokens),reset_hours:Number(hours)});
+          if(r.error) return alert(r.error.message); await renderPlans(); await loadPlanCatalog(); renderPricingCards();
+        });
+      });
+      body.querySelectorAll('.plan-delete').forEach(function(btn){
+        btn.addEventListener('click',async function(){
+          var row=btn.closest('.owner-plan-row'), p=plans.find(function(x){return x.id===row.getAttribute('data-id');});
+          if(!confirm('Xoá gói '+p.name+'? Gói đang có user/đơn hàng sẽ bị hệ thống chặn xoá.')) return;
+          var r=await window.LegendaryBackend.adminAction('delete_plan',{id:p.id});
+          if(r.error) return alert(r.error.message);
+          await renderPlans(); await loadPlanCatalog(); renderPricingCards();
+        });
+      });
+    }
+
+    async function renderUsers() {
+      body.innerHTML='<div class="owner-admin-loading">Đang tải người dùng…</div>';
+      var plans=await getAllPlans();
+      var r=await window.LegendaryBackend.adminAction('list_users',{page:1,perPage:100});
+      if(r.error) throw new Error(r.error.message || 'Không tải được người dùng.');
+      var users=r.data.users||[];
+      body.innerHTML='<div class="owner-user-list">'+users.map(function(u){
+        var p=u.profile||{};
+        return '<div class="owner-user-row"><div><strong>'+escapeHtml(p.display_name||u.email||u.id)+'</strong><small>'+escapeHtml(u.email||'')+' · '+escapeHtml(p.plan||'free')+' · '+Number(p.tokens_used||0).toLocaleString('vi-VN')+'/'+Number(p.token_limit||0).toLocaleString('vi-VN')+'</small></div>' +
+          '<select class="owner-user-plan" data-user="'+escapeHtml(u.id)+'">'+plans.filter(function(x){return x.key!=='guest';}).map(function(x){return '<option value="'+escapeHtml(x.key)+'" '+(x.key===(p.plan||'free')?'selected':'')+'>'+escapeHtml(x.name)+'</option>';}).join('')+'</select>' +
+          '<button class="btn btn-outline btn-sm owner-user-reset" data-user="'+escapeHtml(u.id)+'">Reset token</button>' +
+          '</div>';
+      }).join('')+'</div>';
+      body.querySelectorAll('.owner-user-plan').forEach(function(sel){
+        sel.addEventListener('change',async function(){
+          var r=await window.LegendaryBackend.adminAction('update_user',{user_id:sel.getAttribute('data-user'),plan_key:sel.value});
+          if(r.error){alert(r.error.message);return;}
+          alert('Đã đổi gói và reset token cho user.');
+          await renderUsers();
+        });
+      });
+      body.querySelectorAll('.owner-user-reset').forEach(function(btn){
+        btn.addEventListener('click',async function(){
+          var r=await window.LegendaryBackend.adminAction('update_user',{user_id:btn.getAttribute('data-user'),reset_tokens:true});
+          if(r.error) return alert(r.error.message);
+          await renderUsers();
+        });
+      });
+    }
+
+    note.querySelectorAll('.owner-tab').forEach(function(tab){
+      tab.addEventListener('click',async function(){
+        note.querySelectorAll('.owner-tab').forEach(function(x){x.classList.remove('active');});
+        tab.classList.add('active');
+        try { if(tab.getAttribute('data-tab')==='plans') await renderPlans(); else await renderUsers(); }
+        catch(e){ body.innerHTML='<p class="auth-error">'+escapeHtml(e.message)+'</p>'; }
+      });
+    });
+    try { await renderPlans(); } catch(e) { body.innerHTML='<p class="auth-error">'+escapeHtml(e.message)+'</p>'; }
   }
 
   async function signOut() {
@@ -442,10 +597,13 @@
     openCheckout(plan);
   }
 
-  document.querySelectorAll('.plan-select-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () { handlePlanSelect(btn.getAttribute('data-plan')); });
-  });
+  function bindPlanButtons() {
+    document.querySelectorAll('.plan-select-btn').forEach(function (btn) {
+      btn.onclick = function () { handlePlanSelect(btn.getAttribute('data-plan')); };
+    });
+  }
 
+  loadPlanCatalog().then(function(){ renderPricingCards(); }).catch(function(){});
   async function openCheckout(plan) {
     checkoutPlan = plan;
     var info = PLAN_INFO[plan];

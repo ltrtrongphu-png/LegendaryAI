@@ -34,6 +34,8 @@
   var systemPrompt = document.getElementById('systemPrompt');
   var streamToggle = document.getElementById('streamToggle');
   var engineModelSelect = document.getElementById('engineModelSelect');
+  var chatModelSelect = document.getElementById('chatModelSelect');
+  var reasoningToggle = document.getElementById('reasoningToggle');
   var promptPresetSelect = document.getElementById('promptPresetSelect');
   var tokenHud = document.getElementById('chatTokenHud');
   var tokensRemainingEl = document.getElementById('chatTokensRemaining');
@@ -233,6 +235,14 @@
     }
 
     engineModelSelect.value = desired;
+    if (chatModelSelect) {
+      for (var j = 0; j < chatModelSelect.options.length; j++) {
+        var chatKey = chatModelSelect.options[j].value;
+        var sourceOption = engineModelSelect.querySelector('option[value="' + chatKey + '"]');
+        chatModelSelect.options[j].disabled = !!(sourceOption && sourceOption.disabled);
+      }
+      chatModelSelect.value = desired;
+    }
   }
 
   function effectiveModelKey() {
@@ -245,13 +255,15 @@
   function applySettingsToForm() {
     modeSelect.value = "legendary";
     if (engineModelSelect) engineModelSelect.value = settings.engineModel || "auto";
+    if (chatModelSelect) chatModelSelect.value = settings.engineModel || "auto";
     if (systemPrompt) systemPrompt.value = settings.system || "";
     if (promptPresetSelect) promptPresetSelect.value = settings.preset || "default";
-    // The compact reasoning toggle was removed from the chat composer.
-    // Migrate any older saved setting to the default off state.
-    reasoningEnabled = false;
-    settings.reasoning = false;
+    reasoningEnabled = !!settings.reasoning;
     if (streamToggle) streamToggle.checked = false;
+    if (reasoningToggle) {
+      reasoningToggle.classList.toggle('active', reasoningEnabled);
+      reasoningToggle.setAttribute('aria-pressed', reasoningEnabled ? 'true' : 'false');
+    }
     if (providerSelect) { providerSelect.value = "legendary"; providerSelect.disabled = true; }
     if (apiEndpoint) { apiEndpoint.value = ""; apiEndpoint.disabled = true; }
     if (apiKey) { apiKey.value = ""; apiKey.disabled = true; }
@@ -270,6 +282,30 @@
   settingsBtn.addEventListener('click', function () {
     settingsBackdrop.classList.add('open');
   });
+
+  if (chatModelSelect) {
+    chatModelSelect.addEventListener('change', function () {
+      settings.engineModel = chatModelSelect.value;
+      if (engineModelSelect) engineModelSelect.value = chatModelSelect.value;
+      saveSettingsToStorage(settings);
+      updateModeLabel();
+    });
+  }
+
+  if (reasoningToggle) {
+    reasoningToggle.addEventListener('click', function () {
+      reasoningEnabled = !reasoningEnabled;
+      settings.reasoning = reasoningEnabled;
+      reasoningToggle.classList.toggle('active', reasoningEnabled);
+      reasoningToggle.setAttribute('aria-pressed', reasoningEnabled ? 'true' : 'false');
+      saveSettingsToStorage(settings);
+      if (streamStatus) {
+        streamStatus.textContent = reasoningEnabled
+          ? 'Suy luận nâng cao · đang bật'
+          : '';
+      }
+    });
+  }
 
   if (promptPresetSelect) {
     promptPresetSelect.addEventListener('change', async function () {
@@ -325,7 +361,7 @@
       system: systemPrompt ? systemPrompt.value.trim() : "",
       preset: promptPresetSelect ? promptPresetSelect.value : "default",
       stream: false,
-      reasoning: false
+      reasoning: reasoningEnabled
     };
     saveSettingsToStorage(settings);
     updateModeLabel();
@@ -1628,7 +1664,7 @@
       system: settings.system || '',
       temperature: 0.35,
       max_tokens: 8192,
-      reasoning: false,
+      reasoning: reasoningEnabled,
       signal: controller.signal
     })
       .then(function (result) {

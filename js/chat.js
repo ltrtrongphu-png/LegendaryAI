@@ -1353,7 +1353,15 @@
 
     var avatar = document.createElement('div');
     avatar.className = 'msg-avatar';
-    avatar.textContent = role === 'user' ? 'B' : 'L';
+    if (role === 'user') {
+      avatar.textContent = 'B';
+    } else {
+      var logo = document.createElement('img');
+      logo.src = '/assets/logo-orbit.svg';
+      logo.alt = 'Legendary AI';
+      logo.decoding = 'async';
+      avatar.appendChild(logo);
+    }
 
     var bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
@@ -1452,7 +1460,11 @@
 
     var avatar = document.createElement('div');
     avatar.className = 'msg-avatar';
-    avatar.textContent = 'L';
+    var logo = document.createElement('img');
+    logo.src = '/assets/logo-orbit.svg';
+    logo.alt = 'Legendary AI';
+    logo.decoding = 'async';
+    avatar.appendChild(logo);
 
     var bubble = document.createElement('div');
     bubble.className = 'msg-bubble typing';
@@ -1678,8 +1690,13 @@
           var brain = result && result.brain;
           streamStatus.textContent = brain
             ? '✓ ' + (result.displayModel || 'Legendary Engine') +
+              (result.local ? ' · Local' : '') +
+              (result.providerModel ? ' · ' + result.providerModel : '') +
               ' · ' + (brain.intent || 'general') +
-              (brain.memory ? ' · memory' : '')
+              (brain.memory ? ' · memory' : '') +
+              (result.usage && result.usage.reasoning
+                ? ' · suy luận ×' + (result.usage.reasoning_multiplier || 1.75)
+                : '')
             : '';
         }
 

@@ -514,13 +514,13 @@
     trigger.setAttribute('aria-expanded', 'false');
     trigger.innerHTML = '<span class="account-avatar">' + escapeHtml(name.charAt(0).toUpperCase()) + '</span>' +
       '<span class="account-name">' + escapeHtml(name) + '</span>' +
-      '<span class="plan-chip plan-' + profile.plan + '">' + PLAN_LABEL[profile.plan] + '</span>' +
+      '<span class="plan-chip plan-' + escapeHtml(profile.plan) + '">' + escapeHtml(PLAN_LABEL[profile.plan] || profile.plan) + '</span>' +
       (profile.role === 'owner' ? '<span class="role-chip role-owner">OWNER</span>' : '');
 
     var dropdown = document.createElement('div');
     dropdown.className = 'account-dropdown';
     dropdown.innerHTML = '<p class="acc-email">' + escapeHtml(user.email || '') + '</p>' +
-      '<p class="acc-plan-line">Gói hiện tại: <strong>' + PLAN_LABEL[profile.plan] + '</strong></p>' +
+      '<p class="acc-plan-line">Gói hiện tại: <strong>' + escapeHtml(PLAN_LABEL[profile.plan] || profile.plan) + '</strong></p>' +
       '<p class="acc-plan-line">Token còn lại: <strong>' + Math.max(Number(profile.token_limit || 0) - Number(profile.tokens_used || 0), 0).toLocaleString('vi-VN') + ' / ' + Number(profile.token_limit || 500000).toLocaleString('vi-VN') + '</strong></p>' +
       (profile.role === 'owner' ? '<p class="acc-plan-line"><strong>Quyền Owner</strong> · Quản trị hệ thống</p>' : '') +
       '<div class="acc-features"><strong>Quyền gói</strong>' + (PLAN_FEATURES[profile.plan] || PLAN_FEATURES.free).map(function (f) { return '<span>' + escapeHtml(f) + '</span>'; }).join('') + '</div>';

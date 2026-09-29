@@ -101,9 +101,17 @@ const PLAN_FEATURES: Record<string, Record<string, boolean | number | string>> =
   },
 };
 
-function routeModelByTask(plan: string, role: string, prompt: string): string {
+function routeModelByTask(plan: string, role: string, prompt: string, reasoningRequested = false): string {
   const text = (prompt || "").toLowerCase();
   const localGatewayReady = Boolean(Deno.env.get("LEGENDARY_LOCAL_AI_URL"));
+
+  if (localGatewayReady && reasoningRequested && (plan === "legendary" || role === "owner")) {
+    return "legendary-ultra-120b";
+  }
+
+  if (localGatewayReady && reasoningRequested && (plan === "pro" || plan === "legendary" || role === "owner")) {
+    return "legendary-reasoner-32b";
+  }
 
   if (localGatewayReady && /vision|ảnh|image|hình ảnh|screenshot|camera|ocr/.test(text)) {
     if (plan === "pro") return "legendary-vision-pro-11b";
@@ -927,9 +935,10 @@ Deno.serve(async (req) => {
   const requested = typeof body.model === "string" ? body.model.trim() : "";
   const provisionalLastUser = [...messages].reverse().find((m: any) => m?.role === "user");
   const provisionalPrompt = textFromContent(provisionalLastUser?.content);
+  const reasoningRequested = body.reasoning === true;
   const requestedKey = requested && requested !== "auto"
     ? requested
-    : routeModelByTask(profile.plan, profile.role, provisionalPrompt);
+    : routeModelByTask(profile.plan, profile.role, provisionalPrompt, reasoningRequested);
 
   const { data: requestedModel } = await supabase
     .from("ai_models")
@@ -1050,10 +1059,16 @@ Deno.serve(async (req) => {
     Math.max(256, requestedOutput),
     Number(selectedModel.max_output_tokens || 4096),
   );
+  // Reasoning is intentionally more expensive: reserve and bill a larger
+  // token budget so the UI toggle has a real quota cost, not just a label.
+  const reasoningMultiplier = reasoningRequested ? 1.75 : 1;
+  const estimatedRequestTokens = Math.ceil(
+    (estimatedInputTokens + maxTokens) * reasoningMultiplier,
+  );
   const reservation = Math.max(
     1,
     Math.min(
-      estimatedInputTokens + maxTokens,
+      estimatedRequestTokens,
       Number(profile.token_limit || 500000),
     ),
   );
@@ -1137,7 +1152,9 @@ Deno.serve(async (req) => {
     }
 
     const estimatedOutputTokens = estimateTokens(text);
-    const actualTokens = estimatedInputTokens + estimatedOutputTokens;
+    const actualTokens = Math.ceil(
+      (estimatedInputTokens + estimatedOutputTokens) * reasoningMultiplier,
+    );
     const { data: tokenStateRows } = await supabase.rpc("finalize_tokens", {
       p_reserved: reservation,
       p_actual: actualTokens,
@@ -1169,6 +1186,8 @@ Deno.serve(async (req) => {
       capabilities,
       fallbackUsed,
       local: true,
+      reasoning: reasoningRequested,
+      reasoningMultiplier,
       native: true,
       text,
       plan: profile.plan,

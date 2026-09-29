@@ -276,7 +276,7 @@
 
     var user = await LegendaryBackend.getUser();
     if (renderSeq !== accountRenderSeq) return;
-    if (user.is_anonymous) {
+    if (user && user.is_anonymous) {
       var guestBtn = document.createElement('button');
       guestBtn.type = 'button';
       var guestAuthGroup = document.createElement('div');

@@ -37,6 +37,7 @@
   var chatModelSelect = document.getElementById('chatModelSelect');
   var reasoningToggle = document.getElementById('reasoningToggle');
   var promptPresetSelect = document.getElementById('promptPresetSelect');
+  var assistantModeButtons = document.querySelectorAll('[data-assistant-mode]');
   var tokenHud = document.getElementById('chatTokenHud');
   var tokensRemainingEl = document.getElementById('chatTokensRemaining');
   var tokenResetEl = document.getElementById('chatTokenReset');
@@ -118,6 +119,14 @@
   var currentPlan = 'free';
   var currentRole = 'user';
   var reasoningEnabled = false;
+  var assistantMode = 'general';
+  var ASSISTANT_MODE_LABELS = {
+    general: 'General',
+    education: 'Giáo dục',
+    hacker: 'Hacker Audit',
+    debug: 'Debug & Fix'
+  };
+  var assistantModeButtons = document.querySelectorAll('[data-assistant-mode]');
   var MODEL_LABELS = {
     auto: 'Tự động · theo gói',
     'legendary-lite-1': 'LegendaryLite-1',
@@ -150,14 +159,16 @@
         engineModel: 'auto',
         provider: 'legendary', endpoint: '', key: '', model: '', system: '',
         stream: true,
-        reasoning: false
+        reasoning: false,
+        assistantMode: 'general'
       }, parsed || {});
     } catch (e) {
       return {
         mode: 'legendary',
         engineModel: 'auto',
         provider: 'legendary', endpoint: '', key: '', model: '', system: '',
-        stream: true
+        stream: true,
+        assistantMode: 'general'
       };
     }
   }
@@ -259,6 +270,14 @@
     if (systemPrompt) systemPrompt.value = settings.system || "";
     if (promptPresetSelect) promptPresetSelect.value = settings.preset || "default";
     reasoningEnabled = !!settings.reasoning;
+    assistantMode = ['general','education','hacker','debug'].indexOf(settings.assistantMode) >= 0
+      ? settings.assistantMode
+      : 'general';
+    assistantModeButtons.forEach(function (button) {
+      var active = button.getAttribute('data-assistant-mode') === assistantMode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
     if (streamToggle) streamToggle.checked = false;
     if (reasoningToggle) {
       reasoningToggle.classList.toggle('active', reasoningEnabled);
@@ -271,11 +290,11 @@
   }
 
     function updateModeLabel() {
-    chatModeLabel.textContent =
-      "Legendary Engine · " +
-      (settings.engineModel === "auto"
-        ? (MODEL_LABELS[effectiveModelKey()] || "Auto")
-        : (MODEL_LABELS[settings.engineModel] || settings.engineModel));
+    var modelLabel = settings.engineModel === "auto"
+      ? (MODEL_LABELS[effectiveModelKey()] || "Auto")
+      : (MODEL_LABELS[settings.engineModel] || settings.engineModel);
+    var modeLabel = ASSISTANT_MODE_LABELS[assistantMode] || ASSISTANT_MODE_LABELS.general;
+    chatModeLabel.textContent = "Legendary Engine · " + modelLabel + " · " + modeLabel;
     if (chatDot) chatDot.classList.add("live");
   }
 
@@ -291,6 +310,29 @@
       updateModeLabel();
     });
   }
+
+  assistantModeButtons.forEach(function (button) {
+    button.addEventListener('click', function () {
+      assistantMode = button.getAttribute('data-assistant-mode') || 'general';
+      settings.assistantMode = assistantMode;
+      assistantModeButtons.forEach(function (item) {
+        var active = item === button;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      saveSettingsToStorage(settings);
+      updateModeLabel();
+      if (streamStatus) {
+        var notes = {
+          general: 'General · phân tích + kiểm tra trước khi trả lời',
+          education: 'Giáo dục · lớp 1–12 · giải bài + hướng dẫn',
+          hacker: 'Hacker Audit · tìm lỗi / lỗ hổng / rủi ro',
+          debug: 'Debug & Fix · tìm nguyên nhân + sửa + kiểm tra'
+        };
+        streamStatus.textContent = notes[assistantMode] || notes.general;
+      }
+    });
+  });
 
   if (reasoningToggle) {
     reasoningToggle.addEventListener('click', function () {
@@ -361,7 +403,8 @@
       system: systemPrompt ? systemPrompt.value.trim() : "",
       preset: promptPresetSelect ? promptPresetSelect.value : "default",
       stream: false,
-      reasoning: reasoningEnabled
+      reasoning: reasoningEnabled,
+      assistantMode: assistantMode
     };
     saveSettingsToStorage(settings);
     updateModeLabel();
@@ -1677,6 +1720,8 @@
       temperature: 0.35,
       max_tokens: 8192,
       reasoning: reasoningEnabled,
+      mode: assistantMode,
+      analysisLevel: assistantMode === 'hacker' || assistantMode === 'debug' || assistantMode === 'education' ? 4 : 0,
       signal: controller.signal
     })
       .then(function (result) {
@@ -1696,6 +1741,9 @@
               (brain.memory ? ' · memory' : '') +
               (result.usage && result.usage.reasoning
                 ? ' · suy luận ×' + (result.usage.reasoning_multiplier || 1.75)
+                : '') +
+              (result.usage && result.usage.quality_multiplier > 1
+                ? ' · phân tích ×' + result.usage.quality_multiplier
                 : '')
             : '';
         }

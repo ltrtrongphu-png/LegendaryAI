@@ -67,7 +67,8 @@ export function resolveContext(text, messages = []) {
   };
 }
 
-const INTENT_RULES: Array<[string, RegExp]> = [
+/** @type {Array<[string, RegExp]>} */
+const INTENT_RULES = [
   ['image', /(?:vẽ|draw|tạo|generate|create).*(?:ảnh|hình|image|picture|illustration|art|wallpaper|avatar|logo|poster|thumbnail|photo|meme)|(?:^|\s)(?:vẽ|draw)(?:\s|$)/i],
   ['math', /^(?:tính|calculate|calc)\b|^[0-9+\-*/%(). x×÷\s]+$/i],
   ['utility', /(json|yaml|yml).*(format|formatted|định dạng|pretty|parse|valid)|((format|pretty|parse|validate|định dạng).*(json|yaml|yml))|\b(?:kg|g|gram|km|m|cm|mm|mile|mi|ft|inch|in|°c|°f|celsius|fahrenheit|litre|liter|l|ml)\b.*\b(?:to|sang|đổi|thành|in)\b/i],

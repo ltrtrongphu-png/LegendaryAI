@@ -45,6 +45,8 @@ create index if not exists profiles_plan_expires_idx
 create index if not exists orders_expires_idx
   on public.orders(expires_at)
   where expires_at is not null;
+create index if not exists profiles_plan_id_idx on public.profiles(plan_id);
+create index if not exists orders_plan_idx on public.orders(plan);
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -87,14 +89,14 @@ $$;
 revoke all on function public.handle_new_user() from public, anon, authenticated;
 grant execute on function public.handle_new_user() to supabase_auth_admin;
 
-create or replace function public.manual_reset_tokens()
+create or replace function public.manual_reset_tokens(p_user_id uuid)
 returns table(success boolean,message text,tokens_used integer,token_limit integer,token_reset_at timestamptz,reset_available_at timestamptz)
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  uid uuid := auth.uid();
+  uid uuid := p_user_id;
   p public.profiles%rowtype;
   cooldown interval;
   window_start timestamptz;
@@ -127,8 +129,8 @@ begin
 end;
 $$;
 
-revoke all on function public.manual_reset_tokens() from public,anon;
-grant execute on function public.manual_reset_tokens() to authenticated;
+revoke all on function public.manual_reset_tokens(uuid) from public,anon,authenticated;
+grant execute on function public.manual_reset_tokens(uuid) to service_role;
 
 revoke all on function public.finalize_tokens(integer,integer) from public,anon,authenticated;
 

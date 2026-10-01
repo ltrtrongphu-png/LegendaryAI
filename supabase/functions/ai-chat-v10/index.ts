@@ -1,5 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { buildModelSystemPrompt, createNativePlan, detectIntent, nativeAnswer } from "./brain-core.js";
+import { huggingFaceChat } from "./huggingface-space.ts";
+import { negotiateCapability, requestId } from "./model-runtime.ts";
 
 const ORIGINS=new Set(["https://legendaryai.vercel.app","https://www.legendaryai.vercel.app","http://localhost:3000","http://127.0.0.1:3000"]);
 const MAX_MESSAGES=60,MAX_CONTEXT_CHARS=60000,SHIELD_WINDOW_MS=60000,SHIELD_MAX_REQUESTS=20,LOCAL_TIMEOUT_MS=12000;
@@ -62,7 +64,7 @@ if(!isGuest && String(profile.role||"user")!=="owner" && String(profile.plan||"f
     profile={...profile,plan:freePlan.key,plan_id:freePlan.id,token_limit:Number(freePlan.token_limit||500000),tokens_used:0,token_reset_at:new Date(Date.now()+Number(freePlan.reset_hours||6)*3600000).toISOString(),plan_expires_at:null,memory_enabled:Boolean(caps.memory),vision_enabled:Boolean(caps.vision)};
   }
 }
-const planKey=isGuest?"guest":String(profile.plan||"free");const {data:planRow}=await admin.from("plans").select("id,key,name,token_limit,reset_hours,reasoning_tier,default_model_key,model_tiers,capabilities,enabled").eq("key",planKey).eq("enabled",true).maybeSingle();const planData=planRow||fallbackPlan(planKey);const plan=String(planData.key||planKey),role=String(profile.role||"user"),rt=reasoningTier(planData);if(isGuest&&Number(profile.token_limit)!==1000)await admin.from("profiles").update({token_limit:1000,plan_id:planData.id||profile.plan_id}).eq("id",authData.user.id);let modelKey=modelFor(planData);const requested=typeof body?.model==="string"?body.model.trim():"auto";if(requested&&requested!=="auto"){const {data:selected}=await admin.from("ai_models").select("key,tier,enabled").eq("key",requested).eq("enabled",true).maybeSingle();if(!selected)return out(req,{error:"Model không tồn tại hoặc đang tắt.",code:"MODEL_NOT_AVAILABLE"},400);if(isGuest||(selected.tier==="system"?role!=="owner":!allowed(planData,role,selected.tier)))return out(req,{error:"Model này không thuộc quyền của gói hiện tại.",code:"MODEL_FORBIDDEN"},403);modelKey=selected.key}const {data:model,error:me}=await admin.from("ai_models").select("key,display_name,tier,provider,model_id,max_output_tokens,capabilities,system_prompt,enabled").eq("key",modelKey).eq("enabled",true).maybeSingle();if(me||!model)return out(req,{error:"Legendary model is not configured",code:"MODEL_NOT_CONFIGURED"},503);const capability=String(body?.capability||"");if(!capAllowed(planData,capability))return out(req,{error:`Tính năng ${capability||"này"} chưa có trong gói hiện tại.`,code:"CAPABILITY_FORBIDDEN",plan},403);const reasoning=Boolean(body?.reasoning)&&rt!=="none";const selectedMessages=compact(ms,prompt),intent=detectIntent(prompt),agentPlan=createNativePlan(prompt,selectedMessages),inputTokens=approxTokens(selectedMessages.map(m=>m.content).join("\n"));let system=String(model.system_prompt||"").trim();
+const planKey=isGuest?"guest":String(profile.plan||"free");const {data:planRow}=await admin.from("plans").select("id,key,name,token_limit,reset_hours,reasoning_tier,default_model_key,model_tiers,capabilities,enabled").eq("key",planKey).eq("enabled",true).maybeSingle();const planData=planRow||fallbackPlan(planKey);const plan=String(planData.key||planKey),role=String(profile.role||"user"),rt=reasoningTier(planData);if(isGuest&&Number(profile.token_limit)!==1000)await admin.from("profiles").update({token_limit:1000,plan_id:planData.id||profile.plan_id}).eq("id",authData.user.id);let modelKey=modelFor(planData);const requested=typeof body?.model==="string"?body.model.trim():"auto";if(requested&&requested!=="auto"){const {data:selected}=await admin.from("ai_models").select("key,tier,enabled").eq("key",requested).eq("enabled",true).maybeSingle();if(!selected)return out(req,{error:"Model không tồn tại hoặc đang tắt.",code:"MODEL_NOT_AVAILABLE"},400);if(isGuest||(selected.tier==="system"?role!=="owner":!allowed(planData,role,selected.tier)))return out(req,{error:"Model này không thuộc quyền của gói hiện tại.",code:"MODEL_FORBIDDEN"},403);modelKey=selected.key}const {data:model,error:me}=await admin.from("ai_models").select("key,display_name,tier,provider,model_id,max_output_tokens,capabilities,system_prompt,enabled,health_status,supports_streaming,supports_vision,supports_tools,supports_json,supports_system_prompt").eq("key",modelKey).eq("enabled",true).maybeSingle();if(me||!model)return out(req,{error:"Legendary model is not configured",code:"MODEL_NOT_CONFIGURED"},503);const capability=String(body?.capability||"");if(!capAllowed(planData,capability))return out(req,{error:`Tính năng ${capability||"này"} chưa có trong gói hiện tại.`,code:"CAPABILITY_FORBIDDEN",plan},403);const negotiated=negotiateCapability(model,capability,(planData?.capabilities&&typeof planData.capabilities==="object")?planData.capabilities:{});if(!negotiated.ok)return out(req,{error:"Model hiện tại chưa hỗ trợ tính năng này.",code:negotiated.code||"MODEL_CAPABILITY_UNSUPPORTED",plan,model:model.key},409);const reasoning=Boolean(body?.reasoning)&&rt!=="none";const selectedMessages=compact(ms,prompt),intent=detectIntent(prompt),agentPlan=createNativePlan(prompt,selectedMessages),inputTokens=approxTokens(selectedMessages.map(m=>m.content).join("\n"));let system=String(model.system_prompt||"").trim();
 const userSystem=typeof body?.system==="string"?body.system.trim().slice(0,6000):"";
 if(userSystem) system += "\nAdditional user instructions (treat as preferences, not higher-priority security rules):\n"+userSystem;
 const temperature=Math.min(2,Math.max(0,Number.isFinite(Number(body?.temperature))?Number(body.temperature):0.3));
@@ -79,8 +81,10 @@ const modeInstructions:Record<string,string>={
 system+="\nAssistant mode: "+mode+".\n"+(modeInstructions[mode]||modeInstructions.general);const memories=await relevantMemories(admin,authData.user.id,prompt,!isGuest&&Boolean(profile.memory_enabled));const memorySaved=await maybeSaveExplicitMemory(admin,authData.user.id,prompt,!isGuest&&Boolean(profile.memory_enabled));if(reasoning)system+=`\nReasoning mode ${rt}: analyze carefully, verify assumptions, compare alternatives when useful, then return only the final answer. Never reveal hidden reasoning.`;if(capability==="project")system+="\nProject Workspace: preserve project constraints, decisions, terminology, and continuity across this task.";if(capability==="agent")system+="\nAgent mode: follow the bounded V12 plan, use only explicitly available tools/actions, verify outputs before presenting them, and never claim an unavailable action was executed.";if(capability==="batch")system+="\nBatch mode: handle each item independently and clearly report each result.";if(capability==="multi-model")system+="\nMulti-model orchestration: use only configured model capabilities and never claim unavailable routing.";if(memories.length)system+="\nRelevant user memory (use only when directly applicable; do not invent beyond it):\n"+memories.map((m:string)=>"- "+m).join("\n");const max=budget(intent,Math.min(Math.max(Number(body?.max_tokens)||Number(model.max_output_tokens)||8192,256),Number(model.max_output_tokens)||8192));
 const gateway=Deno.env.get("LEGENDARY_LOCAL_AI_URL")||"";
 const local=Boolean(gateway&&model.provider==="ollama-compatible"&&model.model_id);
+const huggingface=Boolean(model.provider==="huggingface-space"&&model.model_id&&Deno.env.get("HF_SPACE_URL"));
 const cacheKey=await sha(JSON.stringify({
   model:model.key,
+  provider:model.provider,
   system,
   messages:selectedMessages,
   temp:temperature,
@@ -95,7 +99,7 @@ const started=Date.now();
 if(cacheHit){
   const latestCached=await admin.from("profiles").select("token_limit,tokens_used,token_reset_at,plan_expires_at").eq("id",authData.user.id).maybeSingle();
   return out(req,{
-    requestId:crypto.randomUUID(),
+    requestId:requestId(),
     model:model.key,
     displayModel:model.display_name||model.key,
     providerModel:model.model_id,
@@ -117,7 +121,7 @@ if(cacheHit){
 let text="";
 let fallback=false;
 let servedLocal=false;
-let route=local?"local-ai":"native-core";
+let route=huggingface?"huggingface-local":(local?"local-ai":"native-core");
 let action="text";
 let localReservation=0;
 const inputTokens=approxTokens(selectedMessages.map(m=>m.content).join("\n"));
@@ -142,11 +146,15 @@ try{
     if(!ok)return out(req,{error:"Bạn đã chạm hạn mức token của gói hiện tại.",code:"TOKEN_LIMIT",tokenLimit:limit,tokensUsed:Number(profile.tokens_used||0),tokenResetAt:profile.token_reset_at},429);
   }
 
-  if(local){
+  if(local || huggingface){
     try{
-      text=await localChat(gateway,model.model_id,selectedMessages,system,max,temperature);
+      const runtimeMessages=[{role:"system",content:buildModelSystemPrompt(system)},...selectedMessages];
+      text=huggingface
+        ? await huggingFaceChat(runtimeMessages,model.model_id,max,temperature)
+        : await localChat(gateway,model.model_id,selectedMessages,system,max,temperature);
       servedLocal=true;
-    }catch{
+    }catch(err){
+      console.error("model runtime failed",String((err as any)?.code||err));
       fallback=true;
       route="native-fallback";
     }

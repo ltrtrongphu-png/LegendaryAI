@@ -378,7 +378,7 @@ where true;
 create or replace function public.refund_tokens(p_amount integer, p_user_id uuid)
 returns boolean
 language plpgsql
-security definer set search_path = public
+security definer set search_path = ''
 as $
 declare
   uid uuid := coalesce(p_user_id, auth.uid());
@@ -393,7 +393,7 @@ begin
 end;
 $;
 
-revoke all on function public.refund_tokens(integer, uuid) from public;
+revoke all on function public.refund_tokens(integer, uuid) from public, anon, authenticated;
 grant execute on function public.refund_tokens(integer, uuid) to service_role;
 
 -- Was missing entirely: supabase/functions/ai-chat/index.ts calls this after
@@ -434,5 +434,122 @@ begin
 end;
 $$;
 
-revoke all on function public.finalize_tokens(integer, integer) from public;
-grant execute on function public.finalize_tokens(integer, integer) to authenticated;
+revoke all on function public.finalize_tokens(integer, integer) from public, anon, authenticated;
+
+
+-- Dynamic plan baseline. This section makes schema.sql self-contained and safe to rerun
+-- after the earlier legacy profile/order definitions above.
+create table if not exists public.plans (
+  id uuid primary key default gen_random_uuid(),
+  key text not null unique,
+  name text not null,
+  description text not null default '',
+  price_vnd bigint not null default 0 check (price_vnd >= 0),
+  billing_period text not null default 'month',
+  token_limit integer not null check (token_limit > 0),
+  reset_hours integer not null default 6 check (reset_hours > 0),
+  reasoning_tier text not null default 'basic',
+  default_model_key text,
+  model_tiers jsonb not null default '[\"free\"]'::jsonb,
+  capabilities jsonb not null default '{}'::jsonb,
+  features jsonb not null default '[]'::jsonb,
+  enabled boolean not null default true,
+  priority integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+insert into public.plans
+  (key,name,description,price_vnd,billing_period,token_limit,reset_hours,reasoning_tier,default_model_key,model_tiers,capabilities,features,enabled,priority)
+values
+  ('guest','Khách','Phiên khách giới hạn',0,'session',1000,6,'none','legendary-lite-1','["free"]'::jsonb,'{"reasoning":false,"projectWorkspace":false,"vision":false,"memory":false,"agentMode":false,"batchTasks":false,"multiModel":false}'::jsonb,'["Dùng thử Native Core","1.000 token"]'::jsonb,false,-1),
+  ('free','Gói Free','Gói miễn phí cho nhu cầu cơ bản',0,'month',500000,6,'basic','legendary-lite-1','["free"]'::jsonb,'{"reasoning":true,"projectWorkspace":false,"vision":false,"memory":false,"agentMode":false,"batchTasks":false,"multiModel":false}'::jsonb,'["500.000 token / 6 giờ","LegendaryLite-1","Chat & coding cơ bản"]'::jsonb,true,10),
+  ('pro','Gói Pro','Gói chuyên sâu hằng ngày',149000,'month',2000000,12,'deep','legendary-pro-1','["free","pro"]'::jsonb,'{"reasoning":true,"projectWorkspace":true,"vision":true,"memory":true,"agentMode":false,"batchTasks":true,"multiModel":false}'::jsonb,'["2.000.000 token / 12 giờ","Reasoning","Vision","Memory","Batch tasks"]'::jsonb,true,20),
+  ('legendary','Gói Legendary','Gói workload lớn và model cao cấp',399000,'month',6000000,18,'deep-plus','legendary-ultra-1','["free","pro","legendary"]'::jsonb,'{"reasoning":true,"projectWorkspace":true,"vision":true,"memory":true,"agentMode":true,"batchTasks":true,"multiModel":true}'::jsonb,'["6.000.000 token / 18 giờ","Advanced Memory","Agent","Multi-model"]'::jsonb,true,30)
+on conflict (key) do update set
+  name=excluded.name,description=excluded.description,price_vnd=excluded.price_vnd,
+  billing_period=excluded.billing_period,token_limit=excluded.token_limit,
+  reset_hours=excluded.reset_hours,reasoning_tier=excluded.reasoning_tier,
+  default_model_key=excluded.default_model_key,model_tiers=excluded.model_tiers,
+  capabilities=excluded.capabilities,features=excluded.features,
+  enabled=excluded.enabled,priority=excluded.priority,updated_at=now();
+
+alter table public.profiles add column if not exists plan_id uuid;
+alter table public.profiles add column if not exists plan_expires_at timestamptz;
+alter table public.orders add column if not exists expires_at timestamptz;
+
+update public.profiles p
+set plan_id=pl.id
+from public.plans pl
+where p.plan_id is null and pl.key=coalesce(nullif(p.plan,''),'free');
+
+alter table public.profiles drop constraint if exists profiles_plan_check;
+alter table public.profiles drop constraint if exists profiles_plan_key_fkey;
+alter table public.profiles add constraint profiles_plan_key_fkey
+  foreign key (plan) references public.plans(key) on update cascade on delete restrict;
+
+alter table public.orders drop constraint if exists orders_plan_check;
+alter table public.orders drop constraint if exists orders_plan_key_fkey;
+alter table public.orders add constraint orders_plan_key_fkey
+  foreign key (plan) references public.plans(key) on update cascade on delete restrict;
+
+alter table public.plans enable row level security;
+drop policy if exists "plans_public_read_enabled" on public.plans;
+create policy "plans_public_read_enabled" on public.plans
+  for select to anon, authenticated using (enabled=true);
+drop policy if exists "plans_owner_read_all" on public.plans;
+create policy "plans_owner_read_all" on public.plans
+  for select to authenticated using (
+    exists (select 1 from public.profiles p where p.id=(select auth.uid()) and p.role='owner')
+  );
+revoke insert, update, delete on public.plans from anon, authenticated;
+grant select on public.plans to anon, authenticated, service_role;
+grant insert, update, delete on public.plans to service_role;
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.profiles (id,display_name,avatar_url,role,plan,plan_id,token_limit,memory_enabled,vision_enabled,web_search_enabled)
+  select new.id,
+    coalesce(new.raw_user_meta_data->>'full_name',new.raw_user_meta_data->>'name',split_part(coalesce(new.email,''),'@',1)),
+    new.raw_user_meta_data->>'avatar_url','user',pl.key,pl.id,pl.token_limit,
+    coalesce((pl.capabilities->>'memory')::boolean,false),
+    coalesce((pl.capabilities->>'vision')::boolean,false),
+    coalesce((pl.capabilities->>'webSearch')::boolean,false)
+  from public.plans pl where pl.key='free' limit 1
+  on conflict (id) do update set
+    display_name=coalesce(excluded.display_name,public.profiles.display_name),
+    avatar_url=coalesce(excluded.avatar_url,public.profiles.avatar_url),
+    updated_at=now();
+  return new;
+end;
+$$;
+revoke all on function public.handle_new_user() from public,anon,authenticated;
+grant execute on function public.handle_new_user() to supabase_auth_admin;
+
+create or replace function public.manual_reset_tokens()
+returns table(success boolean,message text,tokens_used integer,token_limit integer,token_reset_at timestamptz,reset_available_at timestamptz)
+language plpgsql security definer set search_path=''
+as $$
+declare uid uuid:=auth.uid(); p public.profiles%rowtype; cooldown interval; window_start timestamptz;
+begin
+  if uid is null then return query select false,'Unauthorized',0,0,null::timestamptz,null::timestamptz; return; end if;
+  select * into p from public.profiles where id=uid for update;
+  if p.role='owner' or p.plan='legendary' then cooldown:=interval '7 days';
+  elsif p.plan='pro' then cooldown:=interval '1 month';
+  else return query select false,'Tính năng reset token chỉ dành cho Pro và Legendary.',p.tokens_used,p.token_limit,p.token_reset_at,null::timestamptz; return; end if;
+  window_start:=p.token_reset_window_started_at;
+  if window_start is null or window_start+cooldown<=now() then window_start:=now(); p.token_reset_uses:=0; end if;
+  if p.token_reset_uses>=1 then return query select false,'Bạn đã dùng lượt reset trong chu kỳ hiện tại.',p.tokens_used,p.token_limit,p.token_reset_at,window_start+cooldown; return; end if;
+  update public.profiles set tokens_used=0,token_reset_at=null,token_reset_uses=p.token_reset_uses+1,token_reset_window_started_at=window_start,updated_at=now() where id=uid;
+  return query select true,'Token đã được reset.',0,p.token_limit,null::timestamptz,window_start+cooldown;
+end;
+$$;
+revoke all on function public.manual_reset_tokens() from public,anon;
+grant execute on function public.manual_reset_tokens() to authenticated;
+
+revoke all on function public.finalize_tokens(integer,integer) from public,anon,authenticated;

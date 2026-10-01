@@ -79,7 +79,7 @@ const INTENT_RULES = [
   ['translate', /(dịch|translate|translation)/i],
   ['explain', /(giải thích|explain|tại sao|why|how does|là gì|what is)/i],
   ['brainstorm', /(ý tưởng|brainstorm|gợi ý|ideas|đề xuất)/i],
-  ['code', /(debug|bug|lỗi|error|fix|code review|sửa code|viết code|tạo code|lập trình|plugin|javascript|typescript|python|java|sql|html|css|supabase|api|sdk)/i],
+  ['code', /(debug|bug|lỗi|error|fix|code review|sửa code|viết code|tạo code|lập trình|code|plugin|javascript|typescript|python|java|sql|html|css|supabase|api|sdk)/i],
   ['writing', /(email|thư|tin nhắn|caption|bài viết|viết giúp|viết lại|rewrite|paraphrase|chỉnh sửa câu)/i],
   ['greeting', /^(hi|hello|hey|xin chào|chào)[!?. ]*$/i]
 ];

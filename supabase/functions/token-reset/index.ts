@@ -11,7 +11,11 @@ function corsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
   return {
     ...baseCorsHeaders,
-    "Access-Control-Allow-Origin": configuredSiteUrl || origin || "*",
+    ...(origin === "https://legendaryai.vercel.app" || origin === "https://www.legendaryai.vercel.app" || origin === "http://localhost:3000" || origin === "http://127.0.0.1:3000"
+      ? { "Access-Control-Allow-Origin": origin }
+      : configuredSiteUrl
+        ? { "Access-Control-Allow-Origin": configuredSiteUrl }
+        : {}),
     "Vary": "Origin",
   };
 }
@@ -38,11 +42,13 @@ Deno.serve(async (req: Request) => {
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) return json({ error: "Server configuration missing" }, 503, req);
 
-  const admin = createClient(url, key, { global: { headers: { Authorization: auth } } });
-  const { data: { user }, error: userError } = await admin.auth.getUser();
+  const userClient = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || key, {
+    global: { headers: { Authorization: auth } }
+  });
+  const { data: { user }, error: userError } = await userClient.auth.getUser();
   if (userError || !user) return json({ error: "Unauthorized" }, 401, req);
 
-  const { data, error } = await admin.rpc("manual_reset_tokens");
+  const { data, error } = await userClient.rpc("manual_reset_tokens");
   if (error) return json({ error: error.message }, 400, req);
 
   const row = Array.isArray(data) ? data[0] : data;

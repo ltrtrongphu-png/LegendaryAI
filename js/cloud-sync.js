@@ -18,6 +18,7 @@
         name: a.name || '',
         kind: a.kind || 'text',
         mediaType: a.mediaType || '',
+        dataUrl: (a.dataUrl && String(a.dataUrl).length <= 180000) ? String(a.dataUrl) : '',
         textContent: a.kind === 'text' || a.kind === 'archive' ? String(a.textContent || '').slice(0, 30000) : ''
       };
     });

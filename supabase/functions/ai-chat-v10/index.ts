@@ -131,7 +131,7 @@ function limitForProfile(p:any,planInfo:any,guest:boolean){
 }
 
 try{
-  if(local){
+  if(local || huggingface){
     const limit=limitForProfile(profile,planData,isGuest);
     const remaining=Math.max(0,limit-Number(profile.tokens_used||0));
     localReservation=Math.min(inputTokens+max,remaining);

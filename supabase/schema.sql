@@ -493,6 +493,9 @@ alter table public.orders drop constraint if exists orders_plan_key_fkey;
 alter table public.orders add constraint orders_plan_key_fkey
   foreign key (plan) references public.plans(key) on update cascade on delete restrict;
 
+create index if not exists profiles_plan_id_idx on public.profiles(plan_id);
+create index if not exists orders_plan_idx on public.orders(plan);
+
 alter table public.plans enable row level security;
 drop policy if exists "plans_public_read_enabled" on public.plans;
 create policy "plans_public_read_enabled" on public.plans
@@ -531,11 +534,11 @@ $$;
 revoke all on function public.handle_new_user() from public,anon,authenticated;
 grant execute on function public.handle_new_user() to supabase_auth_admin;
 
-create or replace function public.manual_reset_tokens()
+create or replace function public.manual_reset_tokens(p_user_id uuid)
 returns table(success boolean,message text,tokens_used integer,token_limit integer,token_reset_at timestamptz,reset_available_at timestamptz)
 language plpgsql security definer set search_path=''
 as $$
-declare uid uuid:=auth.uid(); p public.profiles%rowtype; cooldown interval; window_start timestamptz;
+declare uid uuid:=p_user_id; p public.profiles%rowtype; cooldown interval; window_start timestamptz;
 begin
   if uid is null then return query select false,'Unauthorized',0,0,null::timestamptz,null::timestamptz; return; end if;
   select * into p from public.profiles where id=uid for update;
@@ -549,7 +552,7 @@ begin
   return query select true,'Token đã được reset.',0,p.token_limit,null::timestamptz,window_start+cooldown;
 end;
 $$;
-revoke all on function public.manual_reset_tokens() from public,anon;
-grant execute on function public.manual_reset_tokens() to authenticated;
+revoke all on function public.manual_reset_tokens(uuid) from public,anon,authenticated;
+grant execute on function public.manual_reset_tokens(uuid) to service_role;
 
 revoke all on function public.finalize_tokens(integer,integer) from public,anon,authenticated;

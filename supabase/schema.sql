@@ -225,13 +225,25 @@ create table if not exists public.ai_models (
 );
 
 alter table public.ai_models drop constraint if exists ai_models_provider_check;
-alter table public.ai_models add constraint ai_models_provider_check check (provider in ('local','ollama-compatible','openai-compatible','anthropic-compatible'));
+alter table public.ai_models add constraint ai_models_provider_check check (provider in ('local','ollama-compatible','huggingface-space','openai-compatible','anthropic-compatible'));
 alter table public.ai_models add column if not exists tier text not null default 'free';
 alter table public.ai_models add column if not exists base_url_env text;
 alter table public.ai_models add column if not exists api_key_env text;
 alter table public.ai_models add column if not exists context_window integer not null default 32768;
 alter table public.ai_models add column if not exists max_output_tokens integer not null default 4096;
 alter table public.ai_models add column if not exists capabilities jsonb not null default '[]'::jsonb;
+alter table public.ai_models add column if not exists health_status text not null default 'unknown';
+alter table public.ai_models add column if not exists last_health_check_at timestamptz;
+alter table public.ai_models add column if not exists last_latency_ms integer;
+alter table public.ai_models add column if not exists failure_count integer not null default 0;
+alter table public.ai_models add column if not exists priority integer not null default 0;
+alter table public.ai_models add column if not exists supports_streaming boolean not null default false;
+alter table public.ai_models add column if not exists supports_vision boolean not null default false;
+alter table public.ai_models add column if not exists supports_tools boolean not null default false;
+alter table public.ai_models add column if not exists supports_json boolean not null default false;
+alter table public.ai_models add column if not exists supports_system_prompt boolean not null default true;
+alter table public.ai_models drop constraint if exists ai_models_health_status_check;
+alter table public.ai_models add constraint ai_models_health_status_check check (health_status in ('unknown','checking','ready','degraded','offline'));
 
 alter table public.ai_models enable row level security;
 drop policy if exists "ai models public enabled read" on public.ai_models;

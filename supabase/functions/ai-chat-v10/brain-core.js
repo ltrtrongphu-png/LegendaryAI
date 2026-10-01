@@ -3,19 +3,22 @@ const STOP_WORDS = new Set(['và','là','của','cho','một','những','the','a
 export function detectIntent(text) {
   const x = String(text || '').trim().toLowerCase();
   if (!x) return 'empty';
-  if (/^(hi|hello|hey|xin chào|chào)(\s|!|\?|$)/i.test(x)) return 'greeting';
-  if (/(tạo|vẽ|generate|draw|image|ảnh|hình|logo|wallpaper|avatar).*(ảnh|image|hình|logo|wallpaper|avatar|con mèo|cat|dog)|^(tạo|vẽ|generate|draw)\s+(ảnh|image|hình)/i.test(x)) return 'image';
-  if (/^(tính|calculate|calc)\b|^[0-9+\-*/%(). x×÷]+$/.test(x)) return 'math';
+  if (/^(hi|hello|hey|xin chào|chào)[!?. ]*$/i.test(x)) return 'greeting';
+  if (/(?:^|\s)(?:vẽ|draw)(?:\s|$)/i.test(x) ||
+      /(?:^|\s)(?:tạo|generate|create)(?:\s|$)/i.test(x) &&
+      /(?:^|\s)(?:ảnh|hình|image|picture|illustration|art|wallpaper|avatar|logo|poster|thumbnail|photo|meme)(?:\s|$)/i.test(x)) return 'image';
+  if (/^(tính|calculate|calc)\b|^[0-9+\-*/%(). x×÷\s]+$/.test(x)) return 'math';
   if (/(json|yaml|yml).*(format|formatted|định dạng|pretty|parse|valid)|((format|pretty|parse|validate|định dạng).*(json|yaml|yml))/i.test(x)) return 'utility';
-  if (/\b(kg|g|gram|km|m|cm|mm|mile|mi|ft|inch|in|°c|°f|celsius|fahrenheit|litre|liter|l|ml)\b.*\b(to|sang|đổi|in|thành)\b/i.test(x)) return 'utility';
-  if (/(debug|bug|lỗi|error|fix|code review|sửa code|viết code|tạo code|lập trình|plugin|javascript|typescript|python|java|sql|html|css|supabase|api|sdk)/i.test(x)) return 'code';
-  if (/(email|thư|tin nhắn|caption|bài viết|viết giúp|viết lại|rewrite|paraphrase|chỉnh sửa câu)/i.test(x)) return 'writing';
+  if (/\b(kg|g|gram|km|m|cm|mm|mile|mi|ft|inch|in|°c|°f|celsius|fahrenheit|litre|liter|l|ml)\b.*\b(to|sang|đổi|thành)\b/i.test(x) ||
+      /\b(kg|g|gram|km|m|cm|mm|mile|mi|ft|inch|in|°c|°f|celsius|fahrenheit|litre|liter|l|ml)\b\s+in\s+\b(kg|g|gram|km|m|cm|mm|mile|mi|ft|inch|in|°c|°f|celsius|fahrenheit|litre|liter|l|ml)\b/i.test(x)) return 'utility';
   if (/(tóm tắt|tóm lược|summarize|summary|ý chính)/i.test(x)) return 'summarize';
-  if (/(dịch|translate|translation)/i.test(x)) return 'translate';
   if (/(kế hoạch|plan|roadmap|lộ trình|từng bước|steps)/i.test(x)) return 'plan';
   if (/(so sánh|compare|khác nhau|difference|ưu.*nhược|trade.?off)/i.test(x)) return 'compare';
+  if (/(dịch|translate|translation)/i.test(x)) return 'translate';
   if (/(giải thích|explain|tại sao|why|how does|là gì|what is)/i.test(x)) return 'explain';
   if (/(ý tưởng|brainstorm|gợi ý|ideas|đề xuất)/i.test(x)) return 'brainstorm';
+  if (/(debug|bug|lỗi|error|fix|code review|sửa code|viết code|tạo code|lập trình|plugin|javascript|typescript|python|java|sql|html|css|supabase|api|sdk)/i.test(x)) return 'code';
+  if (/(email|thư|tin nhắn|caption|bài viết|viết giúp|viết lại|rewrite|paraphrase|chỉnh sửa câu)/i.test(x)) return 'writing';
   return 'general';
 }
 
@@ -67,7 +70,17 @@ export function codeDiagnostics(text) {
 
 export function buildModelSystemPrompt(basePrompt) {
   const base=String(basePrompt||'').trim();
-  return ['You are LegendaryAI. Return only the final answer intended for the user.','Never reveal chain-of-thought, hidden reasoning, internal routing, intent labels, keywords, constraints, token counts, backend details, or self-check logs.','Do not claim to have used a tool, source, file, model, or capability unless it actually happened.','If information is missing or uncertain, say what is missing and ask the smallest useful clarification.','For code: provide runnable code when the request is sufficiently specified; otherwise ask for the missing environment/version.','For factual claims: separate known facts from uncertainty and avoid invented specifics.','For writing requests: return the finished text directly, without a preamble about your process.','Prefer concise answers by default; expand when the user asks for detail.',base].filter(Boolean).join('\n');
+  return [
+    'You are LegendaryAI. Return only the final answer intended for the user.',
+    'Never reveal hidden reasoning, internal routing, intent labels, keywords, constraints, token counts, backend details, or self-check logs.',
+    'Do not claim to have used a tool, source, file, model, or capability unless it actually happened.',
+    'If information is missing or uncertain, say what is missing and ask the smallest useful clarification.',
+    'For code: provide runnable code when the request is sufficiently specified; otherwise ask for the missing environment/version.',
+    'For factual claims: separate known facts from uncertainty and avoid invented specifics.',
+    'For writing requests: return the finished text directly, without a preamble about your process.',
+    'Prefer concise answers by default; expand when the user asks for detail.',
+    base
+  ].filter(Boolean).join('\\n');
 }
 
 function nativeAnswerLegacy(text,messages=[]) {
@@ -124,18 +137,18 @@ function executeNativeTool(tool, prompt, messages = []) {
     return value === null ? {text:'', tool, error:'JSON_UNRESOLVED'} : {text:value, tool};
   }
   if (tool === 'extractive_summary') {
-    const explicit=prompt.replace(/^(tóm tắt|tóm lược|summarize|summary)[:\\-]?/i,'').trim();
+    const explicit=prompt.replace(/^(tóm tắt|tóm lược|summarize|summary)[:\-]?/i,'').trim();
     const recent=messages.filter(m=>m&&(m.role==='user'||m.role==='ai'||m.role==='assistant')).slice(-8).map(m=>String(m.content||m.text||'').trim()).filter(Boolean);
-    const source=explicit.length>60?explicit:recent.join('\\n');
+    const source=explicit.length>60?explicit:recent.join('\n');
     const value=source?extractiveSummary(source,5):'';
-    return value?{text:'Tóm tắt nhanh (extractive):\\n'+value,tool}:{text:'',tool,error:'SUMMARY_UNRESOLVED'};
+    return value?{text:'Tóm tắt nhanh (extractive):\n'+value,tool}:{text:'',tool,error:'SUMMARY_UNRESOLVED'};
   }
   if (tool === 'code_diagnostics') {
     const value=codeDiagnostics(prompt);
     return value?{text:value,tool}:{text:'',tool,error:'CODE_UNRESOLVED'};
   }
   if (tool === 'safe_template') {
-    return {text:'Tiêu đề: Xin nghỉ phép\\n\\nKính gửi Anh/Chị,\\n\\nEm xin phép nghỉ vào [ngày/thời gian] vì [lý do]. Em sẽ chủ động hoàn thành hoặc bàn giao các công việc cần thiết trước thời gian nghỉ.\\n\\nMong Anh/Chị xem xét và phê duyệt. Em cảm ơn Anh/Chị.\\n\\nTrân trọng,\\n[Tên]',tool};
+    return {text:'Tiêu đề: Xin nghỉ phép\n\nKính gửi Anh/Chị,\n\nEm xin phép nghỉ vào [ngày/thời gian] vì [lý do]. Em sẽ chủ động hoàn thành hoặc bàn giao các công việc cần thiết trước thời gian nghỉ.\n\nMong Anh/Chị xem xét và phê duyệt. Em cảm ơn Anh/Chị.\n\nTrân trọng,\n[Tên]',tool};
   }
   return {text:'',tool,error:'NO_NATIVE_EXECUTOR'};
 }
@@ -145,7 +158,7 @@ function verifyNativeResult(plan, result) {
   const checks = [
     {name:'non_empty',pass:Boolean(text)},
     {name:'bounded_tool',pass:NATIVE_TOOL_ALLOWLIST.has(plan.tool) || plan.tool === 'native_answer'},
-    {name:'math_finite',pass:plan.tool!=='safe_math' || /^-?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[+-]?\\d+)?$/i.test(text)}
+    {name:'math_finite',pass:plan.tool!=='safe_math' || /^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text)}
   ];
   return {passed:checks.every(x=>x.pass),checks};
 }

@@ -445,7 +445,7 @@ create table if not exists public.plans (
   name text not null,
   description text not null default '',
   price_vnd bigint not null default 0 check (price_vnd >= 0),
-  billing_period text not null default 'month',
+  billing_period text not null default 'month' check (billing_period in ('day','week','month','year','session')),
   token_limit integer not null check (token_limit > 0),
   reset_hours integer not null default 6 check (reset_hours > 0),
   reasoning_tier text not null default 'basic',

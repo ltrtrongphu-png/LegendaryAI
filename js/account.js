@@ -587,6 +587,7 @@
     dropdown.className = 'account-dropdown';
     dropdown.innerHTML = '<p class="acc-email">' + escapeHtml(user.email || '') + '</p>' +
       '<p class="acc-plan-line">Gói hiện tại: <strong>' + escapeHtml(PLAN_LABEL[profile.plan] || profile.plan) + '</strong></p>' +
+      (profile.plan_expires_at ? '<p class="acc-plan-line">Hạn gói: <strong>' + escapeHtml(new Date(profile.plan_expires_at).toLocaleString('vi-VN')) + '</strong></p>' : '') +
       '<p class="acc-plan-line">Token còn lại: <strong>' + Math.max(Number(profile.token_limit || 0) - Number(profile.tokens_used || 0), 0).toLocaleString('vi-VN') + ' / ' + Number(profile.token_limit || 500000).toLocaleString('vi-VN') + '</strong></p>' +
       (profile.role === 'owner' ? '<p class="acc-plan-line"><strong>Quyền Owner</strong> · Quản trị hệ thống</p>' : '') +
       '<div class="acc-features"><strong>Quyền gói</strong>' + (PLAN_FEATURES[profile.plan] || PLAN_FEATURES.free).map(function (f) { return '<span>' + escapeHtml(f) + '</span>'; }).join('') + '</div>';

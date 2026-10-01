@@ -1834,6 +1834,7 @@
         var savedText = 'Đã tạo ảnh bằng GPT Image 2.\n\nPrompt: ' + prompt;
         var convSaved = findConv(typing.convId) || getActiveConv();
         convSaved.messages.push({
+          id: messageUid(),
           role: 'ai',
           text: savedText,
           attachments: [{ kind: 'generated-image', dataUrl: dataUrl, name: 'legendary-image.png' }]

@@ -114,6 +114,7 @@ if(cacheHit){
 
 let text="";
 let fallback=false;
+let servedLocal=false;
 let route=local?"local-ai":"native-core";
 let action="text";
 let localReservation=0;
@@ -142,6 +143,7 @@ try{
   if(local){
     try{
       text=await localChat(gateway,model.model_id,selectedMessages,system,max,temperature);
+      servedLocal=true;
     }catch{
       fallback=true;
       route="native-fallback";
@@ -156,8 +158,8 @@ try{
   }
 
   if(text)cacheSet(cacheKey,text);
-  const outputTokens=local?approxTokens(text):0;
-  const actual=local?inputTokens+outputTokens:0;
+  const outputTokens=servedLocal?approxTokens(text):0;
+  const actual=servedLocal?inputTokens+outputTokens:0;
 
   if(localReservation>0){
     const refundAmount=Math.max(0,localReservation-actual);
@@ -177,9 +179,9 @@ try{
     model_key:model.key,
     provider_model:model.model_id,
     plan,
-    input_tokens:local?inputTokens:0,
-    output_tokens:local?outputTokens:0,
-    reserved_tokens:local?localReservation:0,
+    input_tokens:servedLocal?inputTokens:0,
+    output_tokens:servedLocal?outputTokens:0,
+    reserved_tokens:servedLocal?localReservation:0,
     request_ms:latency,
     status:"success"
   };
@@ -194,15 +196,15 @@ try{
     tier:model.tier,
     capabilities:Array.isArray(model.capabilities)?model.capabilities:[],
     fallbackUsed:fallback,
-    local:route==="local-ai",
-    native:route!=="local-ai",
+    local:servedLocal,
+    native:!servedLocal,
     text,
     action,
     plan,
     reasoning:{enabled:reasoning,tier:rt},
     brain:{version:"12.0-agent",intent,route,cacheHit:false,contextMessages:selectedMessages.length,rawContextMessages:ms.length,memoryRecall:memories.length,memorySaved,agent:agentPlan,selfCheck:true},
     performance:{latency_ms:latency,cache_hit:false,context_compacted:ms.length!==selectedMessages.length},
-    usage:{input_tokens:local?inputTokens:0,output_tokens:local?outputTokens:0,total_tokens:actual,tokens_used:finalUsed,token_limit:finalLimit,remaining_tokens:Math.max(0,finalLimit-finalUsed)}
+    usage:{input_tokens:servedLocal?inputTokens:0,output_tokens:servedLocal?outputTokens:0,total_tokens:actual,tokens_used:finalUsed,token_limit:finalLimit,remaining_tokens:Math.max(0,finalLimit-finalUsed)}
   });
 }catch(error){
   if(localReservation>0){

@@ -2,6 +2,9 @@
 -- atomic MoMo finalization, and safe owner bootstrap.
 -- Production changes were applied before this file was committed.
 
+alter table public.plans drop constraint if exists plans_billing_period_check;
+alter table public.plans add constraint plans_billing_period_check check (billing_period in ('day','week','month','year','session'));
+
 alter table public.profiles
   add column if not exists plan_expires_at timestamptz;
 

@@ -80,7 +80,7 @@ export function buildModelSystemPrompt(basePrompt) {
     'For writing requests: return the finished text directly, without a preamble about your process.',
     'Prefer concise answers by default; expand when the user asks for detail.',
     base
-  ].filter(Boolean).join('\\n');
+  ].filter(Boolean).join('\n');
 }
 
 function nativeAnswerLegacy(text,messages=[]) {

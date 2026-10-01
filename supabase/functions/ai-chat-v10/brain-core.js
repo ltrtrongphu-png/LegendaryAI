@@ -1,8 +1,12 @@
+import { analyzeEmotion, applyEmpathyPrefix, buildCognitivePlan, cognitiveProcess, composeTone, rankIntentCandidates, resolveContext } from './cognitive-core.js';
+
 const STOP_WORDS = new Set(['và','là','của','cho','một','những','the','and','or','to','of','in','a','an','is','are','this','that','with']);
 
 export function detectIntent(text) {
   const x = String(text || '').trim().toLowerCase();
   if (!x) return 'empty';
+  const cognitiveCandidates = rankIntentCandidates(x);
+  if (cognitiveCandidates[0]?.intent && cognitiveCandidates[0].confidence >= 0.86) return cognitiveCandidates[0].intent;
   if (/^(hi|hello|hey|xin chào|chào)[!?. ]*$/i.test(x)) return 'greeting';
   if (/(?:^|\s)(?:vẽ|draw)(?:\s|$)/i.test(x) ||
       /(?:^|\s)(?:tạo|generate|create)(?:\s|$)/i.test(x) &&
@@ -182,6 +186,35 @@ export function nativeAgent(text, messages = []) {
   return {...result,agent:{version:'12.0',plan,verification,latency_ms:Date.now()-started}};
 }
 
-export function nativeAnswer(text, messages = []) {
-  return nativeAgent(text, messages);
+export function nativeAnswer(text, messages = [], options = {}) {
+  const cognitive = cognitiveProcess(text, messages, options);
+  if (cognitive.needs_clarification && cognitive.intent === 'general') {
+    return {
+      intent: 'general',
+      text: 'Mình muốn hiểu đúng ý bạn trước. Bạn muốn mình giải thích, lập kế hoạch, viết nội dung, phân tích hay sửa code?',
+      cognitive
+    };
+  }
+  const result = nativeAgent(text, messages);
+  const rawText = String(result?.text || '');
+  const tone = composeTone(cognitive, options.mode || 'General');
+  const shouldEmpathize = tone.empathy_level >= 0.65 && cognitive.emotion.intensity >= 0.35;
+  return {
+    ...result,
+    text: shouldEmpathize ? applyEmpathyPrefix(rawText, cognitive) : rawText,
+    cognitive: {
+      version: cognitive.version,
+      intent: cognitive.intent,
+      intent_confidence: cognitive.intent_confidence,
+      emotion: cognitive.emotion,
+      context: {
+        references: cognitive.context.references,
+        topics: cognitive.context.topics,
+        continuity: cognitive.context.continuity
+      },
+      tone
+    }
+  };
 }
+
+export { analyzeEmotion, buildCognitivePlan, cognitiveProcess, composeTone, rankIntentCandidates, resolveContext };

@@ -1,0 +1,17 @@
+[functions.ai-chat-v10]
+verify_jwt = true
+
+[functions.owner-admin]
+verify_jwt = true
+
+[functions.token-reset]
+verify_jwt = true
+
+[functions.image-generate]
+verify_jwt = true
+
+[functions.momo-create-payment]
+verify_jwt = true
+
+[functions.momo-ipn]
+verify_jwt = false

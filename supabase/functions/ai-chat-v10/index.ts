@@ -3,7 +3,7 @@ import { buildModelSystemPrompt, createNativePlan, detectIntent, nativeAnswer } 
 
 const ORIGINS=new Set(["https://legendaryai.vercel.app","https://www.legendaryai.vercel.app","http://localhost:3000","http://127.0.0.1:3000"]);
 const MAX_MESSAGES=60,MAX_CONTEXT_CHARS=60000,SHIELD_WINDOW_MS=60000,SHIELD_MAX_REQUESTS=20,LOCAL_TIMEOUT_MS=12000;
-const cache=new Map<string,{created:number;text:string}>(),buckets=new Map<string,{started:number;count:number;last:number}>(),memoryCache=new Map<string,{created:number;items:string[]}>();
+const cache=new Map<string,{created:number;text:string;local:boolean}>(),buckets=new Map<string,{started:number;count:number;last:number}>(),memoryCache=new Map<string,{created:number;items:string[]}>();
 const CACHE_TTL_MS=15000,MEMORY_TTL_MS=30000;
 function cors(req:Request){const origin=req.headers.get("origin")||"";return {"Access-Control-Allow-Origin":ORIGINS.has(origin)?origin:"https://legendaryai.vercel.app","Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Credentials":"true",Vary:"Origin"}}
 function out(req:Request,body:unknown,status=200,extra:Record<string,string>={}){return new Response(JSON.stringify(body),{status,headers:{"Content-Type":"application/json; charset=utf-8",...cors(req),...extra}})}
@@ -19,8 +19,8 @@ function normalize(ms:any[]){return(Array.isArray(ms)?ms:[]).filter((m:any)=>m&&
 function compact(ms:any[],prompt:string){const all=normalize(ms),terms=new Set((prompt.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]).slice(0,24)),scored=all.map((m,i)=>{let score=i>=all.length-10?3:0;for(const t of terms)if(m.content.toLowerCase().includes(t))score++;return{m,i,score}}),picked=[...scored.filter(x=>x.i<all.length-10).sort((a,b)=>b.score-a.score||b.i-a.i).slice(0,14),...scored.slice(-10)],seen=new Set<number>(),outm:any[]=[];let total=0;for(const x of picked){if(seen.has(x.i))continue;const n=x.m.content.length;if(outm.length&&total+n>MAX_CONTEXT_CHARS)continue;seen.add(x.i);outm.push(x.m);total+=n}return outm}
 function budget(intent:string,n:number){const caps:Record<string,number>={greeting:512,math:1024,image:512,writing:4096,translate:4096,summarize:6144,code:12288,plan:8192,compare:8192,explain:8192,brainstorm:6144,general:8192};return Math.min(n,caps[intent]||8192)}
 async function sha(v:string){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return Array.from(new Uint8Array(d)).map(x=>x.toString(16).padStart(2,"0")).join("")}
-function cacheGet(k:string){const x=cache.get(k);if(!x)return null;if(Date.now()-x.created>CACHE_TTL_MS){cache.delete(k);return null}return x.text}
-function cacheSet(k:string,t:string){cache.set(k,{created:Date.now(),text:t});if(cache.size>500)cache.delete(cache.keys().next().value!)}
+function cacheGet(k:string){const x=cache.get(k);if(!x)return null;if(Date.now()-x.created>CACHE_TTL_MS){cache.delete(k);return null}return x}
+function cacheSet(k:string,t:string,local:boolean){cache.set(k,{created:Date.now(),text:t,local});if(cache.size>500)cache.delete(cache.keys().next().value!)}
 async function relevantMemories(admin:any,userId:string,prompt:string,enabled:boolean){
   if(!enabled||!userId)return [];
   const cached=memoryCache.get(userId);if(cached&&Date.now()-cached.created<MEMORY_TTL_MS)return cached.items;
@@ -86,8 +86,9 @@ const cacheKey=await sha(JSON.stringify({
   max,
   regenerate:String(body?.cacheKey||"")
 }));
-const cachedText=cacheGet(cacheKey);
-const cacheHit=Boolean(cachedText);
+const cacheEntry=cacheGet(cacheKey);
+const cachedText=cacheEntry?.text||"";
+const cacheHit=Boolean(cacheEntry);
 const started=Date.now();
 
 if(cacheHit){
@@ -100,13 +101,13 @@ if(cacheHit){
     tier:model.tier,
     capabilities:Array.isArray(model.capabilities)?model.capabilities:[],
     fallbackUsed:false,
-    local:false,
-    native:true,
+    local:Boolean(cacheEntry?.local),
+    native:!Boolean(cacheEntry?.local),
     text:cachedText,
     action:"text",
     plan,
-    reasoning:{enabled:reasoning&&servedLocal,tier:rt},
-    brain:{version:"12.0-agent",intent,route:"cache",cacheHit:true,contextMessages:selectedMessages.length,rawContextMessages:ms.length,memoryRecall:memories.length,memorySaved:false,agent:agentPlan,selfCheck:true},
+    reasoning:{enabled:reasoning&&Boolean(cacheEntry?.local),tier:rt},
+    brain:{version:"12.0-agent",intent,route:"cache",cacheHit:true,contextMessages:selectedMessages.length,rawContextMessages:ms.length,memoryRecall:cacheEntry?.local?memories.length:0,memorySaved:false,agent:agentPlan,selfCheck:true},
     performance:{latency_ms:Date.now()-started,cache_hit:true,context_compacted:ms.length!==selectedMessages.length},
     usage:{input_tokens:0,output_tokens:0,total_tokens:0,tokens_used:Number(latestCached.data?.tokens_used??profile.tokens_used??0),token_limit:Number(latestCached.data?.token_limit??limitForProfile(profile,planData,isGuest)),remaining_tokens:Math.max(0,Number(latestCached.data?.token_limit??limitForProfile(profile,planData,isGuest))-Number(latestCached.data?.tokens_used??profile.tokens_used??0))}
   });
@@ -157,7 +158,7 @@ try{
     route=fallback?"native-fallback":"native-core";
   }
 
-  if(text)cacheSet(cacheKey,text);
+  if(text)cacheSet(cacheKey,text,servedLocal);
   const outputTokens=servedLocal?approxTokens(text):0;
   const actual=servedLocal?inputTokens+outputTokens:0;
 
@@ -202,7 +203,7 @@ try{
     action,
     plan,
     reasoning:{enabled:reasoning,tier:rt},
-    brain:{version:"12.0-agent",intent,route,cacheHit:false,contextMessages:selectedMessages.length,rawContextMessages:ms.length,memoryRecall:memories.length,memorySaved,agent:agentPlan,selfCheck:true},
+    brain:{version:"12.0-agent",intent,route,cacheHit:false,contextMessages:selectedMessages.length,rawContextMessages:ms.length,memoryRecall:servedLocal?memories.length:0,memorySaved,agent:agentPlan,selfCheck:true},
     performance:{latency_ms:latency,cache_hit:false,context_compacted:ms.length!==selectedMessages.length},
     usage:{input_tokens:servedLocal?inputTokens:0,output_tokens:servedLocal?outputTokens:0,total_tokens:actual,tokens_used:finalUsed,token_limit:finalLimit,remaining_tokens:Math.max(0,finalLimit-finalUsed)}
   });

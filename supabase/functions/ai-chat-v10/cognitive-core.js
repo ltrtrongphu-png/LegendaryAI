@@ -11,12 +11,12 @@ const EMOTION_PATTERNS = [
 ];
 
 const SARCASM_PATTERNS = [
-  /ừs*hays*quá/i,
-  /tuyệts*vờis*quás*ha/i,
-  /hays*quás*nhỉ/i,
-  /đỉnhs*quás*nhỉ/i,
-  /wows*giỏis*quá/i,
-  /👏s*👏/i
+  /ừ *hay *quá/i,
+  /tuyệt *vời *quá *ha/i,
+  /hay *quá *nhỉ/i,
+  /đỉnh *quá *nhỉ/i,
+  /wow *giỏi *quá/i,
+  /👏 *👏/i
 ];
 
 const STOP = new Set(['và','là','của','cho','một','những','the','and','or','to','of','in','a','an','is','are','this','that','with','tôi','mình','bạn']);

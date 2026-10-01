@@ -89,6 +89,8 @@ $$;
 revoke all on function public.handle_new_user() from public, anon, authenticated;
 grant execute on function public.handle_new_user() to supabase_auth_admin;
 
+drop function if exists public.manual_reset_tokens();
+
 create or replace function public.manual_reset_tokens(p_user_id uuid)
 returns table(success boolean,message text,tokens_used integer,token_limit integer,token_reset_at timestamptz,reset_available_at timestamptz)
 language plpgsql

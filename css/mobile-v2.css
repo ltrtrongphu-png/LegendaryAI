@@ -1,0 +1,111 @@
+/* LegendaryAI — dedicated mobile experience v2
+   Loaded after all desktop/design layers so mobile gets an intentional layout.
+*/
+@media (max-width: 768px){
+  html{scroll-behavior:smooth}
+  body{overflow-x:hidden}
+  .wrap{width:min(100% - 28px,720px);margin-inline:auto}
+  .site-header{position:sticky;top:0;z-index:1000;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+  .header-row{min-height:58px;padding:8px 0;gap:8px}
+  .brand-name{font-size:15px}
+  .brand-logo{width:28px;height:28px}
+  .main-nav{display:none}
+  .header-actions{margin-left:auto;gap:6px}
+  .theme-toggle{width:36px;height:36px;padding:0}
+  #navToggle{display:inline-flex;width:36px;height:36px;padding:0;align-items:center;justify-content:center}
+  #headerTrialCta{display:none}
+  .account-area{max-width:42px}
+  .account-area .account-auth-group{gap:0}
+  
+  .hero{grid-template-columns:1fr!important;min-height:auto!important;padding-top:34px;padding-bottom:28px;text-align:left}
+  .hero-copy{max-width:none}
+  .hero h1{font-size:clamp(34px,10vw,48px);line-height:1.04;letter-spacing:-.045em}
+  .hero .lede{font-size:15px;line-height:1.65}
+  .hero-cta{display:grid;grid-template-columns:1fr;gap:9px}
+  .hero-cta .btn{width:100%;justify-content:center}
+  .hero-trust{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:18px}
+  .hero-trust>div{padding:10px 6px;border-radius:12px}
+  .hero-trust .num{font-size:18px}
+  .hero-trust .lbl{font-size:10px}
+  .hero-visual{display:none!important}
+  
+  .strip{margin-top:0;padding:13px 14px!important}
+  .strip p{font-size:11px;line-height:1.5;text-align:center}
+  .section-head h2,.capacity-text h2,.engine-panel h2{font-size:27px;line-height:1.12;letter-spacing:-.025em}
+  .section-head p{font-size:14px;line-height:1.6}
+  .features,.engine-showcase,.turbo-brain,.capacity,.compare,.pricing,.faq{padding-top:34px!important;padding-bottom:34px!important}
+  .feature-grid,.turbo-grid,.engine-cards,.stats-grid{grid-template-columns:1fr!important;gap:10px}
+  .feature-cell,.turbo-card,.engine-card{padding:16px!important}
+  .stats-grid{grid-template-columns:repeat(2,1fr)!important}
+  .stats-grid>div{padding:14px 10px}
+  
+  /* Chat becomes an app-like mobile surface. */
+  .chat-app{height:calc(100svh - 74px)!important;min-height:560px!important;max-height:none!important;width:100%!important;margin:0!important;border-radius:18px!important}
+  .chat-shell{height:100%!important}
+  .chat-topbar{padding:9px 11px!important;gap:7px!important}
+  .chat-topbar>*{min-width:0}
+  .chat-title{font-size:13px!important}
+  .chat-subtitle,.chat-status,.chat-topbar small{font-size:10px!important}
+  .chat-window{padding:10px 10px 6px!important}
+  .msg{max-width:94%!important}
+  .msg .bubble{font-size:14px!important;line-height:1.6!important;border-radius:15px!important}
+  .msg.user{margin-left:auto}
+  .msg.ai{margin-right:auto}
+  .chat-mode-switcher{padding:7px 10px 5px!important;gap:6px!important}
+  .chat-mode-chip{padding:7px 10px!important;font-size:11px!important;min-height:32px}
+  .chat-suggestions{padding:4px 10px 6px!important}
+  .chat-suggestions button{font-size:11px!important;padding:7px 10px!important}
+  .chat-input-row{grid-template-columns:38px minmax(0,1fr) 42px!important;gap:6px!important;padding:7px 9px!important;align-items:end!important}
+  .chat-input-row textarea{grid-column:2!important;grid-row:1!important;min-height:42px!important;max-height:110px!important;padding:11px 10px!important;font-size:14px!important;border-radius:14px!important}
+  #attachBtn{grid-column:1!important;grid-row:1!important;width:38px!important;height:42px!important;padding:0!important}
+  #sendBtn,#stopBtn{grid-column:3!important;grid-row:1!important;width:42px!important;height:42px!important;padding:0!important}
+  #reasoningToggle{grid-column:1 / -1!important;grid-row:2!important;justify-self:start!important;margin:0!important;font-size:11px!important}
+  .chat-meta{padding:2px 10px 7px!important;font-size:10px!important;gap:6px!important}
+  #chatStreamStatus{max-width:68vw}
+  .attach-preview{max-width:100%;overflow-x:auto}
+  .generated-image{max-width:100%;height:auto}
+  
+  /* Mobile owner/account dialogs */
+  .owner-admin-panel{width:calc(100vw - 20px)!important;max-height:92svh!important;padding:14px!important;border-radius:16px!important}
+  .owner-admin-tabs{overflow-x:auto;flex-wrap:nowrap;padding-bottom:3px}
+  .owner-admin-tabs>*{flex:0 0 auto}
+  .owner-plan-row,.owner-user-row{gap:8px!important;padding:11px!important}
+  
+  /* Tables/cards that would otherwise force horizontal scrolling. */
+  .compare table,.pricing table{min-width:0!important;width:100%!important}
+  .compare{overflow:hidden}
+  .compare .table-wrap,.compare .comparison-table{overflow-x:auto;max-width:100%}
+  
+  footer .wrap{padding-inline:0}
+}
+
+@media (max-width: 480px){
+  .wrap{width:calc(100% - 20px)}
+  .header-row{padding-inline:0}
+  .brand-name{font-size:14px}
+  .hero{padding-top:26px}
+  .hero h1{font-size:36px}
+  .hero .kicker{font-size:10px}
+  .hero-trust{gap:5px}
+  .hero-trust .num{font-size:16px}
+  .hero-trust .lbl{font-size:9px}
+  .chat-app{height:calc(100svh - 64px)!important;min-height:520px!important;border-radius:14px!important}
+  .chat-window{padding-inline:7px!important}
+  .msg{max-width:97%!important}
+  .msg .bubble{font-size:13.5px!important}
+  .chat-mode-chip{padding-inline:9px!important}
+  .chat-input-row{grid-template-columns:36px minmax(0,1fr) 40px!important;padding-inline:7px!important}
+  #attachBtn{width:36px!important}
+  #sendBtn,#stopBtn{width:40px!important}
+  .chat-meta{font-size:9px!important}
+}
+
+/* Mobile menu opened by the existing #navToggle controller. */
+@media (max-width: 768px){
+  .main-nav.mobile-open,
+  .main-nav.is-open,
+  .main-nav.open{display:flex;position:absolute;left:10px;right:10px;top:58px;z-index:1001;flex-direction:column;gap:4px;padding:10px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(8,12,22,.96);box-shadow:0 18px 50px rgba(0,0,0,.35)}
+  .main-nav.mobile-open a,
+  .main-nav.is-open a,
+  .main-nav.open a{padding:11px 12px;border-radius:10px}
+}

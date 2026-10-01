@@ -42,13 +42,11 @@ Deno.serve(async (req: Request) => {
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) return json({ error: "Server configuration missing" }, 503, req);
 
-  const userClient = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || key, {
-    global: { headers: { Authorization: auth } }
-  });
-  const { data: { user }, error: userError } = await userClient.auth.getUser();
+  const admin = createClient(url, key);
+  const { data: { user }, error: userError } = await admin.auth.getUser(auth.replace(/^Bearer\s+/i, ""));
   if (userError || !user) return json({ error: "Unauthorized" }, 401, req);
 
-  const { data, error } = await userClient.rpc("manual_reset_tokens");
+  const { data, error } = await admin.rpc("manual_reset_tokens", { p_user_id: user.id });
   if (error) return json({ error: error.message }, 400, req);
 
   const row = Array.isArray(data) ? data[0] : data;

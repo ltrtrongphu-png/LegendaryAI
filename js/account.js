@@ -177,7 +177,7 @@
         '<h3>' + escapeHtml(p.name.replace(/^Gói\\s+/i,'')) + '</h3>' +
         '<p class="price">' + escapeHtml(price.split(' / ')[0]) + '<span>' + (price.indexOf(' / ') >= 0 ? '/' + escapeHtml(price.split(' / ')[1]) : '') + '</span></p>' +
         '<ul>' + features.slice(0,7).map(function(f){ return '<li>' + escapeHtml(f) + '</li>'; }).join('') + '</ul>' +
-        '<button type="button" class="btn ' + (featured ? 'btn-primary' : 'btn-outline') + ' plan-select-btn" data-plan="' + escapeHtml(p.key) + '" data-label="' + escapeHtml(p.key === 'free' ? 'Bắt đầu' : 'Chọn ' + p.name.replace(/^Gói\\s+/i,'')) + '">' + escapeHtml(p.key === 'free' ? 'Bắt đầu' : 'Chọn ' + p.name.replace(/^Gói\\s+/i,'')) + '</button>' +
+        '<button type="button" class="btn ' + (featured ? 'btn-primary' : 'btn-outline') + ' plan-select-btn" data-plan="' + escapeHtml(p.key) + '" data-label="' + escapeHtml(p.key === 'free' ? 'Bắt đầu' : 'Đang hoàn thiện AI') + '" ' + (p.key !== 'free' ? 'disabled' : '') + '>' + escapeHtml(p.key === 'free' ? 'Bắt đầu' : 'Đang hoàn thiện AI') + '</button>' +
         '</div>';
     }).join('');
     bindPlanButtons();
@@ -647,13 +647,21 @@
         btn.disabled = true; btn.textContent = 'Đang dùng gói này';
         var t = document.createElement('span'); t.className = 'price-current-tag'; t.textContent = 'Gói hiện tại';
         card.appendChild(t);
+      } else if (plan === 'free') {
+        btn.disabled = false;
+        btn.textContent = btn.getAttribute('data-label') || btn.textContent;
       } else {
-        btn.disabled = false; btn.textContent = btn.getAttribute('data-label') || btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Đang hoàn thiện AI';
       }
     });
   }
 
   async function handlePlanSelect(plan) {
+    if (plan !== 'free') {
+      if (typeof streamStatus !== 'undefined' && streamStatus) streamStatus.textContent = 'Gói trả phí đang tạm đóng vì AI production chưa sẵn sàng.';
+      return;
+    }
     if (plan === 'free') {
       var user = await LegendaryBackend.getUser();
       if (!user) { pendingPlan = plan; return openAuthModal('login'); }

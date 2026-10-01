@@ -8,6 +8,11 @@ const cases = [
   ['tạo code plugin Paper 1.21.4', 'code'],
   ['Viết giúp tôi một email xin nghỉ phép lịch sự', 'writing'],
   ['2 + 2', 'math'],
+  ['so sánh Python và Java', 'compare'],
+  ['tạo kế hoạch học SQL', 'plan'],
+  ['tóm tắt: dùng Supabase để lưu dữ liệu', 'summarize'],
+  ['hello world code python', 'code'],
+  ['5 in to cm', 'utility'],
 ];
 for (const [input, expected] of cases) assert.equal(detectIntent(input), expected, `${input} should route to ${expected}`);
 

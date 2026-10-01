@@ -142,6 +142,9 @@
     'legendary-vision-109b': 'Legendary Vision 109B'
   };
   var ACTIVE_KEY = 'legendaryai_active_conv_v2';
+  function messageUid() {
+    return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  }
   var activeController = null;
   var pendingAttachments = [];
 
@@ -533,6 +536,7 @@
         slug: requestedSlug,
         createdAt: Date.now(),
         messages: [{
+          id: messageUid(),
           role: 'ai',
           text: 'Xin chào! Đây là cuộc trò chuyện ' +
             requestedSlug + '. Bạn muốn bắt đầu với điều gì?',
@@ -750,6 +754,7 @@
 
     persistConversations();
     persistActiveId();
+    window.dispatchEvent(new CustomEvent('legendary:conversation-deleted', { detail: { id: id } }));
 
     renderSidebar();
     renderMessages();
@@ -1482,6 +1487,7 @@
     var atts = attachments || [];
 
     conv.messages.push({
+      id: messageUid(),
       role: role,
       text: text,
       attachments: atts
@@ -1557,6 +1563,7 @@
       getActiveConv();
 
     conv.messages.push({
+      id: messageUid(),
       role: 'ai',
       text: state.raw,
       attachments: []
@@ -1616,6 +1623,7 @@
     }
 
     conv.messages.splice(idx, 1);
+    conv._regenerateNonce = messageUid();
     persistConversations();
 
     var lastWrap =
@@ -1743,16 +1751,10 @@
           var brain = result && result.brain;
           streamStatus.textContent = brain
             ? '✓ ' + (result.displayModel || 'Legendary Engine') +
-              (result.selfHosted ? ' · Local' : ' · Core') +
+              (result.local ? ' · Local' : ' · Core') +
               (result.providerModel ? ' · ' + result.providerModel : '') +
               ' · ' + (brain.intent || 'general') +
-              (brain.memory ? ' · memory' : '') +
-              (result.usage && result.usage.reasoning
-                ? ' · suy luận ×' + (result.usage.reasoning_multiplier || 1.75)
-                : '') +
-              (result.usage && result.usage.quality_multiplier > 1
-                ? ' · phân tích ×' + result.usage.quality_multiplier
-                : '')
+              (brain.memoryRecall ? ' · memory' : '')
             : '';
         }
 
@@ -1796,7 +1798,10 @@
   }
 
   function isImageGenerationPrompt(text) {
-    return /(?:\\b(?:tạo|vẽ|generate|draw|create)\\b.*\\b(?:ảnh|hình|image|picture)\\b|\\b(?:ảnh|hình|image|picture)\\b.*\\b(?:tạo|vẽ|generate|draw|create)\\b)/i.test(String(text || ''));
+    var x = String(text || '').trim();
+    return /(?:^|\\s)(?:vẽ|draw)(?:\\s|$)/i.test(x) ||
+      /(?:^|\\s)(?:tạo|generate|create)(?:\\s|$)/i.test(x) &&
+      /(?:^|\\s)(?:ảnh|hình|image|picture|illustration|art|wallpaper|avatar|logo|poster|thumbnail|photo|meme)(?:\\s|$)/i.test(x);
   }
 
   function callImageProvider(conv) {
@@ -1902,6 +1907,7 @@
 
         conv.messages = [
           {
+            id: messageUid(),
             role: 'ai',
             text:
               'Đã xoá hội thoại này. Bạn muốn bắt đầu với điều gì?',

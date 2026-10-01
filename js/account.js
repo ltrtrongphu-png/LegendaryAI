@@ -659,7 +659,7 @@
 
   async function handlePlanSelect(plan) {
     if (plan !== 'free') {
-      if (typeof streamStatus !== 'undefined' && streamStatus) streamStatus.textContent = 'Gói trả phí đang tạm đóng vì AI production chưa sẵn sàng.';
+      alert('Gói trả phí đang tạm đóng vì AI production chưa sẵn sàng.');
       return;
     }
     if (plan === 'free') {

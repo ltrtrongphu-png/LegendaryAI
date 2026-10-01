@@ -9,6 +9,12 @@ function base64Json(value: unknown): string {
 }
 
 const configuredSiteUrl = (Deno.env.get("SITE_URL") || "").replace(/\/$/, "");
+const ORIGINS = new Set([
+  "https://legendaryai.vercel.app",
+  "https://www.legendaryai.vercel.app",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+]);
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -18,7 +24,11 @@ function getCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
   return {
     ...baseCorsHeaders,
-    "Access-Control-Allow-Origin": configuredSiteUrl || origin || "*",
+    ...(ORIGINS.has(origin)
+      ? { "Access-Control-Allow-Origin": origin }
+      : configuredSiteUrl
+        ? { "Access-Control-Allow-Origin": configuredSiteUrl }
+        : {}),
     "Vary": "Origin",
   };
 }
@@ -45,17 +55,15 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return cors({ error: "Unauthorized" }, 401, req);
 
-  const supabase = createClient(supabaseUrl, serviceKey, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const admin = createClient(supabaseUrl, serviceKey);
+  const { data: { user }, error: userError } = await admin.auth.getUser(authHeader.replace(/^Bearer\s+/i, ""));
   if (userError || !user) return cors({ error: "Unauthorized" }, 401, req);
 
   const body = await req.json().catch(() => ({}));
   const planKey = String(body.plan || "").trim().toLowerCase();
-  const { data: plan, error: planError } = await supabase
+  const { data: plan, error: planError } = await admin
     .from("plans")
-    .select("id,key,name,price_vnd,enabled")
+    .select("id,key,name,price_vnd,enabled,default_model_key")
     .eq("key", planKey)
     .eq("enabled", true)
     .maybeSingle();
@@ -67,7 +75,22 @@ Deno.serve(async (req) => {
   const requestId = crypto.randomUUID().replaceAll("-", "").slice(0, 32);
   const extraData = base64Json({ userId: user.id, plan: planKey });
 
-  const { error: insertError } = await supabase.from("orders").insert({
+  const { data: modelForPlan } = await admin
+    .from("ai_models")
+    .select("provider,model_id,enabled")
+    .eq("key", String((plan as any).default_model_key || ""))
+    .maybeSingle();
+  const localGateway = Deno.env.get("LEGENDARY_LOCAL_AI_URL") || "";
+  if (!modelForPlan || !modelForPlan.enabled ||
+      (modelForPlan.provider === "local" && !localGateway) ||
+      (modelForPlan.provider === "ollama-compatible" && !localGateway)) {
+    return cors({
+      error: "Thanh toán gói trả phí đang tạm đóng vì AI model production chưa được bật. Không thu tiền khi tính năng chưa sẵn sàng.",
+      code: "PAYMENT_TEMPORARILY_DISABLED"
+    }, 503, req);
+  }
+
+  const { error: insertError } = await admin.from("orders").insert({
     user_id: user.id,
     plan: planKey,
     amount: plan.price_vnd,
@@ -117,7 +140,7 @@ Deno.serve(async (req) => {
   const result = await response.json();
 
   if (!response.ok || result.resultCode !== 0) {
-    await supabase.from("orders").update({
+    await admin.from("orders").update({
       status: "failed",
       provider_result_code: result.resultCode ?? -1,
       provider_message: result.message ?? "MoMo request failed",

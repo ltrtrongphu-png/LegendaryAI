@@ -50,8 +50,9 @@ export function resolveContext(text, messages = []) {
   const priorUser = recent.filter(m => m.role === 'user').map(m => String(m.content ?? m.text ?? '').trim()).filter(Boolean);
   const previous = priorUser.at(-1) || '';
   const references = [];
-  if (/\b(nó|cái đó|cái này|việc đó|vừa nói|that|it|this|the first one|the second one)\b/i.test(input) && previous) {
-    references.push({expression: input.match(/\b(nó|cái đó|cái này|việc đó|vừa nói|that|it|this|the first one|the second one)\b/i)?.[0] || 'reference', target: previous.slice(0, 240), confidence: 0.74});
+  const referenceRe = /(?:^|\\s)(nó|cái đó|cái này|việc đó|vừa nói|that|it|this|the first one|the second one)(?=\\s|$)/i;
+  if (referenceRe.test(input) && previous) {
+    references.push({expression: input.match(referenceRe)?.[1] || 'reference', target: previous.slice(0, 240), confidence: 0.74});
   }
   const topicTokens = tokens([...priorUser.slice(-3), input].join(' '));
   const counts = new Map();

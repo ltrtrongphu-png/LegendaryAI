@@ -498,12 +498,13 @@ create index if not exists orders_plan_idx on public.orders(plan);
 
 alter table public.plans enable row level security;
 drop policy if exists "plans_public_read_enabled" on public.plans;
-create policy "plans_public_read_enabled" on public.plans
-  for select to anon, authenticated using (enabled=true);
 drop policy if exists "plans_owner_read_all" on public.plans;
-create policy "plans_owner_read_all" on public.plans
-  for select to authenticated using (
-    exists (select 1 from public.profiles p where p.id=(select auth.uid()) and p.role='owner')
+drop policy if exists "plans_read" on public.plans;
+create policy "plans_read" on public.plans
+  for select to anon, authenticated using (
+    enabled=true or exists (
+      select 1 from public.profiles p where p.id=(select auth.uid()) and p.role='owner'
+    )
   );
 revoke insert, update, delete on public.plans from anon, authenticated;
 grant select on public.plans to anon, authenticated, service_role;

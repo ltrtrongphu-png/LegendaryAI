@@ -105,7 +105,7 @@ if(cacheHit){
     text:cachedText,
     action:"text",
     plan,
-    reasoning:{enabled:reasoning,tier:rt},
+    reasoning:{enabled:reasoning&&servedLocal,tier:rt},
     brain:{version:"12.0-agent",intent,route:"cache",cacheHit:true,contextMessages:selectedMessages.length,rawContextMessages:ms.length,memoryRecall:memories.length,memorySaved:false,agent:agentPlan,selfCheck:true},
     performance:{latency_ms:Date.now()-started,cache_hit:true,context_compacted:ms.length!==selectedMessages.length},
     usage:{input_tokens:0,output_tokens:0,total_tokens:0,tokens_used:Number(latestCached.data?.tokens_used??profile.tokens_used??0),token_limit:Number(latestCached.data?.token_limit??limitForProfile(profile,planData,isGuest)),remaining_tokens:Math.max(0,Number(latestCached.data?.token_limit??limitForProfile(profile,planData,isGuest))-Number(latestCached.data?.tokens_used??profile.tokens_used??0))}

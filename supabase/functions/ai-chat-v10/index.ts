@@ -202,7 +202,7 @@ try{
     text,
     action,
     plan,
-    reasoning:{enabled:reasoning,tier:rt},
+    reasoning:{enabled:reasoning&&servedLocal,tier:rt},
     brain:{version:"12.0-agent",intent,route,cacheHit:false,contextMessages:selectedMessages.length,rawContextMessages:ms.length,memoryRecall:servedLocal?memories.length:0,memorySaved,agent:agentPlan,selfCheck:true},
     performance:{latency_ms:latency,cache_hit:false,context_compacted:ms.length!==selectedMessages.length},
     usage:{input_tokens:servedLocal?inputTokens:0,output_tokens:servedLocal?outputTokens:0,total_tokens:actual,tokens_used:finalUsed,token_limit:finalLimit,remaining_tokens:Math.max(0,finalLimit-finalUsed)}

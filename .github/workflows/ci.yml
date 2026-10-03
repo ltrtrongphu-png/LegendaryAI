@@ -25,6 +25,8 @@ jobs:
         run: node tests/cognitive-core-v2.test.mjs
       - name: Native core regressions
         run: deno test --allow-read tests/brain-native-core.test.mjs tests/plan-capabilities.test.mjs
+      - name: Model runtime contract
+        run: deno test tests/model-runtime-contract.test.mjs
       - name: Type-check ai-chat-v10
         run: deno check supabase/functions/ai-chat-v10/index.ts
       - name: Type-check local model health function

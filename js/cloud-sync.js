@@ -12,27 +12,28 @@
   var syncing = false;
   var syncTimer = null;
 
-  function cacheKey(userId) {
-    return CACHE_PREFIX + (userId || 'guest');
-  }
-  function activeKey(userId) {
-    return ACTIVE_PREFIX + (userId || 'guest');
-  }
-  function syncKey(userId) {
-    return SYNC_PREFIX + (userId || 'guest');
-  }
+  function cacheKey(userId) { return CACHE_PREFIX + (userId || 'guest'); }
+  function activeKey(userId) { return ACTIVE_PREFIX + (userId || 'guest'); }
+  function syncKey(userId) { return SYNC_PREFIX + (userId || 'guest'); }
 
   function readJson(key, fallback) {
     try {
       var raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw) : fallback;
-    } catch (_) {
-      return fallback;
-    }
+    } catch (_) { return fallback; }
   }
 
   function writeJson(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+  }
+
+  function removeUserCache(userId) {
+    if (!userId || userId === 'guest') return;
+    try {
+      localStorage.removeItem(cacheKey(userId));
+      localStorage.removeItem(activeKey(userId));
+      localStorage.removeItem(syncKey(userId));
+    } catch (_) {}
   }
 
   function localConversations(userId) {
@@ -46,7 +47,10 @@
     var active = readJson(activeKey(userId), null);
     if (!active || !list.some(function (x) { return x.id === active; })) active = list[0] && list[0].id;
     if (active) {
-      try { localStorage.setItem(activeKey(userId), active); localStorage.setItem(ACTIVE_KEY, active); } catch (_) {}
+      try {
+        localStorage.setItem(activeKey(userId), active);
+        localStorage.setItem(ACTIVE_KEY, active);
+      } catch (_) {}
     }
     try { localStorage.setItem(OWNER_KEY, userId || 'guest'); } catch (_) {}
   }
@@ -63,8 +67,6 @@
     var owner = null;
     try { owner = localStorage.getItem(OWNER_KEY); } catch (_) {}
     if (owner !== (userId || 'guest')) {
-      // Never reuse another account's browser cache. This deliberately favors
-      // privacy over recovering ambiguous legacy data when ownership is unknown.
       clearSharedCache();
     }
   }
@@ -72,11 +74,16 @@
   function fingerprint(list) {
     try {
       return JSON.stringify((list || []).filter(function (c) { return !c.draft; }).map(function (c) {
-        return { id: c.id, title: c.title, slug: c.slug, createdAt: c.createdAt, updatedAt: c.updatedAt || 0, messages: c.messages || [] };
+        return {
+          id: c.id,
+          title: c.title,
+          slug: c.slug,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt || 0,
+          messages: c.messages || []
+        };
       }));
-    } catch (_) {
-      return '';
-    }
+    } catch (_) { return ''; }
   }
 
   function cleanAttachments(list) {
@@ -88,16 +95,12 @@
         dataUrl: '',
         textContent: a.kind === 'text' || a.kind === 'archive' ? String(a.textContent || '').slice(0, 30000) : ''
       };
-      // Keep the metadata but do not repeatedly upload large base64 payloads.
-      // Supabase Storage migration will replace this with object paths.
       if (a.dataUrl && String(a.dataUrl).length <= 180000) item.dataUrl = String(a.dataUrl);
       return item;
     });
   }
 
-  async function getUser() {
-    return window.LegendaryBackend.getUser();
-  }
+  async function getUser() { return window.LegendaryBackend.getUser(); }
 
   function messageId(convId, msg, index) {
     var existing = msg && msg.id;
@@ -170,7 +173,11 @@
     }
 
     if (changed || conflict) {
-      writeJson(syncKey(user.id), { fingerprint: fingerprint(list), snapshots: nextSnapshots, syncedAt: Date.now() });
+      writeJson(syncKey(user.id), {
+        fingerprint: fingerprint(list),
+        snapshots: nextSnapshots,
+        syncedAt: Date.now()
+      });
     }
     return { changed: changed, conflict: conflict };
   }
@@ -199,11 +206,7 @@
 
     var ids = (c.data || []).map(function (x) { return x.id; });
     if (!ids.length) {
-      // Only bootstrap cloud from a cache that is already explicitly owned by
-      // this account. Ambiguous legacy browser data was cleared above.
-      if (local.length) {
-        await uploadLocal(user).catch(function () {});
-      }
+      if (local.length) await uploadLocal(user).catch(function () {});
       return;
     }
 
@@ -236,8 +239,6 @@
     });
 
     if (localDirty) {
-      // Local changes that have not been synced must never be silently erased.
-      // Try to push them first; a stale-write conflict causes a remote reload.
       var pushed = await uploadLocal(user).catch(function () { return { conflict: true }; });
       if (!pushed.conflict) {
         window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
@@ -270,7 +271,6 @@
       var result = await uploadLocal(user);
       if (result && result.conflict) await loadCloud();
     } catch (_) {
-      // A transient cloud failure must never break local chat.
     } finally {
       syncing = false;
     }
@@ -283,7 +283,22 @@
 
   window.addEventListener('legendary:auth-changed', function () {
     clearTimeout(syncTimer);
-    setTimeout(loadCloud, 100);
+    var previousOwner = null;
+    try { previousOwner = localStorage.getItem(OWNER_KEY); } catch (_) {}
+    setTimeout(function () {
+      var currentUser = null;
+      try { currentUser = window.LegendaryBackend.getUser(); } catch (_) {}
+      var currentId = currentUser && currentUser.id;
+      if (!currentId && previousOwner && previousOwner !== 'guest') {
+        removeUserCache(previousOwner);
+        clearSharedCache();
+      } else if (currentId && previousOwner && previousOwner !== currentId) {
+        // A different account must never inherit the previous account's cache.
+        removeUserCache(previousOwner);
+        clearSharedCache();
+      }
+      loadCloud();
+    }, 100);
   });
 
   window.addEventListener('legendary:conversation-changed', function () {

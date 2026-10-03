@@ -6,15 +6,27 @@
   ],
   "headers": [
     {
-      "source": "/",
+      "source": "/(.*)",
       "headers": [
         {
-          "key": "Link",
-          "value": "</css/hero-v10.css>; rel=\"stylesheet\""
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net https://js.hcaptcha.com https://hcaptcha.com https://*.hcaptcha.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://ampddcztjvejwjirqoer.supabase.co wss://ampddcztjvejwjirqoer.supabase.co https://hcaptcha.com https://*.hcaptcha.com; frame-src 'self' https://hcaptcha.com https://*.hcaptcha.com; worker-src 'self' blob:; upgrade-insecure-requests"
         },
         {
-          "key": "Link",
-          "value": "</css/hero-v11-fix.css>; rel=\"stylesheet\""
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
         }
       ]
     },

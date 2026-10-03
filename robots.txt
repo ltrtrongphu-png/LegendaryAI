@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://legendaryai.vercel.app/sitemap.xml

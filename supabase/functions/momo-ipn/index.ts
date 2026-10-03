@@ -1,15 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 async function hmacSha256(secret: string, message: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
   return Array.from(new Uint8Array(signature)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json; charset=utf-8" }
   });
 }
+
 function timingSafeHexEqual(a: string, b: string): boolean {
   const aa = String(a || "").toLowerCase();
   const bb = String(b || "").toLowerCase();
@@ -24,15 +27,37 @@ function timingSafeHexEqual(a: string, b: string): boolean {
 Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
-  const body = await req.json().catch(() => null);
-  if (!body) return jsonResponse({ error: "Invalid JSON" }, 400);
+  const accessKey = Deno.env.get("MOMO_ACCESS_KEY") || "";
+  const secretKey = Deno.env.get("MOMO_SECRET_KEY") || "";
+  const configuredPartnerCode = Deno.env.get("MOMO_PARTNER_CODE") || "";
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-  const accessKey = Deno.env.get("MOMO_ACCESS_KEY")!;
-  const secretKey = Deno.env.get("MOMO_SECRET_KEY")!;
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+  // Never accept or verify an IPN when the signing configuration is incomplete.
+  // In particular, HMAC over the literal string "undefined" must never be valid.
+  if (!accessKey || !secretKey || !configuredPartnerCode || !supabaseUrl || !serviceRoleKey) {
+    console.error("momo-ipn: required server configuration is missing");
+    return jsonResponse({ error: "Payment service is temporarily unavailable" }, 503);
+  }
+
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return jsonResponse({ error: "Invalid JSON" }, 400);
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  if (body.partnerCode !== configuredPartnerCode) {
+    return jsonResponse({ error: "Invalid partnerCode" }, 401);
+  }
+
+  const requiredFields = [
+    "amount", "message", "orderId", "orderInfo", "orderType", "payType",
+    "requestId", "responseTime", "resultCode", "transId", "signature"
+  ];
+  for (const field of requiredFields) {
+    if (body[field] === undefined || body[field] === null) {
+      return jsonResponse({ error: `Missing IPN field: ${field}` }, 400);
+    }
+  }
 
   const signatureText =
     "accessKey=" + accessKey +
@@ -50,7 +75,7 @@ Deno.serve(async (req) => {
     "&transId=" + body.transId;
 
   const expected = await hmacSha256(secretKey, signatureText);
-  if (!body.signature || !timingSafeHexEqual(body.signature, expected)) {
+  if (!timingSafeHexEqual(body.signature, expected)) {
     return jsonResponse({ error: "Invalid signature" }, 401);
   }
 
@@ -61,11 +86,6 @@ Deno.serve(async (req) => {
     .single();
 
   if (orderError || !order) return jsonResponse({ error: "Order not found" }, 404);
-
-  const configuredPartnerCode = Deno.env.get("MOMO_PARTNER_CODE")!;
-  if (body.partnerCode !== configuredPartnerCode) {
-    return jsonResponse({ error: "Invalid partnerCode" }, 401);
-  }
 
   if (Number(body.amount) !== Number(order.amount)) {
     return jsonResponse({ error: "Amount mismatch" }, 400);

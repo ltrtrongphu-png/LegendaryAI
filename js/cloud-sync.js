@@ -3,24 +3,95 @@
   if (!window.LegendaryBackend || !window.LegendaryBackend.enabled) return;
 
   var sb = window.LegendaryBackend.client;
-  var CONV_KEY = 'legendaryai_conversations_v2';
+  var LEGACY_KEY = 'legendaryai_conversations_v2';
   var ACTIVE_KEY = 'legendaryai_active_conv_v2';
+  var OWNER_KEY = 'legendaryai_conv_owner_v3';
+  var CACHE_PREFIX = 'legendaryai_conversations_v3:';
+  var ACTIVE_PREFIX = 'legendaryai_active_conv_v3:';
+  var SYNC_PREFIX = 'legendaryai_sync_state_v3:';
   var syncing = false;
   var syncTimer = null;
 
-  function localConversations() {
-    try { return JSON.parse(localStorage.getItem(CONV_KEY) || '[]'); } catch (_) { return []; }
+  function cacheKey(userId) {
+    return CACHE_PREFIX + (userId || 'guest');
+  }
+  function activeKey(userId) {
+    return ACTIVE_PREFIX + (userId || 'guest');
+  }
+  function syncKey(userId) {
+    return SYNC_PREFIX + (userId || 'guest');
+  }
+
+  function readJson(key, fallback) {
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeJson(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+  }
+
+  function localConversations(userId) {
+    var list = readJson(cacheKey(userId), null);
+    return Array.isArray(list) ? list : [];
+  }
+
+  function mirrorToChatCache(userId, list) {
+    writeJson(cacheKey(userId), list);
+    writeJson(LEGACY_KEY, list);
+    var active = readJson(activeKey(userId), null);
+    if (!active || !list.some(function (x) { return x.id === active; })) active = list[0] && list[0].id;
+    if (active) {
+      try { localStorage.setItem(activeKey(userId), active); localStorage.setItem(ACTIVE_KEY, active); } catch (_) {}
+    }
+    try { localStorage.setItem(OWNER_KEY, userId || 'guest'); } catch (_) {}
+  }
+
+  function clearSharedCache() {
+    try {
+      localStorage.removeItem(LEGACY_KEY);
+      localStorage.removeItem(ACTIVE_KEY);
+      localStorage.removeItem(OWNER_KEY);
+    } catch (_) {}
+  }
+
+  function ensureIsolatedCache(userId) {
+    var owner = null;
+    try { owner = localStorage.getItem(OWNER_KEY); } catch (_) {}
+    if (owner !== (userId || 'guest')) {
+      // Never reuse another account's browser cache. This deliberately favors
+      // privacy over recovering ambiguous legacy data when ownership is unknown.
+      clearSharedCache();
+    }
+  }
+
+  function fingerprint(list) {
+    try {
+      return JSON.stringify((list || []).filter(function (c) { return !c.draft; }).map(function (c) {
+        return { id: c.id, title: c.title, slug: c.slug, createdAt: c.createdAt, updatedAt: c.updatedAt || 0, messages: c.messages || [] };
+      }));
+    } catch (_) {
+      return '';
+    }
   }
 
   function cleanAttachments(list) {
     return (list || []).map(function (a) {
-      return {
+      var item = {
         name: a.name || '',
         kind: a.kind || 'text',
         mediaType: a.mediaType || '',
-        dataUrl: (a.dataUrl && String(a.dataUrl).length <= 180000) ? String(a.dataUrl) : '',
+        dataUrl: '',
         textContent: a.kind === 'text' || a.kind === 'archive' ? String(a.textContent || '').slice(0, 30000) : ''
       };
+      // Keep the metadata but do not repeatedly upload large base64 payloads.
+      // Supabase Storage migration will replace this with object paths.
+      if (a.dataUrl && String(a.dataUrl).length <= 180000) item.dataUrl = String(a.dataUrl);
+      return item;
     });
   }
 
@@ -29,56 +100,96 @@
   }
 
   function messageId(convId, msg, index) {
-    return String(msg && msg.id || (String(convId) + ':legacy:' + index));
+    var existing = msg && msg.id;
+    if (existing) return String(existing);
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return String(convId) + ':legacy:' + index;
   }
 
-  async function uploadLocal(user) {
-    var list = localConversations().filter(function (conv) { return !conv.draft; });
-    if (!list.length) return;
+  function prepareConversation(conv) {
+    var now = Date.now();
+    var copy = Object.assign({}, conv);
+    copy.updatedAt = Number(conv.updatedAt || now);
+    copy.messages = (conv.messages || []).map(function (msg, index) {
+      return Object.assign({}, msg, {
+        id: messageId(conv.id, msg, index),
+        attachments: cleanAttachments(msg.attachments)
+      });
+    });
+    return copy;
+  }
 
-    var convRows = list.map(function (conv) {
+  async function syncConversation(user, conv) {
+    var prepared = prepareConversation(conv);
+    var payload = (prepared.messages || []).map(function (msg, index) {
       return {
-        id: String(conv.id),
+        id: messageId(prepared.id, msg, index),
+        conversation_id: String(prepared.id),
         user_id: user.id,
-        title: String(conv.title || 'Cuộc trò chuyện mới').slice(0, 200),
-        slug: conv.slug || null,
-        created_at: new Date(conv.createdAt || Date.now()).toISOString(),
-        updated_at: new Date().toISOString()
+        role: msg.role === 'ai' ? 'assistant' : msg.role,
+        content: String(msg.text || '').slice(0, 120000),
+        attachments: cleanAttachments(msg.attachments),
+        created_at: new Date((prepared.createdAt || Date.now()) + index).toISOString()
       };
     });
 
-    var cr = await sb.from('conversations').upsert(convRows, { onConflict: 'id' });
-    if (cr.error) throw cr.error;
+    var result = await sb.rpc('sync_conversation', {
+      p_id: String(prepared.id),
+      p_user_id: user.id,
+      p_title: String(prepared.title || 'Cuộc trò chuyện mới').slice(0, 200),
+      p_slug: prepared.slug || null,
+      p_created_at: new Date(prepared.createdAt || Date.now()).toISOString(),
+      p_updated_at: new Date(prepared.updatedAt).toISOString(),
+      p_messages: payload
+    });
+    if (result.error) throw result.error;
+    return result.data || { accepted: true };
+  }
 
-    // Replace each conversation's message set in one delete + one bulk upsert.
-    // This removes stale rows after regenerate/edit while avoiding one HTTP request per message.
+  async function uploadLocal(user) {
+    var list = localConversations(user.id).filter(function (conv) { return !conv.draft; });
+    if (!list.length) return { changed: false, conflict: false };
+
+    var state = readJson(syncKey(user.id), { fingerprint: '', snapshots: {} });
+    var changed = false;
+    var conflict = false;
+    var nextSnapshots = Object.assign({}, state.snapshots || {});
+
     for (var i = 0; i < list.length; i++) {
       var conv = list[i];
-      var del = await sb.from('messages').delete().eq('conversation_id', String(conv.id));
-      if (del.error) throw del.error;
+      var fp = fingerprint([conv]);
+      if (nextSnapshots[conv.id] === fp) continue;
 
-      var messages = (conv.messages || []).map(function (msg, index) {
-        return {
-          id: messageId(conv.id, msg, index),
-          conversation_id: String(conv.id),
-          user_id: user.id,
-          role: msg.role === 'ai' ? 'assistant' : msg.role,
-          content: String(msg.text || '').slice(0, 120000),
-          attachments: cleanAttachments(msg.attachments),
-          created_at: new Date((conv.createdAt || Date.now()) + index).toISOString()
-        };
-      });
-
-      if (messages.length) {
-        var mr = await sb.from('messages').insert(messages);
-        if (mr.error) throw mr.error;
+      var result = await syncConversation(user, conv);
+      if (result && result.accepted === false) {
+        conflict = true;
+        continue;
       }
+      nextSnapshots[conv.id] = fp;
+      changed = true;
     }
+
+    if (changed || conflict) {
+      writeJson(syncKey(user.id), { fingerprint: fingerprint(list), snapshots: nextSnapshots, syncedAt: Date.now() });
+    }
+    return { changed: changed, conflict: conflict };
   }
 
   async function loadCloud() {
     var user = await getUser();
-    if (!user) return;
+    var userId = user ? user.id : 'guest';
+    ensureIsolatedCache(userId);
+
+    if (!user) {
+      var guest = localConversations('guest');
+      mirrorToChatCache('guest', guest);
+      window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
+      return;
+    }
+
+    var local = localConversations(user.id);
+    var syncState = readJson(syncKey(user.id), { fingerprint: '', snapshots: {} });
+    var localDirty = syncState.fingerprint && syncState.fingerprint !== fingerprint(local);
 
     var c = await sb.from('conversations')
       .select('*')
@@ -88,7 +199,11 @@
 
     var ids = (c.data || []).map(function (x) { return x.id; });
     if (!ids.length) {
-      await uploadLocal(user).catch(function () {});
+      // Only bootstrap cloud from a cache that is already explicitly owned by
+      // this account. Ambiguous legacy browser data was cleared above.
+      if (local.length) {
+        await uploadLocal(user).catch(function () {});
+      }
       return;
     }
 
@@ -114,15 +229,25 @@
         title: row.title,
         slug: row.slug || '',
         createdAt: new Date(row.created_at).getTime(),
+        updatedAt: new Date(row.updated_at).getTime(),
         draft: false,
         messages: byId[row.id] || []
       };
     });
 
-    localStorage.setItem(CONV_KEY, JSON.stringify(remote));
-    if (!localStorage.getItem(ACTIVE_KEY) || !remote.some(function (x) { return x.id === localStorage.getItem(ACTIVE_KEY); })) {
-      localStorage.setItem(ACTIVE_KEY, remote[0].id);
+    if (localDirty) {
+      // Local changes that have not been synced must never be silently erased.
+      // Try to push them first; a stale-write conflict causes a remote reload.
+      var pushed = await uploadLocal(user).catch(function () { return { conflict: true }; });
+      if (!pushed.conflict) {
+        window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
+        return;
+      }
+      local = localConversations(user.id);
     }
+
+    mirrorToChatCache(user.id, remote);
+    writeJson(syncKey(user.id), { fingerprint: fingerprint(remote), snapshots: {}, syncedAt: Date.now() });
     window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
   }
 
@@ -131,6 +256,9 @@
     if (!user || !id) return;
     var result = await sb.from('conversations').delete().eq('id', String(id)).eq('user_id', user.id);
     if (result.error) throw result.error;
+    var list = localConversations(user.id).filter(function (conv) { return String(conv.id) !== String(id); });
+    mirrorToChatCache(user.id, list);
+    writeJson(syncKey(user.id), { fingerprint: fingerprint(list), snapshots: {}, syncedAt: Date.now() });
   }
 
   async function syncNow() {
@@ -139,7 +267,8 @@
     if (!user) return;
     syncing = true;
     try {
-      await uploadLocal(user);
+      var result = await uploadLocal(user);
+      if (result && result.conflict) await loadCloud();
     } catch (_) {
       // A transient cloud failure must never break local chat.
     } finally {
@@ -153,14 +282,14 @@
   });
 
   window.addEventListener('legendary:auth-changed', function () {
-    setTimeout(loadCloud, 400);
+    clearTimeout(syncTimer);
+    setTimeout(loadCloud, 100);
   });
 
   window.addEventListener('legendary:conversation-changed', function () {
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(syncNow, 500);
+    syncTimer = setTimeout(syncNow, 600);
   });
 
   setTimeout(loadCloud, 900);
-  setInterval(syncNow, 15000);
 })();

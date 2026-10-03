@@ -66,9 +66,7 @@
   function ensureIsolatedCache(userId) {
     var owner = null;
     try { owner = localStorage.getItem(OWNER_KEY); } catch (_) {}
-    if (owner !== (userId || 'guest')) {
-      clearSharedCache();
-    }
+    if (owner !== (userId || 'guest')) clearSharedCache();
   }
 
   function fingerprint(list) {
@@ -88,15 +86,13 @@
 
   function cleanAttachments(list) {
     return (list || []).map(function (a) {
-      var item = {
+      return {
         name: a.name || '',
         kind: a.kind || 'text',
         mediaType: a.mediaType || '',
         dataUrl: '',
         textContent: a.kind === 'text' || a.kind === 'archive' ? String(a.textContent || '').slice(0, 30000) : ''
       };
-      if (a.dataUrl && String(a.dataUrl).length <= 180000) item.dataUrl = String(a.dataUrl);
-      return item;
     });
   }
 
@@ -162,12 +158,8 @@
       var conv = list[i];
       var fp = fingerprint([conv]);
       if (nextSnapshots[conv.id] === fp) continue;
-
       var result = await syncConversation(user, conv);
-      if (result && result.accepted === false) {
-        conflict = true;
-        continue;
-      }
+      if (result && result.accepted === false) { conflict = true; continue; }
       nextSnapshots[conv.id] = fp;
       changed = true;
     }
@@ -198,10 +190,7 @@
     var syncState = readJson(syncKey(user.id), { fingerprint: '', snapshots: {} });
     var localDirty = syncState.fingerprint && syncState.fingerprint !== fingerprint(local);
 
-    var c = await sb.from('conversations')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false });
+    var c = await sb.from('conversations').select('*').eq('user_id', user.id).order('updated_at', { ascending: false });
     if (c.error) return;
 
     var ids = (c.data || []).map(function (x) { return x.id; });
@@ -210,10 +199,7 @@
       return;
     }
 
-    var m = await sb.from('messages')
-      .select('*')
-      .in('conversation_id', ids)
-      .order('created_at', { ascending: true });
+    var m = await sb.from('messages').select('*').in('conversation_id', ids).order('created_at', { ascending: true });
     if (m.error) return;
 
     var byId = {};
@@ -244,7 +230,6 @@
         window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
         return;
       }
-      local = localConversations(user.id);
     }
 
     mirrorToChatCache(user.id, remote);
@@ -285,19 +270,18 @@
     clearTimeout(syncTimer);
     var previousOwner = null;
     try { previousOwner = localStorage.getItem(OWNER_KEY); } catch (_) {}
-    setTimeout(function () {
+    setTimeout(async function () {
       var currentUser = null;
-      try { currentUser = window.LegendaryBackend.getUser(); } catch (_) {}
+      try { currentUser = await window.LegendaryBackend.getUser(); } catch (_) { currentUser = null; }
       var currentId = currentUser && currentUser.id;
       if (!currentId && previousOwner && previousOwner !== 'guest') {
         removeUserCache(previousOwner);
         clearSharedCache();
       } else if (currentId && previousOwner && previousOwner !== currentId) {
-        // A different account must never inherit the previous account's cache.
         removeUserCache(previousOwner);
         clearSharedCache();
       }
-      loadCloud();
+      await loadCloud();
     }, 100);
   });
 

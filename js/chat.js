@@ -2373,11 +2373,12 @@
   function rehydrateConversationsFromCloud() {
     var previousDraft = conversations.find(function (conv) { return conv.id === activeId && conv.draft; });
     var hasUnsavedComposer = Boolean(chatInput && chatInput.value.trim()) || pendingAttachments.length > 0;
-    var incoming = loadConversations();
+    var incoming = loadConversations().filter(function (conv) { return !conv.draft; });
     if (previousDraft && hasUnsavedComposer && !incoming.some(function (conv) { return conv.id === previousDraft.id; })) {
       incoming.unshift(previousDraft);
     }
-    conversations = incoming.length ? incoming : [makeNewConversation()];
+    if (!incoming.length) incoming = [previousDraft && hasUnsavedComposer ? previousDraft : makeNewConversation()];
+    conversations = incoming;
     ensureConversationSlugs();
 
     var desiredId = null;

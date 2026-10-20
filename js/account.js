@@ -250,12 +250,20 @@
     if (error) return setError(loginError, error);
     if (!authPolicyConsent || !authPolicyConsent.checked) return setError(authConsentError, 'Bạn cần đồng ý với Điều khoản sử dụng và Chính sách bảo mật trước khi tiếp tục với OAuth.');
     setError(authConsentError, null);
-    try { sessionStorage.setItem('legendaryai.pendingConsentVersion', '1.0.0'); } catch (e) {}
-    var r = await supabase.auth.signInWithOAuth({
-      provider: provider,
-      options: { redirectTo: window.location.origin + window.location.pathname }
-    });
-    if (r.error) { try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (e) {} setError(loginError, r.error.message); }
+    try {
+      sessionStorage.setItem('legendaryai.pendingConsentVersion', '1.0.0');
+      var result = await supabase.auth.signInWithOAuth({
+        provider: provider,
+        options: { redirectTo: window.location.origin + window.location.pathname }
+      });
+      if (result.error) {
+        try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (e) {}
+        setError(loginError, 'Không thể bắt đầu đăng nhập qua nhà cung cấp này. Hãy thử lại sau.');
+      }
+    } catch (_) {
+      try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (e) {}
+      setError(loginError, 'Không thể bắt đầu đăng nhập qua nhà cung cấp này. Hãy thử lại sau.');
+    }
   }
 
   if (googleBtn) googleBtn.addEventListener('click', function () { signInOAuth('google'); });
@@ -268,14 +276,19 @@
     if (!email) return setError(loginError, 'Hãy nhập email trước khi yêu cầu đặt lại mật khẩu.');
     forgotPasswordBtn.disabled = true;
     forgotPasswordBtn.textContent = 'Đang gửi…';
-    var r = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + window.location.pathname + '?reset=1'
-    });
-    forgotPasswordBtn.disabled = false;
-    forgotPasswordBtn.textContent = 'Quên mật khẩu?';
-    if (r.error) return setError(loginError, r.error.message);
+    try {
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname + '?reset=1'
+      });
+    } catch (_) {
+      // Do not surface provider-specific failures here: they can reveal whether
+      // an email is registered and may include implementation details.
+    } finally {
+      forgotPasswordBtn.disabled = false;
+      forgotPasswordBtn.textContent = 'Quên mật khẩu?';
+    }
     setError(loginError, null);
-    alert('Đã gửi email đặt lại mật khẩu. Hãy kiểm tra hộp thư của bạn.');
+    alert('Nếu email có tài khoản đủ điều kiện khôi phục, hướng dẫn sẽ được gửi. Hãy kiểm tra hộp thư đến và thư rác sau ít phút.');
   });
 
   if (resetForm) resetForm.addEventListener('submit', async function (e) {

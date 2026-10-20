@@ -153,7 +153,7 @@ create or replace function public.consume_tokens(p_amount integer, p_user_id uui
 returns boolean
 language plpgsql
 security definer set search_path = ''
-as $
+as $$
 declare
   uid uuid := coalesce(p_user_id, auth.uid());
   caller_uid uuid := auth.uid();
@@ -401,7 +401,7 @@ create or replace function public.refund_tokens(p_amount integer, p_user_id uuid
 returns boolean
 language plpgsql
 security definer set search_path = ''
-as $
+as $$
 declare
   uid uuid := coalesce(p_user_id, auth.uid());
   caller_uid uuid := auth.uid();
@@ -413,7 +413,7 @@ begin
    where id = uid;
   return found;
 end;
-$;
+$$;
 
 revoke all on function public.refund_tokens(integer, uuid) from public, anon, authenticated, service_role;
 -- Request-scoped refunds are defined by the forward migration; the legacy overload is intentionally disabled.
@@ -434,7 +434,7 @@ returns table (
 )
 language plpgsql
 security definer set search_path = ''
-as $
+as $$
 declare
   uid uuid := auth.uid();
   delta integer := coalesce(p_actual, 0) - coalesce(p_reserved, 0);
@@ -472,7 +472,7 @@ create table if not exists public.plans (
   reset_hours integer not null default 6 check (reset_hours > 0),
   reasoning_tier text not null default 'basic',
   default_model_key text,
-  model_tiers jsonb not null default '[\"free\"]'::jsonb,
+  model_tiers jsonb not null default '["free"]'::jsonb,
   capabilities jsonb not null default '{}'::jsonb,
   features jsonb not null default '[]'::jsonb,
   enabled boolean not null default true,

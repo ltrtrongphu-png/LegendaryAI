@@ -26,6 +26,54 @@ jobs:
       - name: Test app shell, deep links and legal pages in a browser
         run: node tests/e2e-smoke.mjs
 
+
+  postgres-integration:
+    name: PostgreSQL schema, RLS, payment and quota tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: legendaryai_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d legendaryai_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGDATABASE: legendaryai_test
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 22
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Check schema dollar-quoting and privileged RPC contracts
+        run: node tests/postgres-contract.test.mjs
+      - name: Create disposable Supabase auth/storage fixture
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/bootstrap.sql
+      - name: Execute repository schema on clean PostgreSQL 17
+        run: psql -v ON_ERROR_STOP=1 -f supabase/schema.sql
+      - name: Apply the latest hardening migration on PostgreSQL 17
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261020120000_legal_payment_retention_hardening.sql
+      - name: Exercise RLS, refund idempotency, and MoMo finalization
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/integration.sql
+      - name: Race two token reservations against one budget
+        run: bash tests/postgres/token-concurrency.sh
+
   regression:
     runs-on: ubuntu-latest
     steps:

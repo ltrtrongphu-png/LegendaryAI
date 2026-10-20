@@ -250,12 +250,20 @@
     if (error) return setError(loginError, error);
     if (!authPolicyConsent || !authPolicyConsent.checked) return setError(authConsentError, 'Bạn cần đồng ý với Điều khoản sử dụng và Chính sách bảo mật trước khi tiếp tục với OAuth.');
     setError(authConsentError, null);
-    try { sessionStorage.setItem('legendaryai.pendingConsentVersion', '1.0.0'); } catch (e) {}
-    var r = await supabase.auth.signInWithOAuth({
-      provider: provider,
-      options: { redirectTo: window.location.origin + window.location.pathname }
-    });
-    if (r.error) { try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (e) {} setError(loginError, r.error.message); }
+    try {
+      sessionStorage.setItem('legendaryai.pendingConsentVersion', '1.0.0');
+      var result = await supabase.auth.signInWithOAuth({
+        provider: provider,
+        options: { redirectTo: window.location.origin + window.location.pathname }
+      });
+      if (result.error) {
+        try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (e) {}
+        setError(loginError, 'Không thể bắt đầu đăng nhập qua nhà cung cấp này. Hãy thử lại sau.');
+      }
+    } catch (_) {
+      try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (e) {}
+      setError(loginError, 'Không thể bắt đầu đăng nhập qua nhà cung cấp này. Hãy thử lại sau.');
+    }
   }
 
   if (googleBtn) googleBtn.addEventListener('click', function () { signInOAuth('google'); });
@@ -268,14 +276,19 @@
     if (!email) return setError(loginError, 'Hãy nhập email trước khi yêu cầu đặt lại mật khẩu.');
     forgotPasswordBtn.disabled = true;
     forgotPasswordBtn.textContent = 'Đang gửi…';
-    var r = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + window.location.pathname + '?reset=1'
-    });
-    forgotPasswordBtn.disabled = false;
-    forgotPasswordBtn.textContent = 'Quên mật khẩu?';
-    if (r.error) return setError(loginError, r.error.message);
+    try {
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname + '?reset=1'
+      });
+    } catch (_) {
+      // Do not surface provider-specific failures here: they can reveal whether
+      // an email is registered and may include implementation details.
+    } finally {
+      forgotPasswordBtn.disabled = false;
+      forgotPasswordBtn.textContent = 'Quên mật khẩu?';
+    }
     setError(loginError, null);
-    alert('Đã gửi email đặt lại mật khẩu. Hãy kiểm tra hộp thư của bạn.');
+    alert('Nếu email có tài khoản đủ điều kiện khôi phục, hướng dẫn sẽ được gửi. Hãy kiểm tra hộp thư đến và thư rác sau ít phút.');
   });
 
   if (resetForm) resetForm.addEventListener('submit', async function (e) {
@@ -469,8 +482,27 @@
     try { await renderPlans(); } catch(e) { body.innerHTML='<p class="auth-error">'+escapeHtml(e.message)+'</p>'; }
   }
 
+  function clearAccountScopedCache(userId) {
+    try {
+      localStorage.removeItem('legendaryai_conversations_v2');
+      localStorage.removeItem('legendaryai_active_conv_v2');
+      if (userId) {
+        localStorage.removeItem('legendaryai_conversations_v3:' + userId);
+        localStorage.removeItem('legendaryai_active_conv_v3:' + userId);
+        localStorage.removeItem('legendaryai_sync_state_v3:' + userId);
+        if (localStorage.getItem('legendaryai_conv_owner_v3') === userId) {
+          localStorage.removeItem('legendaryai_conv_owner_v3');
+        }
+      }
+    } catch (_) {}
+  }
+
   async function signOut() {
-    if (supabase) await supabase.auth.signOut();
+    var previousUser = null;
+    try { previousUser = await LegendaryBackend.getUser(); } catch (_) {}
+    try { if (supabase) await supabase.auth.signOut(); } catch (_) {}
+    if (previousUser && !previousUser.is_anonymous) clearAccountScopedCache(previousUser.id);
+    try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (_) {}
     await renderAccountArea();
     window.dispatchEvent(new CustomEvent('legendary:auth-changed'));
   }
@@ -687,12 +719,21 @@
       if (!confirm('Thao tác này sẽ xóa tài khoản, hội thoại, memory và dữ liệu gắn với tài khoản. Bản ghi giao dịch/chấp thuận có thể được giữ lại theo chính sách. Bạn có chắc muốn tiếp tục?')) return;
       var password = prompt('Nhập mật khẩu tài khoản để xác minh lại. Tài khoản chỉ dùng OAuth có thể cần hỗ trợ thủ công.');
       if (!password) return;
+      var deletedUser = null;
+      try { deletedUser = await LegendaryBackend.getUser(); } catch (_) {}
       deleteAccountBtn.disabled = true;
-      var result = await window.LegendaryBackend.accountData('delete', { password: password });
+      let result;
+      try {
+        result = await window.LegendaryBackend.accountData('delete', { password: password });
+      } catch (_) {
+        deleteAccountBtn.disabled = false;
+        return alert('Không thể hoàn tất yêu cầu xóa lúc này. Hãy thử lại sau.');
+      }
       deleteAccountBtn.disabled = false;
       if (result.error || !result.data || !result.data.ok) return alert((result.data && result.data.error) || (result.error && result.error.message) || 'Không thể xóa tài khoản.');
-      if (supabase) await supabase.auth.signOut();
-      try { localStorage.removeItem('legendaryai_conversations_v2'); localStorage.removeItem('legendaryai_active_conv_v2'); } catch (e) {}
+      await signOut();
+      if (deletedUser && !deletedUser.is_anonymous) clearAccountScopedCache(deletedUser.id);
+      try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (_) {}
       alert(result.data.attachment_cleanup_pending ? 'Tài khoản đã xóa; một số tệp có thể cần được dọn thủ công.' : 'Tài khoản đã được xóa.');
       window.location.href = '/';
     });
@@ -813,12 +854,15 @@
   });
 
   if (supabase) {
-    supabase.auth.onAuthStateChange(function (_event) {
-      // Update account UI and notify the chat HUD after the profile is ready.
-      // This prevents the token pill from getting stuck at "—" after login.
+    supabase.auth.onAuthStateChange(function (event) {
+      // Keep user-scoped chat cache/UI isolated through OAuth redirects, normal
+      // sign-in and sign-out, even when no button handler is active on this page.
       setTimeout(async function () {
         await renderAccountArea();
         window.dispatchEvent(new CustomEvent('legendary:profile-ready'));
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+          window.dispatchEvent(new CustomEvent('legendary:auth-changed', { detail: { authEvent: event } }));
+        }
       }, 0);
     });
   }

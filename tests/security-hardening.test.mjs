@@ -39,7 +39,8 @@ assert.match(retiredChat, /CHAT_ROUTE_RETIRED/, "retired ai-chat-v9 must fail cl
 assert.match(retiredChat, /ORIGIN_NOT_ALLOWED/, "retired ai-chat-v9 must not echo arbitrary Origin values");
 assert.match(chat, /LEGENDARY_LOCAL_AI_TOKEN/, "local inference must use the server-side bearer token");
 assert.match(chat, /MODEL_UNAVAILABLE/, "explicit local-model selection must not be silently relabelled as Native Core");
-assert.match(chat, /remaining<inputTokens\+256/, "generation must be bounded by remaining token budget");
+assert.match(chat, /planTokenReservation\(inputTokens,max,remaining\)/, "generation must be bounded by the remaining token budget helper");
+assert.match(chat, /localReservation=reservationPlan\.reservedTokens/, "quota reserve must use the capped reservation plan");
 assert.match(chat, /p_request_id:reservationId,p_reserved:localReservation/, "active chat refunds must be request-scoped");
 assert.match(legacyChat, /p_request_id: reservationId, p_reserved: reservation/, "legacy chat must use the current refund contract");
 assert.match(health, /Authorization: `Bearer \$\{gatewayToken\}`/, "health check must authenticate to the private gateway");

@@ -1,5 +1,15 @@
 # LegendaryAI Changelog
 
+## 1.3.3 — Quota and cache correctness (2026-10-20)
+- Apply independent per-user and per-client-IP rate buckets; prefer the edge-injected client IP header while retaining per-user protection against forwarded-header spoofing.
+- Isolate shared model-response cache entries by user and charge/cache-log estimated input/output tokens on cache hits.
+- Reserve token budget for Native Core and fallback responses as well as local/Hugging Face inference, cap response text to the reserved output budget, and settle usage consistently across routes. Include the system prompt and relevant recalled-memory instructions in the estimated input budget.
+- Persist explicitly requested memories only after a usable answer and quota settlement, filter likely credentials/OTP, and avoid exact duplicate memory rows.
+- Make password-reset responses generic to avoid account enumeration, and catch OAuth provider/network errors while clearing pending consent state.
+- Rehydrate the chat UI after cloud sync, clear the previous user's in-memory prompt/attachments on auth changes, and remove user-scoped localStorage when signing out or deleting an account.
+- Add deterministic tests for token reservation bounds, per-key rate limits, cache isolation/accounting, output caps, and memory side-effect ordering.
+- Update the draft token policy to disclose the approximate 1-token-per-4-character accounting and that Native Core, fallback, and cache-hit responses also consume quota.
+
 ## 1.3.2 — PostgreSQL verification (2026-10-20)
 - Fixed invalid dollar-quote delimiters in the repository SQL schema that prevented token RPC functions from parsing on a clean PostgreSQL database.
 - Fixed an escaped JSON default for the dynamic plan model tiers that PostgreSQL rejected when creating the clean schema.

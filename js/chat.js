@@ -152,12 +152,18 @@
     return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   }
   var activeController = null;
+  var activeTyping = null;
   var pendingAttachments = [];
 
   function abortActiveResponse() {
     var controller = activeController;
+    var typing = activeTyping;
     activeController = null;
+    activeTyping = null;
     if (controller) controller.abort();
+    if (typing && typing.bubble && typing.wrap && typing.wrap.isConnected) {
+      setErrorBubble(typing, 'Đã dừng phản hồi.');
+    }
     toggleBusyUI(false);
     if (streamStatus) streamStatus.textContent = '';
   }
@@ -1782,6 +1788,7 @@
 
     var controller = new AbortController();
     activeController = controller;
+    activeTyping = typing;
     toggleBusyUI(true);
 
     if (streamStatus) {
@@ -1806,6 +1813,7 @@
       fitChatPayload(requestOptions);
     } catch (error) {
       if (activeController === controller) activeController = null;
+      if (activeTyping === typing) activeTyping = null;
       toggleBusyUI(false);
       if (streamStatus) streamStatus.textContent = '';
       setErrorBubble(typing, error && error.message ? error.message : 'Dữ liệu gửi lên vượt giới hạn.');
@@ -1818,6 +1826,7 @@
         typing.raw = result.text || '';
 
         finalizeAiBubble(typing);
+        if (activeTyping === typing) activeTyping = null;
 
         if (activeController === controller) toggleBusyUI(false);
 
@@ -1843,6 +1852,7 @@
       })
       .catch(function (err) {
         if (activeController !== controller) return;
+        if (activeTyping === typing) activeTyping = null;
         if (err && err.name === 'AbortError') {
           setErrorBubble(typing, 'Đã dừng phản hồi.');
         } else {
@@ -1938,11 +1948,7 @@
     stopBtn.addEventListener(
       'click',
       function () {
-        if (activeController) {
-          activeController.abort();
-        }
-
-        toggleBusyUI(false);
+        abortActiveResponse();
       }
     );
   }
@@ -2370,8 +2376,46 @@
   renderSidebar();
   renderMessages();
 
+  function rehydrateConversationsFromCloud() {
+    var previousDraft = conversations.find(function (conv) { return conv.id === activeId && conv.draft; });
+    var hasUnsavedComposer = Boolean(chatInput && chatInput.value.trim()) || pendingAttachments.length > 0;
+    var incoming = loadConversations().filter(function (conv) { return !conv.draft; });
+    if (previousDraft && hasUnsavedComposer && !incoming.some(function (conv) { return conv.id === previousDraft.id; })) {
+      incoming.unshift(previousDraft);
+    }
+    if (!incoming.length) incoming = [previousDraft && hasUnsavedComposer ? previousDraft : makeNewConversation()];
+    conversations = incoming;
+    ensureConversationSlugs();
+
+    var desiredId = null;
+    try { desiredId = localStorage.getItem(ACTIVE_KEY); } catch (_) {}
+    if (desiredId && conversations.some(function (conv) { return conv.id === desiredId; })) {
+      activeId = desiredId;
+    } else if (previousDraft && hasUnsavedComposer && conversations.some(function (conv) { return conv.id === previousDraft.id; })) {
+      activeId = previousDraft.id;
+    } else {
+      activeId = conversations[0].id;
+    }
+    persistActiveId();
+    renderSidebar();
+    renderMessages();
+    syncRouteForConversation(getActiveConv(), true);
+  }
+
+  // cloud-sync writes the authoritative user-scoped cache before this event.
+  // Rehydrate it so new devices show remote history and account switches never
+  // leave the previous account's conversations in the in-memory chat UI.
+  window.addEventListener('legendary:cloud-synced', rehydrateConversationsFromCloud);
+
   window.addEventListener('legendary:auth-changed', function () {
     abortActiveResponse();
+    pendingAttachments = [];
+    if (chatInput) chatInput.value = '';
+    renderAttachPreview();
+    conversations = [makeNewConversation()];
+    activeId = conversations[0].id;
+    renderSidebar();
+    renderMessages();
     syncEngineModelAccess();
   });
 

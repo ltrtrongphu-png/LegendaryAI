@@ -69,8 +69,12 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/schema.sql
       - name: Apply the latest hardening migration on PostgreSQL 17
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261020120000_legal_payment_retention_hardening.sql
+      - name: Apply shared rate-limit migration on PostgreSQL 17
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261020150000_global_rate_limit_hardening.sql
       - name: Exercise RLS, refund idempotency, and MoMo finalization
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/integration.sql
+      - name: Exercise database-backed rate limits
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/rate-limit.sql
       - name: Race two token reservations against one budget
         run: bash tests/postgres/token-concurrency.sh
 
@@ -99,6 +103,10 @@ jobs:
         run: node tests/cloud-sync-integration.test.mjs
       - name: Legal routes and consent regression
         run: node tests/legal-routes.test.mjs
+      - name: Auth privacy and OAuth failure contract
+        run: node tests/auth-privacy-contract.test.mjs
+      - name: Chat auth/cache isolation contract
+        run: node tests/chat-auth-cache-contract.test.mjs
       - name: Current-tree secret scan
         run: node tests/secret-scan.test.mjs
       - name: Git history secret scan
@@ -113,6 +121,8 @@ jobs:
         run: deno test --allow-read tests/brain-native-core.test.mjs tests/plan-capabilities.test.mjs
       - name: Model runtime contract
         run: deno test tests/model-runtime-contract.test.mjs
+      - name: Chat quota/cache and memory side-effect contract
+        run: node tests/chat-quota-contract.test.mjs
       - name: MoMo HMAC/signature canonicalization test vectors
         run: deno test tests/momo-signature.test.mjs
       - name: WebGL reduced-motion and cleanup regression

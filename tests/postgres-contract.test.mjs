@@ -13,4 +13,9 @@ assert.match(migration, /primary key \(user_id, reservation_id\)/i, "refund ledg
 assert.match(migration, /for update/i, "payment finalization must take a row lock");
 assert.match(migration, /p_request_id <> v_order\.provider_request_id/i, "payment finalization must bind request ID to the order");
 assert.match(migration, /orders_provider_transaction_id_uidx/i, "provider transaction ID must be unique");
+const rateMigration = readFileSync("supabase/migrations/20261020150000_global_rate_limit_hardening.sql", "utf8");
+assert.match(rateMigration, /create table if not exists public\\.api_rate_limit_buckets/i, "database rate-limit storage must exist");
+assert.match(rateMigration, /pg_advisory_xact_lock/i, "concurrent rate checks must serialize by key");
+assert.match(rateMigration, /grant execute on function public\\.check_api_rate_limit\\(text, timestamptz, integer, integer, integer\\)\\s+to service_role/i, "database rate-limit RPC must be service-role-only");
+assert.match(rateMigration, /updated_at < p_now - interval '1 hour'/i, "expired rate-limit keys must be pruned");
 console.log("postgres-contract: schema quoting and security invariants passed");

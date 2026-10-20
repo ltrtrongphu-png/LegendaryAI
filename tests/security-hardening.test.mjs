@@ -54,6 +54,7 @@ assert.match(momoCreate, /momoCreateSignatureText\(/, "payment creation must use
 assert.match(momoIpn, /momoIpnSignatureText\(/, "IPN verification must use tested canonical signature text");
 assert.match(momoIpn, /timingSafeHexEqual\(/, "IPN verification must use timing-safe comparison");
 assert.match(createPayment, /PAYMENT_MODEL_UNAVAILABLE/, "paid checkout must fail closed when model is unavailable");
+assert.match(createPayment, /\.eq\("provider_order_id", orderId\)\.eq\("status", "pending"\)/, "a late initiation failure must not overwrite an already-paid order");
 assert.doesNotMatch(createPayment, /MOMO_ENDPOINT.*test-payment\.momo\.vn/, "payment endpoint must not silently default to MoMo sandbox");
 assert.match(ipn, /body\.requestId.*order\.provider_request_id|body\.requestId\) !== String\(order\.provider_request_id/, "IPN must bind requestId to persisted order");
 assert.match(ipn, /Order metadata mismatch/, "successful IPN must bind signed user/plan metadata");

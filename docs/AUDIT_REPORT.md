@@ -200,3 +200,10 @@ A follow-up inspection found invalid single-dollar delimiters in three functions
 ## 14. Quota/cache follow-up (2026-10-20)
 
 The next code phase closes an application-level quota bypass where Native Core/fallback responses and cached replies did not call the atomic token-reservation RPC. Cache entries are now keyed by authenticated user, cache-hit estimated input/output tokens are charged and logged, fresh requests reserve budget before any route, native output is capped to the reserved budget, and all routes settle estimates consistently. Independent user/IP rate-limit buckets replace the prior combined `userId:IP` bucket, and explicit memory insertion is moved to after a usable response and quota settlement with exact-duplicate and credential-pattern checks. These are automated contract tests, not a measured live gateway or distributed limiter; the in-memory limiter resets across Edge Function isolates and should eventually be backed by a shared atomic store for strict cross-instance enforcement.
+
+
+## 15. Account/session cache isolation (2026-10-20)
+
+- The chat UI now rehydrates conversation state when the cloud-sync layer finishes loading, fixing cases where a new device had remote history in localStorage but the already-initialized in-memory UI never refreshed.
+- On sign-in/sign-out notifications the chat aborts active requests, clears the composer and pending attachments, and immediately replaces the previous in-memory history. Once cloud sync finishes, it renders the currently authenticated user's authoritative scoped cache.
+- Normal sign-out and account deletion remove the user's v3 conversation/active/sync localStorage keys plus the legacy shared cache. OAuth redirect sign-in/sign-out events also notify cloud sync. Static contract coverage lives in tests/chat-auth-cache-contract.test.mjs; browser smoke still does not simulate multi-account authentication end to end.

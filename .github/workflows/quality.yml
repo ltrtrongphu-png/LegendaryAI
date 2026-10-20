@@ -48,6 +48,8 @@ jobs:
         run: node tests/brain-native-core.test.mjs
       - name: Regression test background rendering lifecycle
         run: node tests/bg3d-runtime.test.mjs
+      - name: Regression test chat quota/cache and memory side effects
+        run: node tests/chat-quota-contract.test.mjs
       - name: Regression test chat rendering security
         run: node tests/chat-security.test.mjs
       - name: Regression test cloud synchronization races

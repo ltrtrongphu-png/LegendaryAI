@@ -11,6 +11,8 @@ const generationSection = source.slice(endCache);
 assert.match(cacheSection, /userId:authData\.user\.id/, "shared cache entries must be isolated by authenticated user");
 assert.match(cacheSection, /await admin\.rpc\("consume_tokens"/, "cache hits must debit token quota too");
 assert.match(cacheSection, /input_tokens:cachedInputTokens/, "cache-hit usage must record input tokens");
+assert.match(cacheSection, /approxTokens\(buildModelSystemPrompt\(system\)/, "cache-hit estimate must count system instructions and recalled memory");
+assert.match(generationSection, /const inputTokens=approxTokens\(buildModelSystemPrompt\(system\)/, "fresh request estimate must count system instructions and recalled memory");
 assert.match(cacheSection, /output_tokens:cachedOutputTokens/, "cache-hit usage must record output tokens");
 assert.match(source, /const reservationPlan=planTokenReservation\(inputTokens,max,remaining\)/, "fresh responses must reserve an atomic, balance-capped token budget");
 assert.match(generationSection, /localReservation=reservationPlan\.reservedTokens/, "reservation must become active only after successful RPC");

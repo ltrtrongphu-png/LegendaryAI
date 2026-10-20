@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 
 const ROOT = process.cwd();

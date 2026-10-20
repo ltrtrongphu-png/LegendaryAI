@@ -382,6 +382,8 @@
   });
 
   window.addEventListener('legendary:auth-changed', function () {
+    // Invalidate requests immediately; the auth lookup below is intentionally delayed.
+    loadSequence += 1;
     clearTimeout(syncTimer);
     var previousOwner = null;
     try { previousOwner = localStorage.getItem(OWNER_KEY); } catch (_) {}

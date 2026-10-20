@@ -9,7 +9,9 @@
   var CACHE_PREFIX = 'legendaryai_conversations_v3:';
   var ACTIVE_PREFIX = 'legendaryai_active_conv_v3:';
   var SYNC_PREFIX = 'legendaryai_sync_state_v3:';
-  var syncing = false;
+  var syncingUsers = Object.create(null);
+  var queuedSyncUsers = Object.create(null);
+  var loadSequence = 0;
   var syncTimer = null;
 
   function cacheKey(userId) { return CACHE_PREFIX + (userId || 'guest'); }
@@ -175,12 +177,16 @@
   }
 
   async function loadCloud() {
-    var user = await getUser();
+    var sequence = ++loadSequence;
+    var user;
+    try { user = await getUser(); } catch (_) { return; }
+    if (sequence !== loadSequence) return;
     var userId = user ? user.id : 'guest';
     ensureIsolatedCache(userId);
 
     if (!user) {
       var guest = localConversations('guest');
+      if (sequence !== loadSequence) return;
       mirrorToChatCache('guest', guest);
       window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
       return;
@@ -191,15 +197,19 @@
     var localDirty = syncState.fingerprint && syncState.fingerprint !== fingerprint(local);
 
     var c = await sb.from('conversations').select('*').eq('user_id', user.id).order('updated_at', { ascending: false });
+    if (sequence !== loadSequence) return;
     if (c.error) return;
 
     var ids = (c.data || []).map(function (x) { return x.id; });
     if (!ids.length) {
       if (local.length) await uploadLocal(user).catch(function () {});
+      if (sequence !== loadSequence) return;
+      window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
       return;
     }
 
     var m = await sb.from('messages').select('*').in('conversation_id', ids).order('created_at', { ascending: true });
+    if (sequence !== loadSequence) return;
     if (m.error) return;
 
     var byId = {};
@@ -226,18 +236,43 @@
 
     if (localDirty) {
       var pushed = await uploadLocal(user).catch(function () { return { conflict: true }; });
+      if (sequence !== loadSequence) return;
       if (!pushed.conflict) {
         window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
         return;
       }
+      // Keep the local working copy on conflict rather than silently overwriting
+      // edits made offline. Bring down cloud-only conversations, notify the UI,
+      // and let a subsequent local mutation create a newer sync version.
+      var localIds = Object.create(null);
+      local.forEach(function (conv) { localIds[String(conv.id)] = true; });
+      var preserved = local.concat(remote.filter(function (conv) { return !localIds[String(conv.id)]; }));
+      var nextSnapshots = {};
+      preserved.forEach(function (conv) { nextSnapshots[conv.id] = fingerprint([conv]); });
+      mirrorToChatCache(user.id, preserved);
+      writeJson(syncKey(user.id), {
+        fingerprint: fingerprint(preserved),
+        snapshots: nextSnapshots,
+        conflictAt: Date.now(),
+        syncedAt: Date.now()
+      });
+      window.dispatchEvent(new CustomEvent('legendary:sync-conflict', {
+        detail: { userId: user.id, count: local.filter(function (conv) {
+          return remote.some(function (cloud) { return String(cloud.id) === String(conv.id); });
+        }).length }
+      }));
+      return;
     }
 
+    if (sequence !== loadSequence) return;
     mirrorToChatCache(user.id, remote);
     writeJson(syncKey(user.id), { fingerprint: fingerprint(remote), snapshots: {}, syncedAt: Date.now() });
     window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
   }
 
   async function deleteCloudConversation(id) {
+    // Invalidates an in-flight cloud read so it can't resurrect a deleted thread.
+    loadSequence += 1;
     var user = await getUser();
     if (!user || !id) return;
     var result = await sb.from('conversations').delete().eq('id', String(id)).eq('user_id', user.id);
@@ -248,16 +283,24 @@
   }
 
   async function syncNow() {
-    if (syncing) return;
     var user = await getUser();
     if (!user) return;
-    syncing = true;
+    var userKey = String(user.id);
+    if (syncingUsers[userKey]) {
+      queuedSyncUsers[userKey] = true;
+      return;
+    }
+    syncingUsers[userKey] = true;
     try {
       var result = await uploadLocal(user);
       if (result && result.conflict) await loadCloud();
     } catch (_) {
     } finally {
-      syncing = false;
+      delete syncingUsers[userKey];
+      if (queuedSyncUsers[userKey]) {
+        delete queuedSyncUsers[userKey];
+        setTimeout(syncNow, 0);
+      }
     }
   }
 

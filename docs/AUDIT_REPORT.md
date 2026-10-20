@@ -1,7 +1,7 @@
 # LegendaryAI — Audit report (consolidated)
 
 **Audit date:** 2026-10-20  
-**Release candidate:** 1.3.0  
+**Release candidate:** 1.3.2  
 **Repository:** `ltrtrongphu-png/LegendaryAI`  
 **Status:** code and documentation hardening prepared in PR #19; production deployment, live secrets, hosted database migrations, MoMo sandbox, and live inference remain unverified. This report does not claim production readiness.
 
@@ -190,3 +190,8 @@ The follow-up PR also hardens user-controlled content and local/cloud synchroniz
 - CI tests cover the core contracts in tests/chat-security.test.mjs and tests/cloud-sync-runtime.test.mjs; the Playwright smoke test covers application-shell/deep-link/policy-route rendering only. An in-memory Supabase contract simulator in tests/cloud-sync-integration.test.mjs exercises a newer cloud revision conflict, separate preservation of both bodies, offline-only conversation upload, reload persistence and a later deliberate local edit. It is not a real PostgreSQL/RLS test.
 
 Remaining limitation: these sync/browser checks are contract/static regressions, not multi-tab stress tests or authenticated tests against a staged database. Provider, database, legal-operator and retention actions in section 10 remain open and require the operator environment.
+
+
+## 13. PostgreSQL CI validation added (2026-10-20)
+
+A follow-up inspection found invalid single-dollar delimiters in three functions in `supabase/schema.sql` (`consume_tokens`, the retired legacy `refund_tokens` overload, and `finalize_tokens`). Those delimiters have been corrected to valid `$$` blocks. A PostgreSQL 17 GitHub Actions job now initializes only a disposable fixture for the minimum `auth`/`storage` interfaces, executes `supabase/schema.sql` from an empty database, applies the latest hardening migration, then tests RLS isolation between user A/user B, direct-client denial of privileged quota RPCs, cumulative/idempotent refunds, MoMo finalization/idempotency, and a concurrent token-reservation race. The job has not yet been verified until it completes on this branch; even a pass is not a production Supabase migration or MoMo-provider test.

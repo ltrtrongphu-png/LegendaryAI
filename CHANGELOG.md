@@ -6,6 +6,7 @@
 - Reserve token budget for Native Core and fallback responses as well as local/Hugging Face inference, cap response text to the reserved output budget, and settle usage consistently across routes.
 - Persist explicitly requested memories only after a usable answer and quota settlement, filter likely credentials/OTP, and avoid exact duplicate memory rows.
 - Add deterministic tests for token reservation bounds, per-key rate limits, cache isolation/accounting, output caps, and memory side-effect ordering.
+- Update the draft token policy to disclose the approximate 1-token-per-4-character accounting and that Native Core, fallback, and cache-hit responses also consume quota.
 
 ## 1.3.2 — PostgreSQL verification (2026-10-20)
 - Fixed invalid dollar-quote delimiters in the repository SQL schema that prevented token RPC functions from parsing on a clean PostgreSQL database.

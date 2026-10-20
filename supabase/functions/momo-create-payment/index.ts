@@ -81,14 +81,41 @@ Deno.serve(async (req) => {
     .select("provider,model_id,enabled")
     .eq("key", String((plan as any).default_model_key || ""))
     .maybeSingle();
-  const localGateway = Deno.env.get("LEGENDARY_LOCAL_AI_URL") || "";
-  if (!modelForPlan || !modelForPlan.enabled ||
-      (modelForPlan.provider === "local" && !localGateway) ||
-      (modelForPlan.provider === "ollama-compatible" && !localGateway)) {
+  const localGateway = (Deno.env.get("LEGENDARY_LOCAL_AI_URL") || "").replace(/\/$/, "");
+  const localGatewayToken = Deno.env.get("LEGENDARY_LOCAL_AI_TOKEN") || "";
+  if (!modelForPlan || !modelForPlan.enabled) {
     return cors({
       error: "Thanh toán gói trả phí đang tạm đóng vì AI model production chưa được bật. Không thu tiền khi tính năng chưa sẵn sàng.",
       code: "PAYMENT_TEMPORARILY_DISABLED"
     }, 503, req);
+  }
+
+  if (modelForPlan.provider === "local" || modelForPlan.provider === "ollama-compatible") {
+    if (!localGateway || !localGatewayToken) {
+      return cors({ error: "Model tự host chưa được cấu hình đầy đủ; thanh toán đang tạm đóng.", code: "PAYMENT_MODEL_NOT_CONFIGURED" }, 503, req);
+    }
+    const healthController = new AbortController();
+    const healthTimer = setTimeout(() => healthController.abort(), 4000);
+    try {
+      const healthResponse = await fetch(localGateway + "/api/tags", {
+        headers: { Authorization: "Bearer " + localGatewayToken },
+        signal: healthController.signal
+      });
+      if (!healthResponse.ok) throw new Error("MODEL_GATEWAY_UNHEALTHY");
+      const payload: any = await healthResponse.json();
+      const models = Array.isArray(payload?.models) ? payload.models : [];
+      const desired = String(modelForPlan.model_id || "").trim();
+      const modelPresent = desired && models.some((item: any) => {
+        const name = String(item?.name || item?.model || "").trim();
+        return name === desired || name === desired + ":latest";
+      });
+      if (!modelPresent) throw new Error("MODEL_NOT_INSTALLED");
+    } catch {
+      console.error("momo-create-payment: selected model readiness check failed");
+      return cors({ error: "Model đang không sẵn sàng; chưa tạo đơn thanh toán. Vui lòng thử lại sau.", code: "PAYMENT_MODEL_UNAVAILABLE" }, 503, req);
+    } finally {
+      clearTimeout(healthTimer);
+    }
   }
 
   const { error: insertError } = await admin.from("orders").insert({

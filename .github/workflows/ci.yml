@@ -7,6 +7,25 @@ on:
     branches: [main]
 
 jobs:
+  browser-smoke:
+    name: Playwright browser smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 22
+      - name: Install pinned Playwright
+        run: npm install --no-save --package-lock=false playwright@1.64.1
+      - name: Install Chromium
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Test app shell, deep links and legal pages in a browser
+        run: node tests/e2e-smoke.mjs
+
   regression:
     runs-on: ubuntu-latest
     steps:
@@ -24,6 +43,12 @@ jobs:
         run: node tests/cors-origin-policy.test.mjs
       - name: Security hardening regression
         run: node tests/security-hardening.test.mjs
+      - name: Chat rendering security and attachment bounds
+        run: node tests/chat-security.test.mjs
+      - name: Cloud sync conflict/race regression
+        run: node tests/cloud-sync-runtime.test.mjs
+      - name: Cloud sync conflict and offline recovery integration
+        run: node tests/cloud-sync-integration.test.mjs
       - name: Legal routes and consent regression
         run: node tests/legal-routes.test.mjs
       - name: Current-tree secret scan
@@ -40,6 +65,10 @@ jobs:
         run: deno test --allow-read tests/brain-native-core.test.mjs tests/plan-capabilities.test.mjs
       - name: Model runtime contract
         run: deno test tests/model-runtime-contract.test.mjs
+      - name: MoMo HMAC/signature canonicalization test vectors
+        run: deno test tests/momo-signature.test.mjs
+      - name: WebGL reduced-motion and cleanup regression
+        run: node tests/bg3d-runtime.test.mjs
       - name: Type-check ai-chat-v10
         run: deno check supabase/functions/ai-chat-v10/index.ts
       - name: Type-check local model health function

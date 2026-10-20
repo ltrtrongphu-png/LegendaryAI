@@ -1,4 +1,9 @@
 (function () {
+  var ChatSafety = window.LegendaryChatSafety;
+  if (!ChatSafety) {
+    console.error('LegendaryAI: chat safety helpers failed to load; chat initialization stopped.');
+    return;
+  }
   var chatApp = document.getElementById('chatApp');
   var chatSidebar = document.getElementById('chatSidebar');
   var sidebarToggle = document.getElementById('sidebarToggle');
@@ -148,6 +153,14 @@
   }
   var activeController = null;
   var pendingAttachments = [];
+
+  function abortActiveResponse() {
+    var controller = activeController;
+    activeController = null;
+    if (controller) controller.abort();
+    toggleBusyUI(false);
+    if (streamStatus) streamStatus.textContent = '';
+  }
 
   // External AI provider configuration intentionally removed: Legendary Engine only.
 
@@ -434,12 +447,19 @@
     );
   }
 
+  function touchConversation(conv) {
+    if (!conv) return;
+    conv.updatedAt = Math.max(Date.now(), Number(conv.updatedAt || 0) + 1);
+  }
+
   function makeNewConversation() {
+    var now = Date.now();
     return {
       id: uid(),
       title: 'Cuộc trò chuyện mới',
       slug: 'cuoc-tro-chuyen',
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       draft: true,
       messages: [
         {
@@ -536,6 +556,7 @@
           .join(' ') || 'Cuộc trò chuyện mới',
         slug: requestedSlug,
         createdAt: Date.now(),
+        updatedAt: Date.now(),
         messages: [{
           id: messageUid(),
           role: 'ai',
@@ -697,6 +718,7 @@
   }
 
   function newConversation() {
+    abortActiveResponse();
     var conv = makeNewConversation();
 
     conversations.unshift(conv);
@@ -718,6 +740,7 @@
       return;
     }
 
+    abortActiveResponse();
     activeId = id;
 
     persistActiveId();
@@ -743,6 +766,7 @@
       return;
     }
 
+    if (activeId === id) abortActiveResponse();
     conversations.splice(idx, 1);
 
     if (!conversations.length) {
@@ -771,6 +795,7 @@
       'Cuộc trò chuyện mới';
 
     uniqueConversationSlug(conv);
+    touchConversation(conv);
     persistConversations();
 
     if (conv.id === activeId) {
@@ -954,10 +979,7 @@
   // Markdown-lite renderer with headings/lists/quotes/tables/code blocks
   // ---------------------------------------------------------------------
   function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    return ChatSafety.escapeHtml(str);
   }
 
   function inlineFormat(escapedStr) {
@@ -1317,12 +1339,17 @@
 
     attachments.forEach(function (a) {
       if (a.kind === 'image' || a.kind === 'generated-image') {
-        html +=
-          '<img class="att-thumb" src="' +
-          a.dataUrl +
-          '" alt="' +
-          escapeHtml(a.name) +
-          '">';
+        var src = ChatSafety.safeImageSource(a.dataUrl);
+        if (src) {
+          html +=
+            '<img class="att-thumb" src="' +
+            escapeHtml(src) +
+            '" alt="' +
+            escapeHtml(a.name) +
+            '">';
+        } else {
+          html += '<span class="att-file">🖼️ ' + escapeHtml(a.name) + '</span>';
+        }
       } else {
         html +=
           '<span class="att-file">📄 ' +
@@ -1498,6 +1525,7 @@
       conv.draft = false;
       autoTitle(conv, text, atts);
     }
+    touchConversation(conv);
 
     persistConversations();
     renderSidebar();
@@ -1569,6 +1597,7 @@
       text: state.raw,
       attachments: []
     });
+    touchConversation(conv);
 
     persistConversations();
 
@@ -1625,6 +1654,7 @@
 
     conv.messages.splice(idx, 1);
     conv._regenerateNonce = messageUid();
+    touchConversation(conv);
     persistConversations();
 
     var lastWrap =
@@ -1772,17 +1802,26 @@
       signal: controller.signal
     };
 
-    fitChatPayload(requestOptions);
+    try {
+      fitChatPayload(requestOptions);
+    } catch (error) {
+      if (activeController === controller) activeController = null;
+      toggleBusyUI(false);
+      if (streamStatus) streamStatus.textContent = '';
+      setErrorBubble(typing, error && error.message ? error.message : 'Dữ liệu gửi lên vượt giới hạn.');
+      return;
+    }
 
     window.LegendaryAIEngine.chat(requestOptions)
       .then(function (result) {
+        if (controller.signal.aborted) return;
         typing.raw = result.text || '';
 
         finalizeAiBubble(typing);
 
-        toggleBusyUI(false);
+        if (activeController === controller) toggleBusyUI(false);
 
-        if (streamStatus) {
+        if (activeController === controller && streamStatus) {
           var brain = result && result.brain;
           streamStatus.textContent = brain
             ? '✓ ' + (result.displayModel || 'Legendary Engine') +
@@ -1803,6 +1842,7 @@
         }
       })
       .catch(function (err) {
+        if (activeController !== controller) return;
         if (err && err.name === 'AbortError') {
           setErrorBubble(typing, 'Đã dừng phản hồi.');
         } else {
@@ -1858,6 +1898,7 @@
     var convSaved = (typing && typing.convId && findConv(typing.convId)) || getActiveConv();
     if (convSaved && Array.isArray(convSaved.messages)) {
       convSaved.messages.push({ id: messageUid(), role: 'ai', text: unavailable, attachments: [] });
+      touchConversation(convSaved);
       persistConversations();
     }
     if (streamStatus) streamStatus.textContent = 'Tạo ảnh chưa được cấu hình';
@@ -1910,6 +1951,7 @@
     clearChatBtn.addEventListener(
       'click',
       function () {
+        abortActiveResponse();
         var conv = getActiveConv();
 
         conv.messages = [
@@ -1921,6 +1963,7 @@
             attachments: []
           }
         ];
+        touchConversation(conv);
 
         persistConversations();
         renderSidebar();
@@ -1957,6 +2000,12 @@
   // Attachments (images + text/code files + ZIP)
   // ---------------------------------------------------------------------
   var MAX_TEXT_ATTACHMENT_CHARS = 120000;
+  var MAX_RAW_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+  var MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024;
+  var MAX_ZIP_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+  var MAX_IMAGE_ATTACHMENT_BYTES = 100 * 1024;
+  var MAX_PENDING_ATTACHMENTS = 5;
+  var MAX_PENDING_ATTACHMENT_CHARS = 150000;
   var TEXT_FILE_EXTENSIONS = /\.(txt|md|markdown|csv|json|jsonl|log|js|jsx|ts|tsx|py|java|c|h|cpp|hpp|cs|go|rs|php|rb|swift|kt|kts|html|htm|css|scss|sass|xml|yaml|yml|toml|ini|env|sql|sh|bat|ps1|vue|svelte|astro|graphql|gql)$/i;
 
   function renderAttachPreview() {
@@ -2058,8 +2107,18 @@
       if (remaining <= 0) break;
 
       try {
+        var declaredSize = Number(entry && entry._data && entry._data.uncompressedSize);
+        if (!Number.isFinite(declaredSize) || declaredSize < 0 || declaredSize > remaining) {
+          textParts.push('\n===== ' + name + ' =====\n[File skipped: declared uncompressed size exceeds the remaining text budget.]');
+          totalChars += Math.min(120, remaining);
+          continue;
+        }
         var content = await entry.async('string');
-        content = content.slice(0, remaining);
+        if (content.length > remaining) {
+          textParts.push('\n===== ' + name + ' =====\n[File skipped: expanded content exceeded the text budget.]');
+          totalChars += Math.min(120, remaining);
+          continue;
+        }
         textParts.push('\n===== ' + name + ' =====\n' + content);
         totalChars += content.length;
       } catch (_) {
@@ -2136,23 +2195,59 @@
 
       if (!files.length) return;
 
+      var importMessages = [];
       if (streamStatus) streamStatus.textContent = 'Đang đọc tệp…';
 
       for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        var name = String(file.name || 'tệp');
+        var zipLike = file.type === 'application/zip' || /\.zip$/i.test(name);
+        var imageLike = /^image\//i.test(file.type);
+        if (pendingAttachments.length >= MAX_PENDING_ATTACHMENTS) {
+          importMessages.push('Chỉ hỗ trợ tối đa ' + MAX_PENDING_ATTACHMENTS + ' tệp trong mỗi tin nhắn.');
+          break;
+        }
+        if (file.size > MAX_RAW_ATTACHMENT_BYTES) {
+          importMessages.push(name + ': tệp vượt giới hạn 8 MiB.');
+          continue;
+        }
+        if (zipLike && file.size > MAX_ZIP_ATTACHMENT_BYTES) {
+          importMessages.push(name + ': ZIP vượt giới hạn 5 MiB.');
+          continue;
+        }
+        if (!zipLike && !imageLike && (TEXT_FILE_EXTENSIONS.test(name.toLowerCase()) || /^text\//i.test(file.type)) && file.size > MAX_TEXT_FILE_BYTES) {
+          importMessages.push(name + ': tệp văn bản vượt giới hạn 2 MiB.');
+          continue;
+        }
+        if (imageLike && file.size > MAX_IMAGE_ATTACHMENT_BYTES) {
+          importMessages.push(name + ': ảnh vượt giới hạn 100 KiB để bảo đảm payload nằm trong hạn mức.');
+          continue;
+        }
+        if (imageLike && !/^image\/(?:png|jpe?g|gif|webp|avif|bmp|x-icon)$/i.test(file.type)) {
+          importMessages.push(name + ': định dạng ảnh này chưa được hỗ trợ an toàn.');
+          continue;
+        }
         try {
-          var attachment = await readAttachment(files[i]);
+          var attachment = await readAttachment(file);
+          if (attachment.kind === 'image' && !ChatSafety.safeImageSource(attachment.dataUrl)) {
+            importMessages.push(name + ': định dạng ảnh không được hỗ trợ an toàn.');
+            continue;
+          }
+          var projected = pendingAttachments.reduce(function (sum, a) {
+            return sum + String(a.name || '').length + String(a.textContent || '').length + String(a.dataUrl || '').length + 512;
+          }, 0) + String(attachment.name || '').length + String(attachment.textContent || '').length + String(attachment.dataUrl || '').length + 512;
+          if (projected > MAX_PENDING_ATTACHMENT_CHARS) {
+            importMessages.push(name + ': vượt tổng ngân sách tệp đính kèm cho tin nhắn này.');
+            continue;
+          }
           pendingAttachments.push(attachment);
         } catch (error) {
-          if (streamStatus) {
-            streamStatus.textContent =
-              'Không đọc được ' + files[i].name + ': ' +
-              (error && error.message ? error.message : error);
-          }
+          importMessages.push('Không đọc được ' + name + ': ' + (error && error.message ? error.message : 'lỗi không xác định'));
         }
       }
 
       renderAttachPreview();
-      if (streamStatus) streamStatus.textContent = '';
+      if (streamStatus) streamStatus.textContent = importMessages.join(' ');
     });
   }
 
@@ -2163,6 +2258,8 @@
     'submit',
     function (e) {
       e.preventDefault();
+
+      if (activeController) return;
 
       var text =
         chatInput.value.trim();
@@ -2236,6 +2333,7 @@
   // Init
   // ---------------------------------------------------------------------
   window.addEventListener('popstate', function () {
+    abortActiveResponse();
     var slug = routeSlug();
 
     if (slug) {
@@ -2272,8 +2370,17 @@
   renderSidebar();
   renderMessages();
 
-  window.addEventListener(
-    'legendary:auth-changed',
-    syncEngineModelAccess
-  );
+  window.addEventListener('legendary:auth-changed', function () {
+    abortActiveResponse();
+    syncEngineModelAccess();
+  });
+
+  window.addEventListener('legendary:sync-conflict', function (event) {
+    var detail = event && event.detail || {};
+    var count = Math.max(0, Number(detail.count || 0));
+    if (!streamStatus) return;
+    streamStatus.textContent = count
+      ? 'Phát hiện ' + count + ' xung đột đồng bộ. Bản cục bộ đã được giữ; bản đám mây được sao lưu thành hội thoại có tiền tố “[Bản đám mây]”. Hãy so sánh hai bản trước khi tiếp tục chỉnh sửa.'
+      : 'Phát hiện xung đột đồng bộ. Dữ liệu cục bộ được giữ để tránh mất nội dung.';
+  });
 })();

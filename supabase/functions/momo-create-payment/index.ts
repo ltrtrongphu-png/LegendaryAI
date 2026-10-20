@@ -1,12 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-async function hmacSha256(secret: string, message: string): Promise<string> {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return Array.from(new Uint8Array(signature)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-function base64Json(value: unknown): string {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(value))));
-}
+import { hmacSha256, momoCreateSignatureText, base64Json } from "../_shared/momo.ts";
 
 const configuredSiteUrl = (Deno.env.get("SITE_URL") || "").replace(/\/$/, "");
 const ORIGINS = new Set([
@@ -131,17 +124,18 @@ Deno.serve(async (req) => {
   const redirectUrl = siteUrl.replace(/\/$/, "") + "/payment-result?payment=" + encodeURIComponent(orderId);
   const ipnUrl = supabaseUrl + "/functions/v1/momo-ipn";
 
-  const signatureText =
-    "accessKey=" + accessKey +
-    "&amount=" + plan.price_vnd +
-    "&extraData=" + extraData +
-    "&ipnUrl=" + ipnUrl +
-    "&orderId=" + orderId +
-    "&orderInfo=" + plan.name +
-    "&partnerCode=" + partnerCode +
-    "&redirectUrl=" + redirectUrl +
-    "&requestId=" + requestId +
-    "&requestType=captureWallet";
+  const signatureText = momoCreateSignatureText({
+    accessKey,
+    amount: plan.price_vnd,
+    extraData,
+    ipnUrl,
+    orderId,
+    orderInfo: plan.name,
+    partnerCode,
+    redirectUrl,
+    requestId,
+    requestType: "captureWallet",
+  });
 
   const signature = await hmacSha256(secretKey, signatureText);
 

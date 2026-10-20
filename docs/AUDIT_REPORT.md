@@ -128,7 +128,7 @@ This matrix distinguishes confirmed application paths from hosting/provider deta
 - Deno type checks for active/legacy chat, model health, MoMo, Owner/token reset, account data, support, retention cleanup and disabled image endpoint.
 
 ### Not yet proven
-- **Latest PR CI green status:** not confirmed in the available run results. Do not merge until GitHub shows all required checks green for the exact latest head SHA.
+- **Merged baseline verification:** PR #20 was squash-merged to `main` as `f69cf8a08b0749bfec743fcb5eed25bdfb45808f`. Post-merge GitHub Actions runs `39430069649` (CI) and `39430069928` (quality) were successful. This does not prove hosted database/runtime integrations.
 - **Database:** migration not applied to hosted Supabase; SQL has not been executed against a clean local/staging PostgreSQL instance in this pass.
 - **RLS adversarial tests:** no live tests using anon, user A, user B, Owner and service_role sessions.
 - **Tokens:** no concurrent reserve/settle/refund load test to empirically prove no negative balances/double spend.
@@ -157,7 +157,7 @@ This matrix distinguishes confirmed application paths from hosting/provider deta
 
 ## 10. Remaining operator actions
 
-- [ ] Review and merge PR #19 only after all checks pass for the latest head SHA.
+- [x] Consolidated security/payment/privacy release was squash-merged as PR #20. PR #19 was closed as superseded; it is not a pending deployment item.
 - [ ] Apply the forward migration to staging; run the SQL/RLS/token/payment adversarial test set, review rollback and then schedule production application.
 - [ ] Set/verify Supabase and Vercel secrets; confirm that no actual credentials remain exposed in Git history. Rotate any exposed real secret found by the scan.
 - [ ] Confirm Owner by Auth UUID.
@@ -167,3 +167,26 @@ This matrix distinguishes confirmed application paths from hosting/provider deta
 - [ ] Fill all legal placeholders and approve policies with qualified counsel.
 - [ ] Configure monitored support response workflow, retention scheduler and post-deploy smoke checks.
 
+
+
+## 11. Follow-up verification addendum (2026-10-20)
+
+The consolidated PR #20 is already merged to `main`; the historical checklist above has been corrected accordingly. This addendum describes the separate follow-up branch `fix/phase-3-runtime-verification` and is not proof that its CI has passed.
+
+- MoMo payment creation and IPN now use one shared canonical-signature implementation so their string construction and constant-work hex comparison can be tested without invoking a provider. Deterministic HMAC vectors are added at `tests/momo-signature.test.mjs`. Source reference checked: MoMo Developers, “Digital Signature” and payment-init/IPN documentation. The merchant’s exact configured API version and sandbox flow still require an end-to-end test.
+- `js/bg3d.js` now uses a smaller static scene for `prefers-reduced-motion` and detected low-resource devices, pauses animation when the document is hidden, and disposes GPU resources/context on `pagehide`. Static source tests are in `tests/bg3d-runtime.test.mjs`; real device profiling remains outstanding.
+- `tests/e2e-smoke.mjs` adds Chromium/Playwright smoke coverage for the app shell, `/new`, `/chat/:slug`, and all policy routes using a local rewrite-compatible test server. The new `browser-smoke` workflow job must pass on this branch before it can be merged.
+
+Still not proven in this pass: migration execution on a clean Supabase/PostgreSQL instance, adversarial RLS tests for anon/user A/user B/Owner/service_role, concurrent token reservation/settlement/refund, duplicate and delayed MoMo IPNs against a test database, hosted secrets and model health, mobile keyboard/accessibility/Lighthouse metrics, and production retention scheduling. These require local Docker/Postgres/Supabase or operator-owned provider credentials and must not be represented as completed based only on static tests.
+
+
+## 12. Frontend and sync follow-up (2026-10-20)
+
+The follow-up PR also hardens user-controlled content and local/cloud synchronization:
+- Shared HTML escaping now covers both quote characters; image attachment sources are limited to raster base64 data URLs and HTTPS URLs without embedded credentials.
+- Attachment size/count/aggregate payload budgets are checked before and during reading, and ZIP entry declared expansion size is checked before decompression. The payload-size exception is displayed without leaving the send controls locked.
+- Chat requests are aborted on conversation navigation, clear/delete and authentication changes; late results/errors from an older request cannot update the active view or unlock a newer request.
+- Conversation updatedAt is advanced for ordinary message changes, AI completion, title rename, regeneration and clear. Cloud reads have a sequence guard; per-user sync uses a queued single-flight lock, and conflicting local/cloud conversation bodies are retained as separately labeled local-only copies instead of silently discarding one side.
+- CI tests cover the core contracts in tests/chat-security.test.mjs and tests/cloud-sync-runtime.test.mjs; the Playwright smoke test covers application-shell/deep-link/policy-route rendering only. An in-memory Supabase contract simulator in tests/cloud-sync-integration.test.mjs exercises a newer cloud revision conflict, separate preservation of both bodies, offline-only conversation upload, reload persistence and a later deliberate local edit. It is not a real PostgreSQL/RLS test.
+
+Remaining limitation: these sync/browser checks are contract/static regressions, not multi-tab stress tests or authenticated tests against a staged database. Provider, database, legal-operator and retention actions in section 10 remain open and require the operator environment.

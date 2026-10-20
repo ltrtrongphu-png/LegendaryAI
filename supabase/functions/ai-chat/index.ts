@@ -17,12 +17,10 @@ const baseCorsHeaders = {
 
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
-  const allowedOrigin = ALLOWED_WEB_ORIGINS.has(origin)
-    ? origin
-    : "https://legendaryai.vercel.app";
+  const allowedOrigin = ALLOWED_WEB_ORIGINS.has(origin) ? origin : "";
   return {
     ...baseCorsHeaders,
-    "Access-Control-Allow-Origin": allowedOrigin,
+    ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin } : {}),
     "Vary": "Origin",
   };
 }
@@ -1121,6 +1119,8 @@ function nativeModeResponse(mode: string, prompt: string): string | null {
 
 
 Deno.serve(async (req) => {
+  const requestOrigin = req.headers.get("origin") || "";
+  if (requestOrigin && !ALLOWED_WEB_ORIGINS.has(requestOrigin)) return new Response(JSON.stringify({ error: "Origin not allowed", code: "ORIGIN_NOT_ALLOWED" }), { status: 403, headers: { "Content-Type": "application/json; charset=utf-8", Vary: "Origin" } });
   const responseCors = getCorsHeaders(req);
 
   if (req.method === "OPTIONS") {
@@ -1318,6 +1318,7 @@ Deno.serve(async (req) => {
       Number(profile.token_limit || 500000),
     ),
   );
+  const reservationId = crypto.randomUUID();
 
   const { data: allowed, error: tokenError } = await supabase.rpc("consume_tokens", { p_amount: reservation, p_user_id: user.id, p_is_guest: user.is_anonymous === true });
 
@@ -1495,7 +1496,7 @@ Deno.serve(async (req) => {
       },
     }, 200, req);
   } catch (error) {
-    await supabase.rpc("refund_tokens", { p_amount: reservation, p_user_id: user.id }).catch(() => null);
+    await supabase.rpc("refund_tokens", { p_amount: reservation, p_user_id: user.id, p_request_id: reservationId, p_reserved: reservation }).catch(() => null);
     const message = error instanceof Error ? error.message : "Legendary Engine failed.";
     return json({ error: message, code: "LEGENDARY_ENGINE_ERROR" }, 500, req);
   }

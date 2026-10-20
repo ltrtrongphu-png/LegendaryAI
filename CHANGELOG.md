@@ -1,5 +1,21 @@
 # LegendaryAI Changelog
 
+## 1.3.0 — Security, payment, privacy and legal consolidation (2026-10-20)
+- Hardened CORS allowlists across active and legacy chat, model health, Owner, token reset and payment endpoints; allow SITE_URL explicitly and reject unapproved browser origins.
+- Required a server-side bearer secret for the Ollama-compatible gateway; disabled retries on HTTP 429 and prevented silent fallback for an explicitly selected local model.
+- Capped local model generation by remaining token budget and added request-scoped idempotent refund accounting through a migration.
+- Fixed the Vietnamese image-intent regression for “hình thành”; disabled the old external image-generation route until a self-hosted provider is verified.
+- Added the missing transactional/idempotent finalize_momo_payment RPC, request/transaction binding, provider timeout handling and a server-verified payment result page.
+- Added policy consent storage, authenticated user-data export/account deletion, a support request inbox and configurable—but disabled-by-default—retention cleanup.
+- Added Vietnamese draft policy pages, routes, footer links, sitemap entries, audit/legal checklists and security/contribution docs.
+- Removed email-based Owner bootstrap from the schema snapshot; existing Owner assignments are preserved and new Owner grants must be performed by a trusted database administrator.
+- Added regression/secret-scan checks and operational guidance. Production deployment, live MoMo tests, live local-model tests and legal approval remain manual.
+
+## 1.2.2 — CORS origin allowlist hardening
+- Reject browser requests with an unapproved Origin at the active `ai-chat-v10` and `local-model-health` Edge Function boundaries.
+- Add the configured `SITE_URL` to the explicit allowlist while preserving localhost development origins.
+- Add a CI regression check for the origin rejection boundary.
+
 ## 1.2.1 — Repository audit baseline
 - Added `docs/AUDIT_REPORT.md` with verified Phase 0 findings, current documentation drift, preliminary data map, and explicit follow-up verification items.
 - No production configuration, database migration, or runtime behavior changed in this documentation-only phase.

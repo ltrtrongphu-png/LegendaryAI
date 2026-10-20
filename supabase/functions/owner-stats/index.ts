@@ -17,11 +17,10 @@ function getCorsHeaders(req: Request) {
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
   ].filter(Boolean));
-  const isVercelPreview = /^https:\/\/legendaryai(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
-  const allowOrigin = allowed.has(origin) || isVercelPreview ? origin : (configuredSiteUrl || "https://legendaryai.vercel.app");
+  const allowOrigin = allowed.has(origin) ? origin : "";
   return {
     ...baseCorsHeaders,
-    "Access-Control-Allow-Origin": allowOrigin,
+    ...(allowOrigin ? { "Access-Control-Allow-Origin": allowOrigin } : {}),
     "Vary": "Origin",
   };
 }
@@ -34,6 +33,9 @@ function json(body: unknown, status = 200, req?: Request) {
 }
 
 Deno.serve(async (req) => {
+  const origin = (req.headers.get("origin") || "").replace(/\/$/, "");
+  const allowedOrigins = new Set([configuredSiteUrl, "https://legendaryai.vercel.app", "https://www.legendaryai.vercel.app", "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"].filter(Boolean));
+  if (origin && !allowedOrigins.has(origin)) return new Response(JSON.stringify({ error: "Origin not allowed", code: "ORIGIN_NOT_ALLOWED" }), { status: 403, headers: { "Content-Type": "application/json; charset=utf-8", Vary: "Origin" } });
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCorsHeaders(req) });
   if (req.method !== "GET") return json({ error: "Method not allowed" }, 405, req);
 

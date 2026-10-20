@@ -1,6 +1,8 @@
 function isImageGenerationPrompt(text) {
   var x = String(text || '').trim().toLowerCase();
   if (!x) return false;
+  // Vietnamese "hình thành" means form/become, not image intent.
+  if (/\bhình\s+thành\b/i.test(x)) return false;
 
   if (/(?:^|\s)(?:vẽ|draw)(?:\s|$)/i.test(x)) {
     return !/(?:sơ đồ|diagram|mermaid|flowchart|biểu đồ|chart|graph|code|mã|architecture|kiến trúc)/i.test(x);

@@ -88,9 +88,11 @@ node tests/image-intent.test.js
 node tests/cors-origin-policy.test.mjs
 node tests/security-hardening.test.mjs
 node tests/legal-routes.test.mjs
-node tests/secret-scan.test.mjs</code></pre>
+node tests/secret-scan.test.mjs
+node tests/bg3d-runtime.test.mjs
+deno test tests/momo-signature.test.mjs</code></pre>
 
-CI also type-checks Edge Functions with Deno. The tests cover static contracts; they do **not** replace adversarial integration tests against a real PostgreSQL/Supabase staging project, MoMo sandbox callback tests, or a live local-model smoke test.
+CI also type-checks Edge Functions with Deno and runs a Playwright browser smoke test for the app shell, deep links, and legal routes. To run that browser test locally, install Node.js 22, run `npm install --no-save --package-lock=false playwright@1.64.1`, install Chromium with `npx --no-install playwright install chromium`, then run `node tests/e2e-smoke.mjs`. These checks still do **not** replace adversarial integration tests against a real PostgreSQL/Supabase staging project, MoMo sandbox callback tests, or a live local-model smoke test.
 
 ## Privacy, legal pages and data retention
 

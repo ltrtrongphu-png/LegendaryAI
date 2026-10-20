@@ -47,6 +47,16 @@
       if (r.error) return { error: r.error, data: r.data };
       if (r.data && r.data.error) return { error: { message: r.data.error }, data: r.data };
       return { data: r.data };
+    },
+    async accountData(action, payload) {
+      if (!supabase) return { error: { message: 'Supabase chưa sẵn sàng.' } };
+      var token = await this.getAccessToken();
+      if (!token) return { error: { message: 'Phiên đăng nhập đã hết hạn.' } };
+      var result = await supabase.functions.invoke('account-data', {
+        body: Object.assign({ action: action }, payload || {}),
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      return result.error ? { error: result.error, data: result.data } : { data: result.data };
     }
   };
 
@@ -59,6 +69,8 @@
   var registerForm = document.getElementById('registerForm');
   var loginError = document.getElementById('loginError');
   var registerError = document.getElementById('registerError');
+  var authPolicyConsent = document.getElementById('authPolicyConsent');
+  var authConsentError = document.getElementById('authConsentError');
   var registerSuccess = document.getElementById('registerSuccess');
   var forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
   var resetForm = document.getElementById('resetForm');
@@ -236,11 +248,14 @@
   async function signInOAuth(provider) {
     var error = configured();
     if (error) return setError(loginError, error);
+    if (!authPolicyConsent || !authPolicyConsent.checked) return setError(authConsentError, 'Bạn cần đồng ý với Điều khoản sử dụng và Chính sách bảo mật trước khi tiếp tục với OAuth.');
+    setError(authConsentError, null);
+    try { sessionStorage.setItem('legendaryai.pendingConsentVersion', '1.0.0'); } catch (e) {}
     var r = await supabase.auth.signInWithOAuth({
       provider: provider,
       options: { redirectTo: window.location.origin + window.location.pathname }
     });
-    if (r.error) setError(loginError, r.error.message);
+    if (r.error) { try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (e) {} setError(loginError, r.error.message); }
   }
 
   if (googleBtn) googleBtn.addEventListener('click', function () { signInOAuth('google'); });
@@ -308,16 +323,17 @@
     var email = document.getElementById('registerEmail').value.trim().toLowerCase();
     var password = document.getElementById('registerPassword').value;
     if (!name || !email || password.length < 6) return setError(registerError, 'Vui lòng nhập họ tên, email và mật khẩu từ 6 ký tự.');
+    if (!authPolicyConsent || !authPolicyConsent.checked) return setError(registerError, 'Bạn cần đồng ý với Điều khoản sử dụng và Chính sách bảo mật để tạo tài khoản.');
     var captchaToken = requireCaptcha('register', 'registerCaptcha', registerError);
     if (captchaToken === null) return;
-    var signupOptions = { data: { full_name: name } };
+    var signupOptions = { data: { full_name: name, legal_consent: { terms: true, privacy: true, version: '1.0.0' } } };
     if (captchaToken) signupOptions.captchaToken = captchaToken;
     var r = await supabase.auth.signUp({
       email: email,
       password: password,
       options: signupOptions
     });
-    if (r.error) { resetCaptcha('register'); return setError(registerError, r.error.message); }
+    if (r.error) { resetCaptcha('register'); return setError(registerError, 'Không thể hoàn tất đăng ký. Hãy kiểm tra thông tin hoặc thử lại sau.'); }
     resetCaptcha('register');
     registerForm.reset();
     if (r.data.session) {
@@ -498,6 +514,18 @@
 
     var user = await LegendaryBackend.getUser();
     if (renderSeq !== accountRenderSeq) return;
+    var pendingConsentVersion = null;
+    try { pendingConsentVersion = sessionStorage.getItem('legendaryai.pendingConsentVersion'); } catch (e) {}
+    if (user && !user.is_anonymous && pendingConsentVersion) {
+      var consentWrite = await LegendaryBackend.accountData('consent', { version: pendingConsentVersion });
+      if (consentWrite.error || !consentWrite.data || !consentWrite.data.ok) {
+        if (supabase) await supabase.auth.signOut();
+        try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (e) {}
+        alert('Không thể lưu bằng chứng đồng ý chính sách. Hãy thử lại sau khi hệ thống được cấu hình.');
+        return renderAccountArea();
+      }
+      try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (e) {}
+    }
     if (user && user.is_anonymous) {
       var guestBtn = document.createElement('button');
       guestBtn.type = 'button';
@@ -623,6 +651,48 @@
       ownerBtn.addEventListener('click', openOwnerDashboard);
       dropdown.appendChild(ownerBtn);
     }
+    var exportBtn = document.createElement('button');
+    exportBtn.type = 'button';
+    exportBtn.className = 'btn btn-outline btn-sm';
+    exportBtn.textContent = 'Xuất dữ liệu cá nhân';
+    exportBtn.style.marginBottom = '8px';
+    exportBtn.addEventListener('click', async function () {
+      exportBtn.disabled = true;
+      var result = await window.LegendaryBackend.accountData('export');
+      exportBtn.disabled = false;
+      if (result.error || !result.data || !result.data.ok) return alert('Không thể xuất dữ liệu. Hãy thử lại sau.');
+      var blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json;charset=utf-8' });
+      var objectUrl = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = 'legendaryai-personal-data.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 1000);
+    });
+    dropdown.appendChild(exportBtn);
+
+    var deleteAccountBtn = document.createElement('button');
+    deleteAccountBtn.type = 'button';
+    deleteAccountBtn.className = 'btn btn-outline btn-sm';
+    deleteAccountBtn.textContent = 'Xóa tài khoản';
+    deleteAccountBtn.style.marginBottom = '8px';
+    deleteAccountBtn.addEventListener('click', async function () {
+      if (!confirm('Thao tác này sẽ xóa tài khoản, hội thoại, memory và dữ liệu gắn với tài khoản. Bản ghi giao dịch/chấp thuận có thể được giữ lại theo chính sách. Bạn có chắc muốn tiếp tục?')) return;
+      var password = prompt('Nhập mật khẩu tài khoản để xác minh lại. Tài khoản chỉ dùng OAuth có thể cần hỗ trợ thủ công.');
+      if (!password) return;
+      deleteAccountBtn.disabled = true;
+      var result = await window.LegendaryBackend.accountData('delete', { password: password });
+      deleteAccountBtn.disabled = false;
+      if (result.error || !result.data || !result.data.ok) return alert((result.data && result.data.error) || (result.error && result.error.message) || 'Không thể xóa tài khoản.');
+      if (supabase) await supabase.auth.signOut();
+      try { localStorage.removeItem('legendaryai_conversations_v2'); localStorage.removeItem('legendaryai_active_conv_v2'); } catch (e) {}
+      alert(result.data.attachment_cleanup_pending ? 'Tài khoản đã xóa; một số tệp có thể cần được dọn thủ công.' : 'Tài khoản đã được xóa.');
+      window.location.href = '/';
+    });
+    dropdown.appendChild(deleteAccountBtn);
+
     dropdown.appendChild(logout);
 
     trigger.addEventListener('click', function (e) {

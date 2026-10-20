@@ -30,6 +30,7 @@ jobs:
           node --check js/chat.js
           node --check js/cloud-sync.js
           node --check js/main.js
+          node --check js/bg3d.js
           node --check js/ui-upgrade.js
           node --check js/power-suite.js
           node --check legal/contact.js
@@ -43,3 +44,5 @@ jobs:
         run: node tests/image-intent.test.js
       - name: Regression test Legendary Brain native core
         run: node tests/brain-native-core.test.mjs
+      - name: Regression test background rendering lifecycle
+        run: node tests/bg3d-runtime.test.mjs

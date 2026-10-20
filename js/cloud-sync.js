@@ -73,7 +73,7 @@
 
   function fingerprint(list) {
     try {
-      return JSON.stringify((list || []).filter(function (c) { return !c.draft; }).map(function (c) {
+      return JSON.stringify((list || []).filter(function (c) { return !c.draft && !c.syncConflictBackup; }).map(function (c) {
         return {
           id: c.id,
           title: c.title,
@@ -148,7 +148,7 @@
   }
 
   async function uploadLocal(user) {
-    var list = localConversations(user.id).filter(function (conv) { return !conv.draft; });
+    var list = localConversations(user.id).filter(function (conv) { return !conv.draft && !conv.syncConflictBackup; });
     if (!list.length) return { changed: false, conflict: false };
 
     var state = readJson(syncKey(user.id), { fingerprint: '', snapshots: {} });
@@ -168,12 +168,90 @@
 
     if (changed || conflict) {
       writeJson(syncKey(user.id), {
-        fingerprint: fingerprint(list),
+        // Keep the previous baseline after a conflict so loadCloud knows it
+        // must preserve both versions instead of treating local as synced.
+        fingerprint: conflict ? (state.fingerprint || '') : fingerprint(list),
         snapshots: nextSnapshots,
+        conflict: conflict || false,
         syncedAt: Date.now()
       });
     }
     return { changed: changed, conflict: conflict };
+  }
+
+
+  function preserveConflictCopies(userId, localList, remoteList) {
+    var local = (localList || []).filter(function (conv) { return !conv.draft && !conv.syncConflictBackup; });
+    var backups = (localList || []).filter(function (conv) { return !!conv.syncConflictBackup; });
+    var localById = Object.create(null);
+    var remoteById = Object.create(null);
+    var backupSources = Object.create(null);
+    var snapshots = {};
+    var conflicts = [];
+
+    local.forEach(function (conv) { localById[String(conv.id)] = conv; });
+    (remoteList || []).forEach(function (conv) { remoteById[String(conv.id)] = conv; });
+    backups.forEach(function (conv) { backupSources[String(conv.syncConflictSourceId)] = true; });
+
+    local.forEach(function (conv) {
+      var cloud = remoteById[String(conv.id)];
+      if (!cloud || fingerprint([conv]) === fingerprint([cloud])) return;
+      conflicts.push(String(conv.id));
+      // Keep this device's version as the working copy, but make the next
+      // deliberate edit newer than the competing cloud revision.
+      conv.updatedAt = Math.max(Date.now(), Number(cloud.updatedAt || 0) + 1);
+      if (backupSources[String(conv.id)]) return;
+
+      backups.push({
+        id: 'conflict-cloud-' + String(cloud.id) + '-' + Date.now() + '-' + conflicts.length,
+        title: ('[Bản đám mây] ' + String(cloud.title || 'Cuộc trò chuyện mới')).slice(0, 180),
+        slug: String(cloud.slug || 'cuoc-tro-chuyen') + '-cloud-copy-' + Date.now(),
+        createdAt: Number(cloud.createdAt || Date.now()),
+        updatedAt: Number(cloud.updatedAt || Date.now()),
+        draft: false,
+        syncConflictBackup: true,
+        syncConflictSourceId: String(cloud.id),
+        messages: (cloud.messages || []).map(function (msg) {
+          return Object.assign({}, msg, {
+            attachments: (msg.attachments || []).map(function (att) { return Object.assign({}, att); })
+          });
+        })
+      });
+    });
+
+    var localIds = Object.create(null);
+    local.forEach(function (conv) {
+      localIds[String(conv.id)] = true;
+      snapshots[conv.id] = fingerprint([conv]);
+    });
+    var cloudOnly = (remoteList || []).filter(function (conv) { return !localIds[String(conv.id)]; });
+    var kept = local.concat(cloudOnly, backups);
+    mirrorToChatCache(userId, kept);
+    writeJson(syncKey(userId), {
+      fingerprint: fingerprint(local),
+      snapshots: snapshots,
+      conflict: false,
+      conflictIds: conflicts,
+      syncedAt: Date.now()
+    });
+    window.dispatchEvent(new CustomEvent('legendary:sync-conflict', {
+      detail: { userId: userId, count: conflicts.length }
+    }));
+    return kept;
+  }
+
+  function preserveExistingConflictCopies(localList, remoteList) {
+    var backups = (localList || []).filter(function (conv) { return !!conv.syncConflictBackup; });
+    var sourceIds = Object.create(null);
+    var localById = Object.create(null);
+    (localList || []).filter(function (conv) { return !conv.draft && !conv.syncConflictBackup; })
+      .forEach(function (conv) { localById[String(conv.id)] = conv; });
+    backups.forEach(function (conv) { sourceIds[String(conv.syncConflictSourceId)] = true; });
+    var effectiveRemote = (remoteList || []).map(function (cloud) {
+      var local = localById[String(cloud.id)];
+      return sourceIds[String(cloud.id)] && local ? local : cloud;
+    });
+    return effectiveRemote.concat(backups);
   }
 
   async function loadCloud() {
@@ -234,39 +312,33 @@
       };
     });
 
+    if (syncState.conflict) {
+      preserveConflictCopies(user.id, local, remote);
+      return;
+    }
+
     if (localDirty) {
       var pushed = await uploadLocal(user).catch(function () { return { conflict: true }; });
       if (sequence !== loadSequence) return;
-      if (!pushed.conflict) {
-        window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
+      if (pushed.conflict) {
+        preserveConflictCopies(user.id, local, remote);
         return;
       }
-      // Keep the local working copy on conflict rather than silently overwriting
-      // edits made offline. Bring down cloud-only conversations, notify the UI,
-      // and let a subsequent local mutation create a newer sync version.
-      var localIds = Object.create(null);
-      local.forEach(function (conv) { localIds[String(conv.id)] = true; });
-      var preserved = local.concat(remote.filter(function (conv) { return !localIds[String(conv.id)]; }));
-      var nextSnapshots = {};
-      preserved.forEach(function (conv) { nextSnapshots[conv.id] = fingerprint([conv]); });
-      mirrorToChatCache(user.id, preserved);
-      writeJson(syncKey(user.id), {
-        fingerprint: fingerprint(preserved),
-        snapshots: nextSnapshots,
-        conflictAt: Date.now(),
-        syncedAt: Date.now()
-      });
-      window.dispatchEvent(new CustomEvent('legendary:sync-conflict', {
-        detail: { userId: user.id, count: local.filter(function (conv) {
-          return remote.some(function (cloud) { return String(cloud.id) === String(conv.id); });
-        }).length }
-      }));
+      window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
       return;
     }
 
     if (sequence !== loadSequence) return;
-    mirrorToChatCache(user.id, remote);
-    writeJson(syncKey(user.id), { fingerprint: fingerprint(remote), snapshots: {}, syncedAt: Date.now() });
+    var preservedRemote = preserveExistingConflictCopies(local, remote);
+    mirrorToChatCache(user.id, preservedRemote);
+    var snapshots = {};
+    remote.forEach(function (conv) { snapshots[conv.id] = fingerprint([conv]); });
+    writeJson(syncKey(user.id), {
+      fingerprint: fingerprint(remote),
+      snapshots: snapshots,
+      conflict: false,
+      syncedAt: Date.now()
+    });
     window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
   }
 

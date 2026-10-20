@@ -1987,6 +1987,7 @@
   // ---------------------------------------------------------------------
   var MAX_TEXT_ATTACHMENT_CHARS = 120000;
   var MAX_RAW_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+  var MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024;
   var MAX_ZIP_ATTACHMENT_BYTES = 5 * 1024 * 1024;
   var MAX_IMAGE_ATTACHMENT_BYTES = 100 * 1024;
   var MAX_PENDING_ATTACHMENTS = 5;
@@ -2198,6 +2199,10 @@
         }
         if (zipLike && file.size > MAX_ZIP_ATTACHMENT_BYTES) {
           importMessages.push(name + ': ZIP vượt giới hạn 5 MiB.');
+          continue;
+        }
+        if (!zipLike && !imageLike && (TEXT_FILE_EXTENSIONS.test(name.toLowerCase()) || /^text\//i.test(file.type)) && file.size > MAX_TEXT_FILE_BYTES) {
+          importMessages.push(name + ': tệp văn bản vượt giới hạn 2 MiB.');
           continue;
         }
         if (imageLike && file.size > MAX_IMAGE_ATTACHMENT_BYTES) {

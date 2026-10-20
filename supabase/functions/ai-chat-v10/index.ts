@@ -136,6 +136,11 @@ if(cacheHit){
     return out(req,{error:"Bạn đã chạm hạn mức token của gói hiện tại.",code:"TOKEN_LIMIT",tokenLimit:limitForProfile(profile,planData,isGuest),tokensUsed:Number(profile.tokens_used||0),tokenResetAt:profile.token_reset_at},429);
   }
   const latestCached=await admin.from("profiles").select("token_limit,tokens_used,token_reset_at,plan_expires_at").eq("id",authData.user.id).maybeSingle();
+  if(latestCached.error){
+    const {error:cacheRefundError}=await admin.rpc("refund_tokens",{p_amount:cachedReservation,p_user_id:authData.user.id,p_request_id:cachedReservationId,p_reserved:cachedReservation});
+    if(cacheRefundError)console.error("cache-hit refund after profile read failure failed",cacheRefundError.message);
+    return out(req,{error:"Không thể đọc trạng thái hạn mức.",code:"TOKEN_PROFILE_READ_FAILED"},500);
+  }
   const cachedLimit=Number(latestCached.data?.token_limit??limitForProfile(profile,planData,isGuest));
   const cachedUsed=Number(latestCached.data?.tokens_used??(Number(profile.tokens_used||0)+cachedReservation));
   const {error:cachedUsageError}=await admin.from("ai_usage_logs").insert({
@@ -232,8 +237,12 @@ try{
   }
 
   if(!text)throw new Error("EMPTY_ENGINE_RESPONSE");
+  // Native Core is bounded too; enforce the reserved output budget before returning
+  // text so the settled token count can never exceed the amount held atomically.
+  if(text.length>max*4)text=text.slice(0,max*4);
   const outputTokens=approxTokens(text);
   const actual=inputTokens+outputTokens;
+  cacheSet(cacheKey,text,servedLocal);
 
   if(localReservation>0){
     const refundAmount=Math.max(0,localReservation-actual);
@@ -287,7 +296,7 @@ try{
     reasoning:{enabled:reasoning&&servedLocal,tier:rt},
     brain:{version:"12.0-agent",intent,route,cacheHit:false,contextMessages:selectedMessages.length,rawContextMessages:ms.length,memoryRecall:servedLocal?memories.length:0,memorySaved,agent:agentPlan,selfCheck:true},
     performance:{latency_ms:latency,cache_hit:false,context_compacted:ms.length!==selectedMessages.length},
-    usage:{input_tokens:servedLocal?inputTokens:0,output_tokens:servedLocal?outputTokens:0,total_tokens:actual,tokens_used:finalUsed,token_limit:finalLimit,remaining_tokens:Math.max(0,finalLimit-finalUsed)}
+    usage:{input_tokens:inputTokens,output_tokens:outputTokens,total_tokens:actual,tokens_used:finalUsed,token_limit:finalLimit,remaining_tokens:Math.max(0,finalLimit-finalUsed)}
   });
 }catch(error){
   if(localReservation>0){

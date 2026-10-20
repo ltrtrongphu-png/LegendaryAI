@@ -4,11 +4,41 @@ import { huggingFaceChat } from "./huggingface-space.ts";
 import { checkRateLimitBucket, negotiateCapability, planTokenReservation, requestId } from "./model-runtime.ts";
 
 const ORIGINS=new Set(["https://legendaryai.vercel.app","https://www.legendaryai.vercel.app","http://localhost:3000","http://127.0.0.1:3000"]);const configuredSiteUrl=(Deno.env.get("SITE_URL")||"").replace(/\/$/,"");if(configuredSiteUrl)ORIGINS.add(configuredSiteUrl);
-const MAX_MESSAGES=60,MAX_CONTEXT_CHARS=60000,SHIELD_WINDOW_MS=60000,SHIELD_MAX_REQUESTS=20,LOCAL_TIMEOUT_MS=12000;
+const MAX_MESSAGES=60,MAX_CONTEXT_CHARS=60000,SHIELD_WINDOW_MS=60000,SHIELD_MAX_REQUESTS=20,SHIELD_IP_MAX_REQUESTS=120,SHIELD_IP_MIN_INTERVAL_MS=10,LOCAL_TIMEOUT_MS=12000;
 const cache=new Map<string,{created:number;text:string;local:boolean}>(),buckets=new Map<string,{started:number;count:number;last:number}>(),memoryCache=new Map<string,{created:number;items:string[]}>();
 const CACHE_TTL_MS=15000,MEMORY_TTL_MS=30000;
 function cors(req:Request){const origin=req.headers.get("origin")||"";return {...(ORIGINS.has(origin)?{"Access-Control-Allow-Origin":origin}:{}),"Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Credentials":"true",Vary:"Origin"}}
 function out(req:Request,body:unknown,status=200,extra:Record<string,string>={}){return new Response(JSON.stringify(body),{status,headers:{"Content-Type":"application/json; charset=utf-8",...cors(req),...extra}})}
+async function readBodyLimited(req:Request,maxBytes:number){
+  const header=req.headers.get("content-length");
+  if(header){
+    const declared=Number(header);
+    if(Number.isFinite(declared)&&declared>maxBytes)return {tooLarge:true as const,text:""};
+  }
+  if(!req.body)return {tooLarge:false as const,text:""};
+  const reader=req.body.getReader();
+  const chunks:Uint8Array[]=[];
+  let total=0;
+  try{
+    while(true){
+      const item=await reader.read();
+      if(item.done)break;
+      total+=item.value.byteLength;
+      if(total>maxBytes){
+        try{await reader.cancel();}catch{}
+        return {tooLarge:true as const,text:""};
+      }
+      chunks.push(item.value);
+    }
+  }catch(error){
+    try{await reader.cancel();}catch{}
+    throw error;
+  }
+  const bytes=new Uint8Array(total);
+  let offset=0;
+  for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+  return {tooLarge:false as const,text:new TextDecoder().decode(bytes)};
+}
 function textOf(v:any):string{if(Array.isArray(v))return v.map((x:any)=>typeof x==="string"?x:x?.type==="text"?x.text||"":x?.type==="image"?`[IMAGE:${String(x.name||"image")}]`:x?.text||x?.content||"").join("\n");if(typeof v==="string")return v;if(v==null)return "";return JSON.stringify(v)}
 const approxTokens=(t:string)=>Math.max(1,Math.ceil(String(t||"").length/4));
 const fallbackPlan=(key:string)=>({key,name:key,token_limit:key==="legendary"?6000000:key==="pro"?2000000:key==="free"?500000:1000,reset_hours:key==="legendary"?18:key==="pro"?12:6,reasoning_tier:key==="legendary"?"deep-plus":key==="pro"?"deep":key==="free"?"basic":"none",default_model_key:key==="legendary"?"legendary-ultra-1":key==="pro"?"legendary-pro-1":"legendary-lite-1",model_tiers:key==="legendary"?["free","pro","legendary"]:key==="pro"?["free","pro"]:["free"],capabilities:key==="legendary"?{reasoning:true,projectWorkspace:true,vision:true,memory:true,agentMode:true,batchTasks:true,multiModel:true}:key==="pro"?{reasoning:true,projectWorkspace:true,vision:true,memory:true,agentMode:false,batchTasks:true,multiModel:false}:{reasoning:key!=="guest",projectWorkspace:false,vision:false,memory:false,agentMode:false,batchTasks:false,multiModel:false}});
@@ -17,19 +47,44 @@ const reasoningTier=(p:any)=>String(p?.reasoning_tier||"none");
 function allowed(p:any,r:string,t:string){if(r==="owner")return true;const tiers=Array.isArray(p?.model_tiers)?p.model_tiers:[];return tiers.includes(t)}
 function capAllowed(p:any,c:string){if(!c)return true;return Boolean(p?.capabilities&&p.capabilities[c])}
 function pruneBuckets(now:number){if(buckets.size<1000)return;for(const [k,v] of buckets){if(now-v.started>SHIELD_WINDOW_MS*2)buckets.delete(k)}if(buckets.size>1200){const first=buckets.keys().next().value;if(first)buckets.delete(first)}}
-function shield(req:Request,id:string,_raw:string){
+async function shield(admin:any,req:Request,id:string){
   const now=Date.now();
-  pruneBuckets(now);
-  // Prefer the edge-injected client IP header; the per-user bucket remains
-  // independently effective even if a caller can spoof a forwarding header.
-  const ip=(req.headers.get("cf-connecting-ip")||req.headers.get("x-forwarded-for")||"").split(",")[0].trim()||"unknown";
-  const userLimit=checkRateLimitBucket(buckets,"user:"+id,now,SHIELD_WINDOW_MS,SHIELD_MAX_REQUESTS,50);
-  if(!userLimit.ok)return userLimit;
-  if(ip!=="unknown"){
-    const ipLimit=checkRateLimitBucket(buckets,"ip:"+ip,now,SHIELD_WINDOW_MS,SHIELD_MAX_REQUESTS,50);
-    if(!ipLimit.ok)return ipLimit;
+  const edgeIp=(req.headers.get("cf-connecting-ip")||"").split(",")[0].trim();
+  const forwardedIp=(req.headers.get("x-forwarded-for")||"").split(",")[0].trim();
+  const fallbackIp=edgeIp||forwardedIp||"unknown";
+  const keys=[{hash:await sha("legendaryai:rate:user:"+id),max:SHIELD_MAX_REQUESTS,min:50}];
+  // Only persist an IP bucket when the edge supplied its dedicated client-IP
+  // header. A caller-controlled X-Forwarded-For value is not stored in Postgres.
+  if(edgeIp)keys.push({hash:await sha("legendaryai:rate:ip:"+edgeIp),max:SHIELD_IP_MAX_REQUESTS,min:SHIELD_IP_MIN_INTERVAL_MS});
+  try{
+    for(const key of keys){
+      const {data,error}=await admin.rpc("check_api_rate_limit",{
+        p_key_hash:key.hash,
+        p_now:new Date(now).toISOString(),
+        p_window_seconds:60,
+        p_max_requests:key.max,
+        p_min_interval_ms:key.min
+      });
+      if(error||!data||typeof data!=="object")throw new Error("PERSISTENT_RATE_LIMIT_UNAVAILABLE");
+      if(data.ok!==true)return {
+        ok:false,
+        code:String(data.code||"RATE_LIMITED"),
+        retryAfter:Math.max(1,Number(data.retry_after??data.retryAfter??1))
+      };
+    }
+    return {ok:true as const,code:"",retryAfter:0};
+  }catch{
+    // The in-memory fallback maintains per-user limits if an older database has
+    // not applied the migration yet; it is explicitly not distributed across isolates.
+    pruneBuckets(now);
+    const userLimit=checkRateLimitBucket(buckets,"user:"+id,now,SHIELD_WINDOW_MS,SHIELD_MAX_REQUESTS,50);
+    if(!userLimit.ok)return userLimit;
+    if(fallbackIp!=="unknown"){
+      const ipLimit=checkRateLimitBucket(buckets,"ip:"+fallbackIp,now,SHIELD_WINDOW_MS,SHIELD_IP_MAX_REQUESTS,SHIELD_IP_MIN_INTERVAL_MS);
+      if(!ipLimit.ok)return ipLimit;
+    }
+    return {ok:true as const,code:"",retryAfter:0};
   }
-  return {ok:true as const,code:"",retryAfter:0};
 }
 function normalize(ms:any[]){return(Array.isArray(ms)?ms:[]).filter((m:any)=>m&&(m.role==="user"||m.role==="assistant"||m.role==="ai")).slice(-MAX_MESSAGES).map((m:any)=>({role:m.role==="ai"?"assistant":m.role,content:textOf(m.content)}))}
 function compact(ms:any[],prompt:string){const all=normalize(ms),terms=new Set((prompt.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]).slice(0,24)),scored=all.map((m,i)=>{let score=i>=all.length-10?3:0;for(const t of terms)if(m.content.toLowerCase().includes(t))score++;return{m,i,score}}),picked=[...scored.filter(x=>x.i<all.length-10).sort((a,b)=>b.score-a.score||b.i-a.i).slice(0,14),...scored.slice(-10)],seen=new Set<number>(),outm:any[]=[];let total=0;for(const x of picked){if(seen.has(x.i))continue;const n=x.m.content.length;if(outm.length&&total+n>MAX_CONTEXT_CHARS)continue;seen.add(x.i);outm.push(x.m);total+=n}return outm}
@@ -60,7 +115,7 @@ async function maybeSaveExplicitMemory(admin:any,userId:string,prompt:string,ena
   return !error;
 }
 async function localChat(url:string,model:string,ms:any[],system:string,max:number,temp:number){const base=url.replace(/\/$/,"");const gatewayToken=Deno.env.get("LEGENDARY_LOCAL_AI_TOKEN")||"";if(!gatewayToken)throw new Error("MODEL_GATEWAY_AUTH_NOT_CONFIGURED");let last:any;for(let i=0;i<2;i++){const c=new AbortController(),timer=setTimeout(()=>c.abort(),LOCAL_TIMEOUT_MS);try{const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+gatewayToken},body:JSON.stringify({model,stream:false,messages:[{role:"system",content:buildModelSystemPrompt(system)},...ms],options:{temperature:temp,num_predict:max}}),signal:c.signal}),raw=await r.text();if(!r.ok)throw new Error(`Local AI HTTP ${r.status}`);const d=raw?JSON.parse(raw):null,t=String(d?.message?.content||d?.response||"").trim();if(!t)throw new Error("Local AI returned an empty response");return t}catch(e){last=e}finally{clearTimeout(timer)}if(i===0 && !(last instanceof Error && last.message==="Local AI HTTP 429"))await new Promise(r=>setTimeout(r,250));else if(last instanceof Error && last.message==="Local AI HTTP 429")break}throw last instanceof Error?last:new Error("Local AI request failed")}
-Deno.serve(async req=>{const origin=req.headers.get("origin")||"";if(origin&&!ORIGINS.has(origin))return new Response(JSON.stringify({error:"Origin not allowed",code:"ORIGIN_NOT_ALLOWED"}),{status:403,headers:{"Content-Type":"application/json; charset=utf-8","Vary":"Origin"}});if(req.method==="OPTIONS")return new Response("ok",{headers:cors(req)});if(req.method!=="POST")return out(req,{error:"Method not allowed"},405);const auth=req.headers.get("Authorization");if(!auth)return out(req,{error:"Unauthorized"},401);const url=Deno.env.get("SUPABASE_URL"),key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");if(!url||!key)return out(req,{error:"Server configuration missing",code:"SERVER_CONFIG"},503);const admin=createClient(url,key),token=auth.replace(/^Bearer\s+/i,"");const {data:authData,error:authError}=await admin.auth.getUser(token);if(authError||!authData.user)return out(req,{error:"Unauthorized"},401);let body:any,raw="";try{raw=await req.text();if(raw.length>250000)return out(req,{error:"Payload too large",code:"PAYLOAD_TOO_LARGE"},413);body=JSON.parse(raw)}catch{return out(req,{error:"Invalid JSON"},400)}const sh=shield(req,authData.user.id,raw);if(!sh.ok)return out(req,{error:"Legendary Shield blocked this request.",code:sh.code,retryAfter:sh.retryAfter},429,{"Retry-After":String(sh.retryAfter||1)});const ms=Array.isArray(body?.messages)?body.messages:[],prompt=textOf([...ms].reverse().find((m:any)=>m?.role==="user")?.content).trim();if(!prompt)return out(req,{error:"messages is required"},400);const isGuest=authData.user.is_anonymous===true;let {data:profile,error:pe}=await admin.from("profiles").select("role,plan,plan_id,token_limit,tokens_used,token_reset_at,plan_expires_at,memory_enabled,vision_enabled").eq("id",authData.user.id).maybeSingle();if(pe||!profile)return out(req,{error:"Profile could not be loaded",code:"PROFILE_NOT_FOUND"},500);
+Deno.serve(async req=>{const origin=req.headers.get("origin")||"";if(origin&&!ORIGINS.has(origin))return new Response(JSON.stringify({error:"Origin not allowed",code:"ORIGIN_NOT_ALLOWED"}),{status:403,headers:{"Content-Type":"application/json; charset=utf-8","Vary":"Origin"}});if(req.method==="OPTIONS")return new Response("ok",{headers:cors(req)});if(req.method!=="POST")return out(req,{error:"Method not allowed"},405);const auth=req.headers.get("Authorization");if(!auth)return out(req,{error:"Unauthorized"},401);const url=Deno.env.get("SUPABASE_URL"),key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");if(!url||!key)return out(req,{error:"Server configuration missing",code:"SERVER_CONFIG"},503);const admin=createClient(url,key),token=auth.replace(/^Bearer\s+/i,"");const {data:authData,error:authError}=await admin.auth.getUser(token);if(authError||!authData.user)return out(req,{error:"Unauthorized"},401);const sh=await shield(admin,req,authData.user.id);if(!sh.ok)return out(req,{error:"Legendary Shield blocked this request.",code:sh.code,retryAfter:sh.retryAfter},429,{"Retry-After":String(sh.retryAfter||1)});let body:any,raw="";try{const read=await readBodyLimited(req,250000);if(read.tooLarge)return out(req,{error:"Payload too large",code:"PAYLOAD_TOO_LARGE"},413);raw=read.text;body=JSON.parse(raw)}catch{return out(req,{error:"Invalid JSON"},400)}const ms=Array.isArray(body?.messages)?body.messages:[],prompt=textOf([...ms].reverse().find((m:any)=>m?.role==="user")?.content).trim();if(!prompt)return out(req,{error:"messages is required"},400);const isGuest=authData.user.is_anonymous===true;let {data:profile,error:pe}=await admin.from("profiles").select("role,plan,plan_id,token_limit,tokens_used,token_reset_at,plan_expires_at,memory_enabled,vision_enabled").eq("id",authData.user.id).maybeSingle();if(pe||!profile)return out(req,{error:"Profile could not be loaded",code:"PROFILE_NOT_FOUND"},500);
 if(!isGuest && String(profile.role||"user")!=="owner" && String(profile.plan||"free")!=="free" && profile.plan_expires_at && new Date(profile.plan_expires_at).getTime() <= Date.now()){
   const {data:freePlan}=await admin.from("plans").select("id,key,token_limit,reset_hours,capabilities").eq("key","free").eq("enabled",true).maybeSingle();
   if(freePlan){

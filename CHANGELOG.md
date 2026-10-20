@@ -1,5 +1,12 @@
 # LegendaryAI Changelog
 
+## 1.2.2 — CORS origin allowlist hardening
+- Reject browser requests with an unapproved Origin at the active `ai-chat-v10` and `local-model-health` Edge Function boundaries.
+- Add the configured `SITE_URL` to the explicit allowlist while preserving localhost development origins.
+- Add a CI regression check for the origin rejection boundary.
+
+# LegendaryAI Changelog
+
 ## 1.2.0 — Legendary Brain V12
 - Added bounded **Planner → Executor → Verifier → Finalizer** pipeline to Native Core.
 - Added an explicit native-tool allowlist for math, unit conversion, JSON formatting, extractive summary, code diagnostics and safe templates.

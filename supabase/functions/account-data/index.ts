@@ -25,7 +25,7 @@ function response(req: Request, body: unknown, status = 200) {
   });
 }
 
-async function storageObjects(admin: ReturnType<typeof createClient>, prefix: string, depth = 0): Promise<string[]> {
+async function storageObjects(admin: any, prefix: string, depth = 0): Promise<string[]> {
   if (depth > 8) return [];
   const found: string[] = [];
   for (let offset = 0; offset < 10000; offset += 100) {

@@ -1,6 +1,6 @@
 import { hmacSha256, momoCreateSignatureText, momoIpnSignatureText, timingSafeHexEqual } from "../supabase/functions/_shared/momo.ts";
 
-function assertEquals(actual: unknown, expected: unknown, message: string) {
+function assertEquals(actual, expected, message) {
   if (actual !== expected) throw new Error(message + "\nactual: " + String(actual) + "\nexpected: " + String(expected));
 }
 

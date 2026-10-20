@@ -44,7 +44,7 @@
     } catch (error) {
       report(error && error.message ? error.message : 'Không thể xác minh trạng thái.', true);
     } finally {
-      await client.auth.signOut().catch(function () {});
+      // Do not sign out the user's main-site session from this status page.
     }
   }
   run().catch(function () { report('Không thể xác minh trạng thái thanh toán. Vui lòng thử lại sau.', true); });

@@ -7,7 +7,7 @@ const ORIGINS=new Set(["https://legendaryai.vercel.app","https://www.legendaryai
 const MAX_MESSAGES=60,MAX_CONTEXT_CHARS=60000,SHIELD_WINDOW_MS=60000,SHIELD_MAX_REQUESTS=20,LOCAL_TIMEOUT_MS=12000;
 const cache=new Map<string,{created:number;text:string;local:boolean}>(),buckets=new Map<string,{started:number;count:number;last:number}>(),memoryCache=new Map<string,{created:number;items:string[]}>();
 const CACHE_TTL_MS=15000,MEMORY_TTL_MS=30000;
-function cors(req:Request){const origin=req.headers.get("origin")||"";return {"Access-Control-Allow-Origin":ORIGINS.has(origin)?origin:"https://legendaryai.vercel.app","Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Credentials":"true",Vary:"Origin"}}
+function cors(req:Request){const origin=req.headers.get("origin")||"";return {...(ORIGINS.has(origin)?{"Access-Control-Allow-Origin":origin}:{}),"Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Credentials":"true",Vary:"Origin"}}
 function out(req:Request,body:unknown,status=200,extra:Record<string,string>={}){return new Response(JSON.stringify(body),{status,headers:{"Content-Type":"application/json; charset=utf-8",...cors(req),...extra}})}
 function textOf(v:any):string{if(Array.isArray(v))return v.map((x:any)=>typeof x==="string"?x:x?.type==="text"?x.text||"":x?.type==="image"?`[IMAGE:${String(x.name||"image")}]`:x?.text||x?.content||"").join("\n");if(typeof v==="string")return v;if(v==null)return "";return JSON.stringify(v)}
 const approxTokens=(t:string)=>Math.max(1,Math.ceil(String(t||"").length/4));
@@ -43,7 +43,7 @@ async function maybeSaveExplicitMemory(admin:any,userId:string,prompt:string,ena
   if(!error)memoryCache.delete(userId);
   return !error;
 }
-async function localChat(url:string,model:string,ms:any[],system:string,max:number,temp:number){const base=url.replace(/\/$/,"");let last:any;for(let i=0;i<2;i++){const c=new AbortController(),timer=setTimeout(()=>c.abort(),LOCAL_TIMEOUT_MS);try{const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model,stream:false,messages:[{role:"system",content:buildModelSystemPrompt(system)},...ms],options:{temperature:temp,num_predict:max}}),signal:c.signal}),raw=await r.text();if(!r.ok)throw new Error(`Local AI HTTP ${r.status}: ${raw.slice(0,300)}`);const d=raw?JSON.parse(raw):null,t=String(d?.message?.content||d?.response||"").trim();if(!t)throw new Error("Local AI returned an empty response");return t}catch(e){last=e}finally{clearTimeout(timer)}if(i===0)await new Promise(r=>setTimeout(r,250))}throw last instanceof Error?last:new Error("Local AI request failed")}
+async function localChat(url:string,model:string,ms:any[],system:string,max:number,temp:number){const base=url.replace(/\/$/,"");const gatewayToken=Deno.env.get("LEGENDARY_LOCAL_AI_TOKEN")||"";if(!gatewayToken)throw new Error("MODEL_GATEWAY_AUTH_NOT_CONFIGURED");let last:any;for(let i=0;i<2;i++){const c=new AbortController(),timer=setTimeout(()=>c.abort(),LOCAL_TIMEOUT_MS);try{const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+gatewayToken},body:JSON.stringify({model,stream:false,messages:[{role:"system",content:buildModelSystemPrompt(system)},...ms],options:{temperature:temp,num_predict:max}}),signal:c.signal}),raw=await r.text();if(!r.ok)throw new Error(`Local AI HTTP ${r.status}`);const d=raw?JSON.parse(raw):null,t=String(d?.message?.content||d?.response||"").trim();if(!t)throw new Error("Local AI returned an empty response");return t}catch(e){last=e}finally{clearTimeout(timer)}if(i===0 && !(last instanceof Error && last.message==="Local AI HTTP 429"))await new Promise(r=>setTimeout(r,250));else if(last instanceof Error && last.message==="Local AI HTTP 429")break}throw last instanceof Error?last:new Error("Local AI request failed")}
 Deno.serve(async req=>{const origin=req.headers.get("origin")||"";if(origin&&!ORIGINS.has(origin))return new Response(JSON.stringify({error:"Origin not allowed",code:"ORIGIN_NOT_ALLOWED"}),{status:403,headers:{"Content-Type":"application/json; charset=utf-8","Vary":"Origin"}});if(req.method==="OPTIONS")return new Response("ok",{headers:cors(req)});if(req.method!=="POST")return out(req,{error:"Method not allowed"},405);const auth=req.headers.get("Authorization");if(!auth)return out(req,{error:"Unauthorized"},401);const url=Deno.env.get("SUPABASE_URL"),key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");if(!url||!key)return out(req,{error:"Server configuration missing",code:"SERVER_CONFIG"},503);const admin=createClient(url,key),token=auth.replace(/^Bearer\s+/i,"");const {data:authData,error:authError}=await admin.auth.getUser(token);if(authError||!authData.user)return out(req,{error:"Unauthorized"},401);let body:any,raw="";try{raw=await req.text();if(raw.length>250000)return out(req,{error:"Payload too large",code:"PAYLOAD_TOO_LARGE"},413);body=JSON.parse(raw)}catch{return out(req,{error:"Invalid JSON"},400)}const sh=shield(req,authData.user.id,raw);if(!sh.ok)return out(req,{error:"Legendary Shield blocked this request.",code:sh.code,retryAfter:sh.retryAfter},429,{"Retry-After":String(sh.retryAfter||1)});const ms=Array.isArray(body?.messages)?body.messages:[],prompt=textOf([...ms].reverse().find((m:any)=>m?.role==="user")?.content).trim();if(!prompt)return out(req,{error:"messages is required"},400);const isGuest=authData.user.is_anonymous===true;let {data:profile,error:pe}=await admin.from("profiles").select("role,plan,plan_id,token_limit,tokens_used,token_reset_at,plan_expires_at,memory_enabled,vision_enabled").eq("id",authData.user.id).maybeSingle();if(pe||!profile)return out(req,{error:"Profile could not be loaded",code:"PROFILE_NOT_FOUND"},500);
 if(!isGuest && String(profile.role||"user")!=="owner" && String(profile.plan||"free")!=="free" && profile.plan_expires_at && new Date(profile.plan_expires_at).getTime() <= Date.now()){
   const {data:freePlan}=await admin.from("plans").select("id,key,token_limit,reset_hours,capabilities").eq("key","free").eq("enabled",true).maybeSingle();
@@ -124,6 +124,7 @@ let servedLocal=false;
 let route=huggingface?"huggingface-local":(local?"local-ai":"native-core");
 let action="text";
 let localReservation=0;
+const reservationId=crypto.randomUUID();
 const inputTokens=approxTokens(selectedMessages.map(m=>m.content).join("\n"));
 
 function limitForProfile(p:any,planInfo:any,guest:boolean){
@@ -155,6 +156,10 @@ try{
       servedLocal=true;
     }catch(err){
       console.error("model runtime failed",String((err as any)?.code||err));
+      if(requested!=="auto"&&model.provider==="ollama-compatible"){
+        if(localReservation>0){await admin.rpc("refund_tokens",{p_amount:localReservation,p_user_id:authData.user.id,p_request_id:reservationId,p_reserved:localReservation});localReservation=0;}
+        return out(req,{error:"Model bạn chọn hiện không khả dụng. Không trả về câu trả lời thay thế dưới tên model đã chọn.",code:"MODEL_UNAVAILABLE",fallbackUsed:false,requestId:reservationId},503);
+      }
       fallback=true;
       route="native-fallback";
     }
@@ -174,7 +179,7 @@ try{
   if(localReservation>0){
     const refundAmount=Math.max(0,localReservation-actual);
     if(refundAmount>0){
-      const {error:refundError}=await admin.rpc("refund_tokens",{p_amount:refundAmount,p_user_id:authData.user.id});
+      const {error:refundError}=await admin.rpc("refund_tokens",{p_amount:refundAmount,p_user_id:authData.user.id,p_request_id:reservationId,p_reserved:localReservation});
       if(refundError) console.error("refund_tokens failed",refundError.message);
     }
   }
@@ -218,7 +223,7 @@ try{
   });
 }catch(error){
   if(localReservation>0){
-    const {error:refundError}=await admin.rpc("refund_tokens",{p_amount:localReservation,p_user_id:authData.user.id});
+    const {error:refundError}=await admin.rpc("refund_tokens",{p_amount:localReservation,p_user_id:authData.user.id,p_request_id:reservationId,p_reserved:localReservation});
     if(refundError) console.error("refund after failure failed",refundError.message);
   }
   console.error("AI engine error",error instanceof Error?error.message:String(error));

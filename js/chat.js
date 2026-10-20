@@ -152,12 +152,18 @@
     return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   }
   var activeController = null;
+  var activeTyping = null;
   var pendingAttachments = [];
 
   function abortActiveResponse() {
     var controller = activeController;
+    var typing = activeTyping;
     activeController = null;
+    activeTyping = null;
     if (controller) controller.abort();
+    if (typing && typing.bubble && typing.wrap && typing.wrap.isConnected) {
+      setErrorBubble(typing, 'Đã dừng phản hồi.');
+    }
     toggleBusyUI(false);
     if (streamStatus) streamStatus.textContent = '';
   }
@@ -1782,6 +1788,7 @@
 
     var controller = new AbortController();
     activeController = controller;
+    activeTyping = typing;
     toggleBusyUI(true);
 
     if (streamStatus) {
@@ -1806,6 +1813,7 @@
       fitChatPayload(requestOptions);
     } catch (error) {
       if (activeController === controller) activeController = null;
+      if (activeTyping === typing) activeTyping = null;
       toggleBusyUI(false);
       if (streamStatus) streamStatus.textContent = '';
       setErrorBubble(typing, error && error.message ? error.message : 'Dữ liệu gửi lên vượt giới hạn.');
@@ -1818,6 +1826,7 @@
         typing.raw = result.text || '';
 
         finalizeAiBubble(typing);
+        if (activeTyping === typing) activeTyping = null;
 
         if (activeController === controller) toggleBusyUI(false);
 
@@ -1843,6 +1852,7 @@
       })
       .catch(function (err) {
         if (activeController !== controller) return;
+        if (activeTyping === typing) activeTyping = null;
         if (err && err.name === 'AbortError') {
           setErrorBubble(typing, 'Đã dừng phản hồi.');
         } else {
@@ -1938,11 +1948,7 @@
     stopBtn.addEventListener(
       'click',
       function () {
-        if (activeController) {
-          activeController.abort();
-        }
-
-        toggleBusyUI(false);
+        abortActiveResponse();
       }
     );
   }

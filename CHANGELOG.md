@@ -1,5 +1,9 @@
 # LegendaryAI Changelog
 
+## 1.3.2 — PostgreSQL verification (2026-10-20)
+- Fixed invalid dollar-quote delimiters in the repository SQL schema that prevented token RPC functions from parsing on a clean PostgreSQL database.
+- Added PostgreSQL 17 CI integration with a disposable Supabase auth/storage fixture, clean-schema execution, latest migration application, user A/user B RLS isolation, service-role-only quota RPC checks, idempotent token refunds, MoMo payment finalization/idempotency, and a concurrent quota reservation race.
+
 ## 1.3.1 — Runtime verification hardening (2026-10-20)
 - Centralized the MoMo payment-init and captureWallet IPN canonical signature strings in shared helpers used by both Edge Functions.
 - Added deterministic HMAC test vectors and case/tampering/length checks for hexadecimal signature comparison.

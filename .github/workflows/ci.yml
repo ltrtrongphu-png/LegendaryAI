@@ -101,6 +101,8 @@ jobs:
         run: node tests/legal-routes.test.mjs
       - name: Auth privacy and OAuth failure contract
         run: node tests/auth-privacy-contract.test.mjs
+      - name: Chat auth/cache isolation contract
+        run: node tests/chat-auth-cache-contract.test.mjs
       - name: Current-tree secret scan
         run: node tests/secret-scan.test.mjs
       - name: Git history secret scan

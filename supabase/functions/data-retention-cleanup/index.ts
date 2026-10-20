@@ -7,7 +7,7 @@ function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function listOldObjects(admin: ReturnType<typeof createClient>, prefix: string, cutoff: Date, depth = 0): Promise<string[]> {
+async function listOldObjects(admin: any, prefix: string, cutoff: Date, depth = 0): Promise<string[]> {
   if (depth > 8) return [];
   const result: string[] = [];
   for (let offset = 0; offset < 10000; offset += 100) {

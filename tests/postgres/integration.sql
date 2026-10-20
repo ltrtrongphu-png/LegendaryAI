@@ -8,6 +8,8 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Supabase grants these table privileges by default; the disposable fixture grants them
 -- explicitly so the test measures RLS behavior, not platform default-privilege setup.
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO service_role;
 GRANT SELECT ON public.profiles, public.orders TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.conversations, public.messages, public.ai_memories TO authenticated;
 GRANT SELECT ON public.ai_usage_logs TO authenticated;

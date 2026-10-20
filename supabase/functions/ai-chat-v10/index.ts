@@ -78,7 +78,7 @@ const modeInstructions:Record<string,string>={
   analysis:"Analysis mode: separate facts, assumptions, and uncertainty; compare relevant alternatives; check internal consistency; surface important counterpoints; and give a clear evidence-based synthesis.",
   creative:"Creative mode: generate original ideas and usable drafts within the user constraints. Explore multiple directions when useful, avoid generic filler, and keep results practical."
 };
-system+="\nAssistant mode: "+mode+".\n"+(modeInstructions[mode]||modeInstructions.general);const memories=await relevantMemories(admin,authData.user.id,prompt,!isGuest&&Boolean(profile.memory_enabled));const memorySaved=await maybeSaveExplicitMemory(admin,authData.user.id,prompt,!isGuest&&Boolean(profile.memory_enabled));if(reasoning)system+=`\nReasoning mode ${rt}: analyze carefully, verify assumptions, compare alternatives when useful, then return only the final answer. Never reveal hidden reasoning.`;if(capability==="project")system+="\nProject Workspace: preserve project constraints, decisions, terminology, and continuity across this task.";if(capability==="agent")system+="\nAgent mode: follow the bounded V12 plan, use only explicitly available tools/actions, verify outputs before presenting them, and never claim an unavailable action was executed.";if(capability==="batch")system+="\nBatch mode: handle each item independently and clearly report each result.";if(capability==="multi-model")system+="\nMulti-model orchestration: use only configured model capabilities and never claim unavailable routing.";if(memories.length)system+="\nRelevant user memory (use only when directly applicable; do not invent beyond it):\n"+memories.map((m:string)=>"- "+m).join("\n");const max=budget(intent,Math.min(Math.max(Number(body?.max_tokens)||Number(model.max_output_tokens)||8192,256),Number(model.max_output_tokens)||8192));
+system+="\nAssistant mode: "+mode+".\n"+(modeInstructions[mode]||modeInstructions.general);const memories=await relevantMemories(admin,authData.user.id,prompt,!isGuest&&Boolean(profile.memory_enabled));const memorySaved=await maybeSaveExplicitMemory(admin,authData.user.id,prompt,!isGuest&&Boolean(profile.memory_enabled));if(reasoning)system+=`\nReasoning mode ${rt}: analyze carefully, verify assumptions, compare alternatives when useful, then return only the final answer. Never reveal hidden reasoning.`;if(capability==="project")system+="\nProject Workspace: preserve project constraints, decisions, terminology, and continuity across this task.";if(capability==="agent")system+="\nAgent mode: follow the bounded V12 plan, use only explicitly available tools/actions, verify outputs before presenting them, and never claim an unavailable action was executed.";if(capability==="batch")system+="\nBatch mode: handle each item independently and clearly report each result.";if(capability==="multi-model")system+="\nMulti-model orchestration: use only configured model capabilities and never claim unavailable routing.";if(memories.length)system+="\nRelevant user memory (use only when directly applicable; do not invent beyond it):\n"+memories.map((m:string)=>"- "+m).join("\n");let max=budget(intent,Math.min(Math.max(Number(body?.max_tokens)||Number(model.max_output_tokens)||8192,256),Number(model.max_output_tokens)||8192));
 const gateway=Deno.env.get("LEGENDARY_LOCAL_AI_URL")||"";
 const local=Boolean(gateway&&model.provider==="ollama-compatible"&&model.model_id);
 const huggingface=Boolean(model.provider==="huggingface-space"&&model.model_id&&Deno.env.get("HF_SPACE_URL"));
@@ -135,10 +135,13 @@ try{
   if(local || huggingface){
     const limit=limitForProfile(profile,planData,isGuest);
     const remaining=Math.max(0,limit-Number(profile.tokens_used||0));
-    localReservation=Math.min(inputTokens+max,remaining);
-    if(localReservation<=0){
-      return out(req,{error:"Bạn đã chạm hạn mức token của gói hiện tại.",code:"TOKEN_LIMIT",tokenLimit:limit,tokensUsed:Number(profile.tokens_used||0),tokenResetAt:profile.token_reset_at},429);
+    // Do not reserve less than the requested budget and then let inference exceed the quota.
+    // Require enough budget for input plus the minimum output; cap generation to the remaining balance.
+    if(remaining<inputTokens+256){
+      return out(req,{error:"Hạn mức còn lại không đủ cho ngữ cảnh và đầu ra tối thiểu. Hãy giảm ngữ cảnh hoặc chờ reset.",code:"TOKEN_LIMIT",tokenLimit:limit,tokensUsed:Number(profile.tokens_used||0),tokenResetAt:profile.token_reset_at},429);
     }
+    max=Math.max(256,Math.min(max,remaining-inputTokens));
+    localReservation=inputTokens+max;
     const {data:ok,error:te}=await admin.rpc("consume_tokens",{p_amount:localReservation,p_user_id:authData.user.id,p_is_guest:isGuest});
     if(te){
       console.error("consume_tokens failed",te.message);

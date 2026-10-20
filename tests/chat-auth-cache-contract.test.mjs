@@ -5,6 +5,8 @@ const chat = readFileSync("js/chat.js", "utf8");
 const account = readFileSync("js/account.js", "utf8");
 
 assert.match(chat, /window\.addEventListener\('legendary:cloud-synced', rehydrateConversationsFromCloud\)/, "the chat UI must hydrate the authoritative cache after cloud sync");
+assert.match(chat, /var activeTyping = null/, "an active response bubble must have a tracked lifecycle");
+assert.match(chat, /activeTyping = null;[\s\S]*if \(controller\) controller\.abort\(\)/, "auth changes must detach the old request before aborting it");
 assert.match(chat, /function rehydrateConversationsFromCloud\(\)/, "cloud rehydration must be centralized");
 assert.match(chat, /var incoming = loadConversations\(\)\.filter\(function \(conv\) \{ return !conv\.draft; \}\)/, "cloud history reload must avoid duplicate placeholder drafts");
 const authStart = chat.lastIndexOf("window.addEventListener('legendary:auth-changed', function ()");

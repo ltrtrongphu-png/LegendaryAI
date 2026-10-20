@@ -39,6 +39,9 @@ assert.match(legacyChat, /p_request_id: reservationId, p_reserved: reservation/,
 assert.match(health, /Authorization: `Bearer \$\{gatewayToken\}`/, "health check must authenticate to the private gateway");
 
 assert.match(createPayment, /AbortController/, "MoMo provider call must time out");
+assert.match(createPayment, /LEGENDARY_LOCAL_AI_TOKEN/, "paid checkout must require the private model gateway secret");
+assert.match(createPayment, /\/api\/tags/, "paid checkout must verify live model gateway readiness");
+assert.match(createPayment, /PAYMENT_MODEL_UNAVAILABLE/, "paid checkout must fail closed when model is unavailable");
 assert.doesNotMatch(createPayment, /MOMO_ENDPOINT.*test-payment\.momo\.vn/, "payment endpoint must not silently default to MoMo sandbox");
 assert.match(ipn, /body\.requestId.*order\.provider_request_id|body\.requestId\) !== String\(order\.provider_request_id/, "IPN must bind requestId to persisted order");
 assert.match(ipn, /Order metadata mismatch/, "successful IPN must bind signed user/plan metadata");

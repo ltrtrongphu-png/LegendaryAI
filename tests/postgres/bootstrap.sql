@@ -11,6 +11,9 @@ BEGIN
 END
 $roles$;
 
+-- Match Supabase's elevated service-role characteristics in this disposable fixture.
+ALTER ROLE service_role BYPASSRLS;
+
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE SCHEMA IF NOT EXISTS storage;
 

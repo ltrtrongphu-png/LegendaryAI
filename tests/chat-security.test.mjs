@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { escapeHtml, safeImageSource } from "../js/chat-safety.js";
+import chatSafety from "../js/chat-safety.js";
+const { escapeHtml, safeImageSource } = chatSafety;
 
 assert.equal(
   escapeHtml(`" onmouseover='alert(1)' <img src=x>&`),

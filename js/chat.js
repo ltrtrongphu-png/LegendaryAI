@@ -143,6 +143,7 @@
   };
   var ACTIVE_KEY = 'legendaryai_active_conv_v2';
   function messageUid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   }
   var activeController = null;
@@ -1702,6 +1703,50 @@
     return parts.length === 1 && parts[0].type === 'text' ? parts[0].text : parts;
   }
 
+  var CHAT_CONTEXT_LIMIT = 20;
+  var CHAT_PAYLOAD_BUDGET = 220000;
+
+  function sanitizeChatMessage(message, includeAttachments) {
+    var m = message || {};
+    var content = buildMessageContent({
+      text: String(m.text || ''),
+      attachments: includeAttachments ? (m.attachments || []) : []
+    });
+    if (Array.isArray(content)) {
+      content = content.map(function (part) {
+        if (part && part.type === 'image') return { type: 'text', text: '[Image attachment omitted from historical context]' };
+        return part;
+      });
+    }
+    return { role: m.role === 'ai' ? 'assistant' : 'user', content: content };
+  }
+
+  function buildBoundedChatMessages(conv) {
+    var source = (conv && Array.isArray(conv.messages)) ? conv.messages : [];
+    var start = Math.max(0, source.length - CHAT_CONTEXT_LIMIT);
+    var recent = source.slice(start);
+    return recent.map(function (message, index) {
+      return sanitizeChatMessage(message, start + index === source.length - 1);
+    });
+  }
+
+  function fitChatPayload(options) {
+    var payload = Object.assign({}, options);
+    delete payload.signal;
+    var serialized;
+    try { serialized = JSON.stringify(payload); } catch (_) {
+      var error = new Error('Không thể chuẩn bị dữ liệu cuộc trò chuyện.');
+      error.code = 'PAYLOAD_INVALID';
+      throw error;
+    }
+    if (serialized.length > CHAT_PAYLOAD_BUDGET) {
+      var tooLarge = new Error('Nội dung gửi lên quá lớn. Hãy rút gọn tệp đính kèm hoặc lịch sử cuộc trò chuyện.');
+      tooLarge.code = 'PAYLOAD_TOO_LARGE';
+      throw tooLarge;
+    }
+    return options;
+  }
+
   function callLegendaryEngine(conv) {
     var typing = addTypingBubble();
 
@@ -1714,32 +1759,22 @@
         'Legendary Engine đang suy luận…';
     }
 
-    var messages = conv.messages.map(
-      function (m) {
-        return {
-          role:
-            m.role === 'ai'
-              ? 'assistant'
-              : 'user',
-          content:
-            buildMessageContent(m, 'openai')
-        };
-      }
-    );
-
-    window.LegendaryAIEngine.chat({
-      model:
-        settings.engineModel ||
-        'auto',
+    var messages = buildBoundedChatMessages(conv);
+    var requestOptions = {
+      model: settings.engineModel || 'auto',
       messages: messages,
       system: settings.system || '',
       temperature: 0.35,
-      max_tokens: 8192,
+      max_tokens: 4096,
       reasoning: reasoningEnabled,
       mode: assistantMode,
       analysisLevel: ['education','coding','debug','analysis'].indexOf(assistantMode) >= 0 ? 4 : (assistantMode === 'creative' || assistantMode === 'writing' ? 2 : 1),
       signal: controller.signal
-    })
+    };
+
+    fitChatPayload(requestOptions);
+
+    window.LegendaryAIEngine.chat(requestOptions)
       .then(function (result) {
         typing.raw = result.text || '';
 
@@ -1799,9 +1834,16 @@
 
   function isImageGenerationPrompt(text) {
     var x = String(text || '').trim();
-    return /(?:^|\\s)(?:vẽ|draw)(?:\\s|$)/i.test(x) ||
-      /(?:^|\\s)(?:tạo|generate|create)(?:\\s|$)/i.test(x) &&
-      /(?:^|\\s)(?:ảnh|hình|image|picture|illustration|art|wallpaper|avatar|logo|poster|thumbnail|photo|meme)(?:\\s|$)/i.test(x);
+    if (!x) return false;
+
+    // Do not route diagrams/charts/code drawing requests to the paid image provider.
+    if (/(?:^|\s)(?:vẽ|draw)(?:\s|$)/i.test(x)) {
+      if (/(?:sơ đồ|diagram|mermaid|flowchart|biểu đồ|chart|graph|code|mã|architecture|kiến trúc)/i.test(x)) return false;
+      return true;
+    }
+
+    return /(?:^|\s)(?:tạo|generate|create)(?:\s|$)/i.test(x) &&
+      /(?:^|\s)(?:ảnh|hình|image|picture|illustration|art|wallpaper|avatar|logo|poster|thumbnail|photo|meme)(?:\s|$)/i.test(x);
   }
 
   function callImageProvider(conv) {

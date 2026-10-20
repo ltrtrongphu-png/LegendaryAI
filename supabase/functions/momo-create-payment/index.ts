@@ -170,11 +170,14 @@ Deno.serve(async (req) => {
   }
 
   if (!response.ok || result.resultCode !== 0) {
-    await admin.from("orders").update({
+    // An IPN can race this initiation response. Never downgrade an order that
+    // has already been finalized as paid by the signed callback.
+    const { error: failureUpdateError } = await admin.from("orders").update({
       status: "failed",
       provider_result_code: result.resultCode ?? -1,
       provider_message: result.message ?? "MoMo request failed",
-    }).eq("provider_order_id", orderId);
+    }).eq("provider_order_id", orderId).eq("status", "pending");
+    if (failureUpdateError) console.error("momo-create-payment: unable to record provider rejection");
     return cors({ error: "MoMo không thể tạo giao dịch. Vui lòng thử lại sau.", code: "PAYMENT_PROVIDER_REJECTED" }, 502, req);
   }
 

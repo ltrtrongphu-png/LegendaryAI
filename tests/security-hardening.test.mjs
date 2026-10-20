@@ -6,6 +6,7 @@ const migration = read("supabase/migrations/20261020120000_legal_payment_retenti
 const schema = read("supabase/schema.sql");
 const chat = read("supabase/functions/ai-chat-v10/index.ts");
 const legacyChat = read("supabase/functions/ai-chat/index.ts");
+const retiredChat = read("supabase/functions/ai-chat-v9/index.ts");
 const health = read("supabase/functions/local-model-health/index.ts");
 const createPayment = read("supabase/functions/momo-create-payment/index.ts");
 const ipn = read("supabase/functions/momo-ipn/index.ts");
@@ -31,6 +32,8 @@ for (const [label, src] of [["active chat", chat], ["legacy chat", legacyChat], 
   assert.match(src, /ORIGIN_NOT_ALLOWED/, label + " must reject unapproved origins");
   assert.match(src, /SITE_URL/, label + " must support configured SITE_URL");
 }
+assert.match(retiredChat, /CHAT_ROUTE_RETIRED/, "retired ai-chat-v9 must fail closed");
+assert.match(retiredChat, /ORIGIN_NOT_ALLOWED/, "retired ai-chat-v9 must not echo arbitrary Origin values");
 assert.match(chat, /LEGENDARY_LOCAL_AI_TOKEN/, "local inference must use the server-side bearer token");
 assert.match(chat, /MODEL_UNAVAILABLE/, "explicit local-model selection must not be silently relabelled as Native Core");
 assert.match(chat, /remaining<inputTokens\+256/, "generation must be bounded by remaining token budget");

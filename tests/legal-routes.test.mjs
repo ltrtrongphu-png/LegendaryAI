@@ -12,7 +12,7 @@ for (const slug of pages) {
 for (const slug of pages.filter((x) => x !== "payment-result")) {
   const html = read("legal/" + slug + ".html");
   assert.match(html, /lang="vi"/, slug + " should declare Vietnamese as its primary language");
-  assert.match(html, /Phiên bản 1\.0\.0/, slug + " needs a policy version");
+  assert.match(html, slug === "token-policy" ? /Phiên bản 1\.0\.1/ : /Phiên bản 1\.0\.0/, slug + " needs the expected policy version");
   assert.match(html, /TÊN ĐƠN VỊ|EMAIL HỖ TRỢ|ĐỊA CHỈ LIÊN HỆ/i, slug + " must keep unknown operator facts as placeholders");
 }
 const main = read("index.html");

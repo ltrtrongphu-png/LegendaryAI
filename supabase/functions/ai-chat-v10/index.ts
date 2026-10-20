@@ -114,7 +114,7 @@ const cacheHit=Boolean(cacheEntry);
 const started=Date.now();
 
 if(cacheHit){
-  const cachedInputTokens=approxTokens(selectedMessages.map(m=>m.content).join("\n"));
+  const cachedInputTokens=approxTokens(buildModelSystemPrompt(system)+"\n"+selectedMessages.map(m=>m.content).join("\n"));
   const cachedOutputTokens=approxTokens(cachedText);
   const cachedReservation=cachedInputTokens+cachedOutputTokens;
   const cachedReservationId=crypto.randomUUID();
@@ -182,7 +182,7 @@ let route=huggingface?"huggingface-local":(local?"local-ai":"native-core");
 let action="text";
 let localReservation=0;
 const reservationId=crypto.randomUUID();
-const inputTokens=approxTokens(selectedMessages.map(m=>m.content).join("\n"));
+const inputTokens=approxTokens(buildModelSystemPrompt(system)+"\n"+selectedMessages.map(m=>m.content).join("\n"));
 
 function limitForProfile(p:any,planInfo:any,guest:boolean){
   return guest?1000:Number(planInfo?.token_limit||p?.token_limit||500000);

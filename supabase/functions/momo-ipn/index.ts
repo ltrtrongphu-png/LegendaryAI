@@ -1,27 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-async function hmacSha256(secret: string, message: string): Promise<string> {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return Array.from(new Uint8Array(signature)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+import { hmacSha256, momoIpnSignatureText, timingSafeHexEqual } from "../_shared/momo.ts";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json; charset=utf-8" }
   });
-}
-
-function timingSafeHexEqual(a: string, b: string): boolean {
-  const aa = String(a || "").toLowerCase();
-  const bb = String(b || "").toLowerCase();
-  const max = Math.max(aa.length, bb.length);
-  let diff = aa.length ^ bb.length;
-  for (let i = 0; i < max; i++) {
-    diff |= (aa.charCodeAt(i) || 0) ^ (bb.charCodeAt(i) || 0);
-  }
-  return diff === 0;
 }
 
 Deno.serve(async (req) => {
@@ -59,20 +43,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  const signatureText =
-    "accessKey=" + accessKey +
-    "&amount=" + body.amount +
-    "&extraData=" + (body.extraData || "") +
-    "&message=" + body.message +
-    "&orderId=" + body.orderId +
-    "&orderInfo=" + body.orderInfo +
-    "&orderType=" + body.orderType +
-    "&partnerCode=" + body.partnerCode +
-    "&payType=" + body.payType +
-    "&requestId=" + body.requestId +
-    "&responseTime=" + body.responseTime +
-    "&resultCode=" + body.resultCode +
-    "&transId=" + body.transId;
+  const signatureText = momoIpnSignatureText(accessKey, body as Record<string, unknown>);
 
   const expected = await hmacSha256(secretKey, signatureText);
   if (!timingSafeHexEqual(body.signature, expected)) {

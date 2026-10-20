@@ -5,6 +5,7 @@
 - Added deterministic HMAC test vectors and case/tampering/length checks for hexadecimal signature comparison.
 - Reduced background WebGL particle/line counts on reduced-motion and low-resource devices, disabled continuous animation in those modes, paused animation on hidden tabs, and released GPU resources on pagehide.
 - Added Playwright smoke coverage for the application shell, /new and /chat/:slug deep links, and all legal routes; CI installs a pinned Playwright release for the browser check.
+- Escaped quoted HTML attributes, restricted image sources to raster data URLs/HTTPS, bounded upload and ZIP expansion sizes, and cancelled stale chat requests on navigation.
 
 ## 1.3.0 — Security, payment, privacy and legal consolidation (2026-10-20)
 - Hardened CORS allowlists across active and legacy chat, model health, Owner, token reset and payment endpoints; allow SITE_URL explicitly and reject unapproved browser origins.

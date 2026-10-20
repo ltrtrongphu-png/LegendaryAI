@@ -2370,8 +2370,17 @@
   renderSidebar();
   renderMessages();
 
-  window.addEventListener(
-    'legendary:auth-changed',
-    syncEngineModelAccess
-  );
+  window.addEventListener('legendary:auth-changed', function () {
+    abortActiveResponse();
+    syncEngineModelAccess();
+  });
+
+  window.addEventListener('legendary:sync-conflict', function (event) {
+    var detail = event && event.detail || {};
+    var count = Math.max(0, Number(detail.count || 0));
+    if (!streamStatus) return;
+    streamStatus.textContent = count
+      ? 'Phát hiện ' + count + ' xung đột đồng bộ. Bản cục bộ đã được giữ; bản đám mây được sao lưu thành hội thoại có tiền tố “[Bản đám mây]”. Hãy so sánh hai bản trước khi tiếp tục chỉnh sửa.'
+      : 'Phát hiện xung đột đồng bộ. Dữ liệu cục bộ được giữ để tránh mất nội dung.';
+  });
 })();

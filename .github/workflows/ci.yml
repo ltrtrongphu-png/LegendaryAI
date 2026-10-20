@@ -17,6 +17,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: CORS origin allowlist regression
+        run: node tests/cors-origin-policy.test.mjs
       - name: Browser routing regression
         run: node tests/chat-routing.test.js
       - name: Image intent regression

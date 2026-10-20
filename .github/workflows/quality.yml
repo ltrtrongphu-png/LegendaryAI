@@ -48,3 +48,5 @@ jobs:
         run: node tests/bg3d-runtime.test.mjs
       - name: Regression test chat rendering security
         run: node tests/chat-security.test.mjs
+      - name: Regression test cloud synchronization races
+        run: node tests/cloud-sync-runtime.test.mjs

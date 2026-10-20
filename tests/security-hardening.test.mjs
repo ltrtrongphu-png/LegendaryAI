@@ -19,6 +19,10 @@ assert.match(migration, /create table if not exists public\.token_refunds/i, "re
 assert.match(migration, /revoke all on function public\.refund_tokens\(integer, uuid\) from public, anon, authenticated, service_role/i, "legacy non-idempotent refund RPC must be disabled");
 assert.match(migration, /grant execute on function public\.refund_tokens\(integer, uuid, text, integer\) to service_role/i, "only service role can use idempotent refund RPC");
 assert.match(migration, /revoke all on function public\.consume_tokens\(integer, uuid, boolean\) from public, anon, authenticated/i, "client roles cannot reserve tokens directly");
+assert.match(migration, /add column if not exists expires_at timestamptz/i, "payment finalizer order expiry column must exist");
+assert.match(migration, /finalize_tokens_for_user\(uuid, integer, integer\)/i, "legacy service-role settlement needs explicit user ID");
+assert.match(migration, /grant execute on function public\.finalize_tokens_for_user\(uuid, integer, integer\) to service_role/i, "only service role can settle legacy usage");
+assert.match(legacyChat, /rpc\("finalize_tokens_for_user"/i, "legacy chat must use the explicit-user settlement RPC");
 assert.match(schema, /drop policy if exists "ai models owner write"/i, "schema must explicitly reapply model-write authorization");
 assert.match(schema, /p\.id = \(select auth\.uid\(\)\) and p\.role = 'owner'/i, "Owner model policies should use a stable initplan");
 assert.doesNotMatch(schema, /ltrtrongphu@gmail\.com/i, "Owner privilege must not be granted by matching an email address");

@@ -482,8 +482,27 @@
     try { await renderPlans(); } catch(e) { body.innerHTML='<p class="auth-error">'+escapeHtml(e.message)+'</p>'; }
   }
 
+  function clearAccountScopedCache(userId) {
+    try {
+      localStorage.removeItem('legendaryai_conversations_v2');
+      localStorage.removeItem('legendaryai_active_conv_v2');
+      if (userId) {
+        localStorage.removeItem('legendaryai_conversations_v3:' + userId);
+        localStorage.removeItem('legendaryai_active_conv_v3:' + userId);
+        localStorage.removeItem('legendaryai_sync_state_v3:' + userId);
+        if (localStorage.getItem('legendaryai_conv_owner_v3') === userId) {
+          localStorage.removeItem('legendaryai_conv_owner_v3');
+        }
+      }
+    } catch (_) {}
+  }
+
   async function signOut() {
-    if (supabase) await supabase.auth.signOut();
+    var previousUser = null;
+    try { previousUser = await LegendaryBackend.getUser(); } catch (_) {}
+    try { if (supabase) await supabase.auth.signOut(); } catch (_) {}
+    if (previousUser && !previousUser.is_anonymous) clearAccountScopedCache(previousUser.id);
+    try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (_) {}
     await renderAccountArea();
     window.dispatchEvent(new CustomEvent('legendary:auth-changed'));
   }
@@ -700,12 +719,21 @@
       if (!confirm('Thao tác này sẽ xóa tài khoản, hội thoại, memory và dữ liệu gắn với tài khoản. Bản ghi giao dịch/chấp thuận có thể được giữ lại theo chính sách. Bạn có chắc muốn tiếp tục?')) return;
       var password = prompt('Nhập mật khẩu tài khoản để xác minh lại. Tài khoản chỉ dùng OAuth có thể cần hỗ trợ thủ công.');
       if (!password) return;
+      var deletedUser = null;
+      try { deletedUser = await LegendaryBackend.getUser(); } catch (_) {}
       deleteAccountBtn.disabled = true;
-      var result = await window.LegendaryBackend.accountData('delete', { password: password });
+      let result;
+      try {
+        result = await window.LegendaryBackend.accountData('delete', { password: password });
+      } catch (_) {
+        deleteAccountBtn.disabled = false;
+        return alert('Không thể hoàn tất yêu cầu xóa lúc này. Hãy thử lại sau.');
+      }
       deleteAccountBtn.disabled = false;
       if (result.error || !result.data || !result.data.ok) return alert((result.data && result.data.error) || (result.error && result.error.message) || 'Không thể xóa tài khoản.');
-      if (supabase) await supabase.auth.signOut();
-      try { localStorage.removeItem('legendaryai_conversations_v2'); localStorage.removeItem('legendaryai_active_conv_v2'); } catch (e) {}
+      await signOut();
+      if (deletedUser && !deletedUser.is_anonymous) clearAccountScopedCache(deletedUser.id);
+      try { sessionStorage.removeItem('legendaryai.pendingConsentVersion'); } catch (_) {}
       alert(result.data.attachment_cleanup_pending ? 'Tài khoản đã xóa; một số tệp có thể cần được dọn thủ công.' : 'Tài khoản đã được xóa.');
       window.location.href = '/';
     });
@@ -826,12 +854,15 @@
   });
 
   if (supabase) {
-    supabase.auth.onAuthStateChange(function (_event) {
-      // Update account UI and notify the chat HUD after the profile is ready.
-      // This prevents the token pill from getting stuck at "—" after login.
+    supabase.auth.onAuthStateChange(function (event) {
+      // Keep user-scoped chat cache/UI isolated through OAuth redirects, normal
+      // sign-in and sign-out, even when no button handler is active on this page.
       setTimeout(async function () {
         await renderAccountArea();
         window.dispatchEvent(new CustomEvent('legendary:profile-ready'));
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+          window.dispatchEvent(new CustomEvent('legendary:auth-changed', { detail: { authEvent: event } }));
+        }
       }, 0);
     });
   }

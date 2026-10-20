@@ -37,10 +37,13 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ok: false, code: "MODEL_UNAVAILABLE", provider: "ollama-compatible", configured: false }), { status: 503, headers: cors(req) });
   }
 
+  const gatewayToken = Deno.env.get("LEGENDARY_LOCAL_AI_TOKEN") || "";
+  if (!gatewayToken) return new Response(JSON.stringify({ ok: false, code: "MODEL_AUTH_NOT_CONFIGURED", provider: "ollama-compatible", configured: true }), { status: 503, headers: cors(req) });
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4000);
   try {
-    const response = await fetch(`${url}/api/tags`, { signal: controller.signal });
+    const response = await fetch(`${url}/api/tags`, { headers: { Authorization: `Bearer ${gatewayToken}` }, signal: controller.signal });
     const raw = await response.text();
     if (!response.ok) {
       return new Response(JSON.stringify({ ok: false, code: "MODEL_UNAVAILABLE", provider: "ollama-compatible", configured: true, status: response.status }), { status: 503, headers: cors(req) });

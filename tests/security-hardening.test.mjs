@@ -55,5 +55,5 @@ assert.doesNotMatch(image, /OPENAI_API_KEY|api\.openai\.com/i, "image endpoint m
 assert.match(accountData, /admin\.auth\.getUser\(accessToken\)/, "account actions must authenticate the caller");
 assert.match(accountData, /admin\.auth\.admin\.deleteUser\(user\.id\)/, "account deletion must use server-side admin operation");
 assert.match(accountData, /signInWithPassword/, "account deletion requires reauthentication");
-assert.match(accountData, /action==="export"/, "data export endpoint must exist");
+assert.match(accountData, /action\s*===\s*["\u0027]export["\u0027]/, "data export endpoint must exist");
 console.log("security-hardening: assertions passed");

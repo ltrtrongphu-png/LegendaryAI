@@ -21,6 +21,9 @@ assert.match(cloud, /syncConflictBackup/, "cloud conflict backups must be exclud
 assert.match(cloud, /function preserveConflictCopies\(/, "local and cloud versions must both be preserved on conflict");
 assert.match(cloud, /\[Bản đám mây\]/, "cloud conflict copy must be clearly labeled");
 assert.match(cloud, /function preserveExistingConflictCopies\(/, "conflict copies must survive later reloads");
+assert.match(cloud, /hasUnsyncedLocal/, "local-only conversations without a sync snapshot must be retried");
+assert.match(cloud, /var localOnly = \(localList \|\| \[\]\)\.filter/, "later cloud loads must keep local-only conversations");
+assert.match(cloud, /setTimeout\(loadCloud, 0\)/, "successful local upload must reload remote-only conversations");
 
 const migration = readFileSync("supabase/migrations/20261003153000_conversation_sync_rpc.sql", "utf8");
 assert.match(migration, /p_updated_at >= current_updated/, "client must honor the RPC's monotonic updated_at comparison");

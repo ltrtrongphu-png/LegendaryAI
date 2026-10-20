@@ -50,3 +50,5 @@ jobs:
         run: node tests/chat-security.test.mjs
       - name: Regression test cloud synchronization races
         run: node tests/cloud-sync-runtime.test.mjs
+      - name: Integration test local/cloud conflict preservation
+        run: node tests/cloud-sync-integration.test.mjs

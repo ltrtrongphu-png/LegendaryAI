@@ -1,8 +1,50 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/new", "destination": "/" },
-    { "source": "/chat/:slug", "destination": "/" }
+    {
+      "source": "/terms",
+      "destination": "/legal/terms.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/legal/privacy.html"
+    },
+    {
+      "source": "/refund",
+      "destination": "/legal/refund.html"
+    },
+    {
+      "source": "/acceptable-use",
+      "destination": "/legal/acceptable-use.html"
+    },
+    {
+      "source": "/cookies",
+      "destination": "/legal/cookies.html"
+    },
+    {
+      "source": "/token-policy",
+      "destination": "/legal/token-policy.html"
+    },
+    {
+      "source": "/contact",
+      "destination": "/legal/contact.html"
+    },
+    {
+      "source": "/ai-disclosure",
+      "destination": "/legal/ai-disclosure.html"
+    },
+    {
+      "source": "/payment-result",
+      "destination": "/legal/payment-result.html"
+    },
+    {
+      "source": "/new",
+      "destination": "/"
+    },
+    {
+      "source": "/chat/:slug",
+      "destination": "/"
+    }
   ],
   "headers": [
     {

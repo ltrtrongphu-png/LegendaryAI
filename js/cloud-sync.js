@@ -345,6 +345,9 @@
         return;
       }
       window.dispatchEvent(new CustomEvent('legendary:cloud-synced'));
+      // Re-read the remote snapshot after a successful upload so remote-only
+      // conversations are not omitted from the active local cache.
+      setTimeout(loadCloud, 0);
       return;
     }
 

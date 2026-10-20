@@ -472,7 +472,7 @@ create table if not exists public.plans (
   reset_hours integer not null default 6 check (reset_hours > 0),
   reasoning_tier text not null default 'basic',
   default_model_key text,
-  model_tiers jsonb not null default '[\"free\"]'::jsonb,
+  model_tiers jsonb not null default '["free"]'::jsonb,
   capabilities jsonb not null default '{}'::jsonb,
   features jsonb not null default '[]'::jsonb,
   enabled boolean not null default true,

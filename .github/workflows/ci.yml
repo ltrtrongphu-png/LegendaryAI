@@ -99,6 +99,8 @@ jobs:
         run: node tests/cloud-sync-integration.test.mjs
       - name: Legal routes and consent regression
         run: node tests/legal-routes.test.mjs
+      - name: Auth privacy and OAuth failure contract
+        run: node tests/auth-privacy-contract.test.mjs
       - name: Current-tree secret scan
         run: node tests/secret-scan.test.mjs
       - name: Git history secret scan

@@ -1405,7 +1405,8 @@ Deno.serve(async (req) => {
     const actualTokens = Math.ceil(
       (estimatedInputTokens + estimatedOutputTokens) * reasoningMultiplier * qualityMultiplier,
     );
-    const { data: tokenStateRows } = await supabase.rpc("finalize_tokens", {
+    const { data: tokenStateRows } = await supabase.rpc("finalize_tokens_for_user", {
+      p_user_id: user.id,
       p_reserved: reservation,
       p_actual: actualTokens,
     });

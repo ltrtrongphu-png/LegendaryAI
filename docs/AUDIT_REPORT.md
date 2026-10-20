@@ -1,13 +1,13 @@
 # LegendaryAI — Audit report (consolidated)
 
 **Audit date:** 2026-10-20  
-**Release candidate:** 1.3.2  
+**Release candidate:** 1.3.3  
 **Repository:** `ltrtrongphu-png/LegendaryAI`  
-**Status:** code and documentation hardening prepared in PR #19; production deployment, live secrets, hosted database migrations, MoMo sandbox, and live inference remain unverified. This report does not claim production readiness.
+**Status:** automated code, database-fixture and browser checks have been added across the hardening series; this report does not claim production readiness. Hosted production deployment/configuration, live secrets, migration on the connected Supabase project, MoMo merchant sandbox, and live inference remain unverified.
 
 ## 1. Executive summary
 
-This pass continued the earlier baseline audit, consolidated follow-up fixes into the open umbrella PR, and added regression checks, a database migration, policy drafts and operator procedures. Material code issues discovered and addressed include:
+This report consolidates the repo-level findings and later follow-up phases. PR #20–#22 have been merged; each phase adds verification while separating disposable CI evidence from hosted production validation. Material code issues discovered and addressed include:
 
 - CORS helpers on chat, payment, model-health and privileged endpoints emitted a production origin for callers whose `Origin` was not allowlisted. The affected handlers now reject a supplied non-allowlisted origin and only return `Access-Control-Allow-Origin` for configured origins.
 - The deprecated `ai-chat-v9` endpoint retained a weaker CORS implementation. It now returns HTTP 410 and does not invoke a model provider or mutate quota.
@@ -171,7 +171,7 @@ This matrix distinguishes confirmed application paths from hosting/provider deta
 
 ## 11. Follow-up verification addendum (2026-10-20)
 
-The consolidated PR #20 is already merged to `main`; the historical checklist above has been corrected accordingly. This addendum describes the separate follow-up branch `fix/phase-3-runtime-verification` and is not proof that its CI has passed.
+PR #20 and the Phase 3 hardening in PR #21 have been merged to `main`; CI and quality checks passed for the relevant PR head. This addendum records the engineering changes, while physical-device profiling remains outstanding.
 
 - MoMo payment creation and IPN now use one shared canonical-signature implementation so their string construction and constant-work hex comparison can be tested without invoking a provider. Deterministic HMAC vectors are added at `tests/momo-signature.test.mjs`. Source reference checked: MoMo Developers, “Digital Signature” and payment-init/IPN documentation. The merchant’s exact configured API version and sandbox flow still require an end-to-end test.
 - `js/bg3d.js` now uses a smaller static scene for `prefers-reduced-motion` and detected low-resource devices, pauses animation when the document is hidden, and disposes GPU resources/context on `pagehide`. Static source tests are in `tests/bg3d-runtime.test.mjs`; real device profiling remains outstanding.
@@ -194,7 +194,7 @@ Remaining limitation: these sync/browser checks are contract/static regressions,
 
 ## 13. PostgreSQL CI validation added (2026-10-20)
 
-A follow-up inspection found invalid single-dollar delimiters in three functions in `supabase/schema.sql` (`consume_tokens`, the retired legacy `refund_tokens` overload, and `finalize_tokens`). Those delimiters have been corrected to valid `$` blocks. The first PostgreSQL 17 run then exposed an invalid escaped JSON default for `plans.model_tiers`; that is now corrected as a native SQL JSON literal too. The same follow-up also guards against a late MoMo initiate failure response downgrading an order already paid by an IPN. A PostgreSQL 17 GitHub Actions job now initializes only a disposable fixture for the minimum `auth`/`storage` interfaces, executes `supabase/schema.sql` from an empty database, applies the latest hardening migration, then tests RLS isolation between user A/user B, direct-client denial of privileged quota RPCs, cumulative/idempotent refunds, MoMo finalization/idempotency, and a concurrent token-reservation race. The job has not yet been verified until it completes on this branch; even a pass is not a production Supabase migration or MoMo-provider test.
+A follow-up inspection found invalid single-dollar delimiters in three functions in `supabase/schema.sql` (`consume_tokens`, the retired legacy `refund_tokens` overload, and `finalize_tokens`). Those delimiters have been corrected to valid `$` blocks. The first PostgreSQL 17 run then exposed an invalid escaped JSON default for `plans.model_tiers`; that is now corrected as a native SQL JSON literal too. The same follow-up also guards against a late MoMo initiate failure response downgrading an order already paid by an IPN. A PostgreSQL 17 GitHub Actions job now initializes only a disposable fixture for the minimum `auth`/`storage` interfaces, executes `supabase/schema.sql` from an empty database, applies the latest hardening migration, then tests RLS isolation between user A/user B, direct-client denial of privileged quota RPCs, cumulative/idempotent refunds, MoMo finalization/idempotency, and a concurrent token-reservation race. On PR #22, PostgreSQL 17 CI passed clean schema execution, the latest hardening migration, RLS/user-isolation checks, cumulative refund idempotency, MoMo finalization/idempotency, and the concurrent quota reservation race. The fixture is disposable PostgreSQL with minimal Supabase-compatible auth/storage objects, not a live Supabase migration or MoMo-provider test.
 
 
 ## 14. Quota/cache follow-up (2026-10-20)

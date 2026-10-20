@@ -10,15 +10,26 @@ jobs:
   regression:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v4.2.2
         with:
-          node-version: 20
-      - uses: denoland/setup-deno@v2
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4.4.0
         with:
-          deno-version: v2.x
+          node-version: 22
+      - uses: denoland/setup-deno@v2.0.5
+        with:
+          deno-version: 2.9.6
       - name: CORS origin allowlist regression
         run: node tests/cors-origin-policy.test.mjs
+      - name: Security hardening regression
+        run: node tests/security-hardening.test.mjs
+      - name: Legal routes and consent regression
+        run: node tests/legal-routes.test.mjs
+      - name: Current-tree secret scan
+        run: node tests/secret-scan.test.mjs
+      - name: Git history secret scan
+        run: node scripts/secret-scan.mjs --history
       - name: Browser routing regression
         run: node tests/chat-routing.test.js
       - name: Image intent regression
@@ -33,3 +44,15 @@ jobs:
         run: deno check supabase/functions/ai-chat-v10/index.ts
       - name: Type-check local model health function
         run: deno check supabase/functions/local-model-health/index.ts
+      - name: Type-check legacy ai-chat
+        run: deno check supabase/functions/ai-chat/index.ts
+      - name: Type-check MoMo create and IPN
+        run: deno check supabase/functions/momo-create-payment/index.ts supabase/functions/momo-ipn/index.ts
+      - name: Type-check account and support functions
+        run: deno check supabase/functions/account-data/index.ts supabase/functions/support-request/index.ts
+      - name: Type-check retention cleanup
+        run: deno check supabase/functions/data-retention-cleanup/index.ts
+      - name: Type-check Owner and token reset functions
+        run: deno check supabase/functions/owner-admin/index.ts supabase/functions/owner-stats/index.ts supabase/functions/token-reset/index.ts
+      - name: Type-check disabled image generation endpoint
+        run: deno check supabase/functions/image-generate/index.ts

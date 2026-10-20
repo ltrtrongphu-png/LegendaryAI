@@ -31,4 +31,30 @@ assert.equal(error.code, 'MODEL_TIMEOUT');
 assert.equal(error.message, 'gateway timed out');
 assert.match(source.requestId(), /^[0-9a-f-]{36}$/i);
 
+const bounded = source.planTokenReservation(100, 500, 350, 256);
+assert.deepEqual(bounded, { ok: true, inputTokens: 100, outputTokens: 250, reservedTokens: 350 });
+assert.deepEqual(source.planTokenReservation(100, 500, 355, 256), {
+  ok: false,
+  code: 'TOKEN_LIMIT',
+  inputTokens: 100,
+  outputTokens: 0,
+  reservedTokens: 0
+});
+assert.deepEqual(source.planTokenReservation(12, 128, 1000, 256), {
+  ok: false,
+  code: 'TOKEN_LIMIT',
+  inputTokens: 12,
+  outputTokens: 0,
+  reservedTokens: 0
+});
+
+const buckets = new Map();
+assert.equal(source.checkRateLimitBucket(buckets, 'user:a', 1000, 60000, 2, 50).ok, true);
+assert.equal(source.checkRateLimitBucket(buckets, 'ip:192.0.2.10', 1000, 60000, 2, 50).ok, true);
+assert.equal(source.checkRateLimitBucket(buckets, 'user:a', 1020, 60000, 2, 50).code, 'REQUEST_BURST');
+assert.equal(source.checkRateLimitBucket(buckets, 'user:a', 1051, 60000, 2, 50).ok, true);
+assert.equal(source.checkRateLimitBucket(buckets, 'user:a', 1102, 60000, 2, 50).ok, true);
+assert.equal(source.checkRateLimitBucket(buckets, 'user:a', 1153, 60000, 2, 50).code, 'RATE_LIMITED');
+assert.equal(source.checkRateLimitBucket(buckets, 'user:b', 1153, 60000, 2, 50).ok, true, 'one user must not exhaust another user bucket');
+
 console.log('model-runtime contract: PASS');

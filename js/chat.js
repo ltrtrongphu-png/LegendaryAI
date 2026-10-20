@@ -2370,8 +2370,45 @@
   renderSidebar();
   renderMessages();
 
+  function rehydrateConversationsFromCloud() {
+    var previousDraft = conversations.find(function (conv) { return conv.id === activeId && conv.draft; });
+    var hasUnsavedComposer = Boolean(chatInput && chatInput.value.trim()) || pendingAttachments.length > 0;
+    var incoming = loadConversations();
+    if (previousDraft && hasUnsavedComposer && !incoming.some(function (conv) { return conv.id === previousDraft.id; })) {
+      incoming.unshift(previousDraft);
+    }
+    conversations = incoming.length ? incoming : [makeNewConversation()];
+    ensureConversationSlugs();
+
+    var desiredId = null;
+    try { desiredId = localStorage.getItem(ACTIVE_KEY); } catch (_) {}
+    if (desiredId && conversations.some(function (conv) { return conv.id === desiredId; })) {
+      activeId = desiredId;
+    } else if (previousDraft && hasUnsavedComposer && conversations.some(function (conv) { return conv.id === previousDraft.id; })) {
+      activeId = previousDraft.id;
+    } else {
+      activeId = conversations[0].id;
+    }
+    persistActiveId();
+    renderSidebar();
+    renderMessages();
+    syncRouteForConversation(getActiveConv(), true);
+  }
+
+  // cloud-sync writes the authoritative user-scoped cache before this event.
+  // Rehydrate it so new devices show remote history and account switches never
+  // leave the previous account's conversations in the in-memory chat UI.
+  window.addEventListener('legendary:cloud-synced', rehydrateConversationsFromCloud);
+
   window.addEventListener('legendary:auth-changed', function () {
     abortActiveResponse();
+    pendingAttachments = [];
+    if (chatInput) chatInput.value = '';
+    renderAttachPreview();
+    conversations = [makeNewConversation()];
+    activeId = conversations[0].id;
+    renderSidebar();
+    renderMessages();
     syncEngineModelAccess();
   });
 

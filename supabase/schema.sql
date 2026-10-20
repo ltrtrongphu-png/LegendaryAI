@@ -79,22 +79,22 @@ alter table public.orders enable row level security;
 drop policy if exists "profiles own row" on public.profiles;
 drop policy if exists "profiles own select" on public.profiles;
 create policy "profiles own select" on public.profiles
-  for select using (auth.uid() = id);
+  for select to authenticated using ((select auth.uid()) = id);
 
 -- Profiles are created by the auth trigger and plan/token_limit are server-controlled.
 -- Do not grant client insert/update/delete access to profiles.
 
 drop policy if exists "conversations own rows" on public.conversations;
 create policy "conversations own rows" on public.conversations
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 drop policy if exists "messages own rows" on public.messages;
 create policy "messages own rows" on public.messages
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 drop policy if exists "orders own rows" on public.orders;
 create policy "orders own rows" on public.orders
-  for select using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -103,10 +103,6 @@ security definer set search_path = public
 as $$
 declare new_role text := 'user';
 begin
-  if lower(coalesce(new.email, '')) = 'ltrtrongphu@gmail.com' then
-    new_role := 'owner';
-  end if;
-
   insert into public.profiles (id, display_name, avatar_url, role, memory_enabled, vision_enabled, web_search_enabled)
   values (
     new.id,
@@ -125,12 +121,7 @@ begin
 end;
 $$;
 
--- Grant Owner to the existing account, if it already exists.
-update public.profiles p
-set role = 'owner', updated_at = now()
-from auth.users u
-where p.id = u.id
-  and lower(coalesce(u.email, '')) = 'ltrtrongphu@gmail.com';
+-- Existing Owner assignments are preserved. New Owner access must be granted manually by a trusted database administrator using a verified auth user UUID; never elevate by matching email.
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -145,12 +136,12 @@ on conflict (id) do nothing;
 drop policy if exists "chat attachments own read" on storage.objects;
 create policy "chat attachments own read" on storage.objects
   for select to authenticated
-  using (bucket_id = 'chat-attachments' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'chat-attachments' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 drop policy if exists "chat attachments own insert" on storage.objects;
 create policy "chat attachments own insert" on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'chat-attachments' and (storage.foldername(name))[1] = auth.uid()::text);
+  with check (bucket_id = 'chat-attachments' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 drop policy if exists "chat attachments own delete" on storage.objects;
 create policy "chat attachments own delete" on storage.objects
@@ -161,8 +152,8 @@ create policy "chat attachments own delete" on storage.objects
 create or replace function public.consume_tokens(p_amount integer, p_user_id uuid, p_is_guest boolean default false)
 returns boolean
 language plpgsql
-security definer set search_path = public
-as $$
+security definer set search_path = ''
+as $
 declare
   uid uuid := coalesce(p_user_id, auth.uid());
   caller_uid uuid := auth.uid();
@@ -201,7 +192,7 @@ begin
 end;
 $$;
 
-revoke all on function public.consume_tokens(integer, uuid, boolean) from public;
+revoke all on function public.consume_tokens(integer, uuid, boolean) from public, anon, authenticated;
 grant execute on function public.consume_tokens(integer, uuid, boolean) to service_role;
 
 -- Optional model registry for Owner-controlled model profiles.
@@ -250,14 +241,14 @@ drop policy if exists "ai models public enabled read" on public.ai_models;
 create policy "ai models public enabled read" on public.ai_models
   for select using (enabled = true or exists (
     select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'owner'
+    where p.id = (select auth.uid()) and p.role = 'owner'
   ));
 drop policy if exists "ai models owner write" on public.ai_models;
 create policy "ai models owner write" on public.ai_models
   for all using (exists (
-    select 1 from public.profiles p where p.id = auth.uid() and p.role = 'owner'
+    select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'owner'
   )) with check (exists (
-    select 1 from public.profiles p where p.id = auth.uid() and p.role = 'owner'
+    select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'owner'
   ));
 
 insert into public.ai_models
@@ -344,7 +335,7 @@ create index if not exists ai_memories_user_idx
 alter table public.ai_memories enable row level security;
 drop policy if exists "ai memories own rows" on public.ai_memories;
 create policy "ai memories own rows" on public.ai_memories
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 grant select, insert, update, delete on public.ai_memories to authenticated;
 
@@ -368,9 +359,28 @@ create index if not exists ai_usage_user_created_idx
 alter table public.ai_usage_logs enable row level security;
 drop policy if exists "ai usage own read" on public.ai_usage_logs;
 create policy "ai usage own read" on public.ai_usage_logs
-  for select using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 
 grant select on public.ai_usage_logs to authenticated;
+
+
+-- Re-apply tight RLS policies using auth.uid() as an initplan when schema.sql is rerun.
+drop policy if exists "profiles own select" on public.profiles;
+create policy "profiles own select" on public.profiles for select to authenticated using ((select auth.uid()) = id);
+drop policy if exists "conversations own rows" on public.conversations;
+create policy "conversations own rows" on public.conversations for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists "messages own rows" on public.messages;
+create policy "messages own rows" on public.messages for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists "orders own rows" on public.orders;
+create policy "orders own rows" on public.orders for select to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "ai models public enabled read" on public.ai_models;
+create policy "ai models public enabled read" on public.ai_models for select to anon, authenticated using (enabled = true or exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'owner'));
+drop policy if exists "ai models owner write" on public.ai_models;
+create policy "ai models owner write" on public.ai_models for all to authenticated using (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'owner')) with check (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'owner'));
+drop policy if exists "ai memories own rows" on public.ai_memories;
+create policy "ai memories own rows" on public.ai_memories for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists "ai usage own read" on public.ai_usage_logs;
+create policy "ai usage own read" on public.ai_usage_logs for select to authenticated using ((select auth.uid()) = user_id);
 
 -- Keep plan capabilities consistent with the account tier.
 update public.profiles
@@ -405,8 +415,8 @@ begin
 end;
 $;
 
-revoke all on function public.refund_tokens(integer, uuid) from public, anon, authenticated;
-grant execute on function public.refund_tokens(integer, uuid) to service_role;
+revoke all on function public.refund_tokens(integer, uuid) from public, anon, authenticated, service_role;
+-- Request-scoped refunds are defined by the forward migration; the legacy overload is intentionally disabled.
 
 -- Was missing entirely: supabase/functions/ai-chat/index.ts calls this after
 -- every successful reply to true the reservation made by consume_tokens()
@@ -423,8 +433,8 @@ returns table (
   token_reset_at timestamptz
 )
 language plpgsql
-security definer set search_path = public
-as $$
+security definer set search_path = ''
+as $
 declare
   uid uuid := auth.uid();
   delta integer := coalesce(p_actual, 0) - coalesce(p_reserved, 0);

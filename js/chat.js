@@ -447,12 +447,19 @@
     );
   }
 
+  function touchConversation(conv) {
+    if (!conv) return;
+    conv.updatedAt = Math.max(Date.now(), Number(conv.updatedAt || 0) + 1);
+  }
+
   function makeNewConversation() {
+    var now = Date.now();
     return {
       id: uid(),
       title: 'Cuộc trò chuyện mới',
       slug: 'cuoc-tro-chuyen',
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       draft: true,
       messages: [
         {
@@ -549,6 +556,7 @@
           .join(' ') || 'Cuộc trò chuyện mới',
         slug: requestedSlug,
         createdAt: Date.now(),
+        updatedAt: Date.now(),
         messages: [{
           id: messageUid(),
           role: 'ai',
@@ -787,6 +795,7 @@
       'Cuộc trò chuyện mới';
 
     uniqueConversationSlug(conv);
+    touchConversation(conv);
     persistConversations();
 
     if (conv.id === activeId) {
@@ -1516,6 +1525,7 @@
       conv.draft = false;
       autoTitle(conv, text, atts);
     }
+    touchConversation(conv);
 
     persistConversations();
     renderSidebar();
@@ -1587,6 +1597,7 @@
       text: state.raw,
       attachments: []
     });
+    touchConversation(conv);
 
     persistConversations();
 
@@ -1643,6 +1654,7 @@
 
     conv.messages.splice(idx, 1);
     conv._regenerateNonce = messageUid();
+    touchConversation(conv);
     persistConversations();
 
     var lastWrap =
@@ -1886,6 +1898,7 @@
     var convSaved = (typing && typing.convId && findConv(typing.convId)) || getActiveConv();
     if (convSaved && Array.isArray(convSaved.messages)) {
       convSaved.messages.push({ id: messageUid(), role: 'ai', text: unavailable, attachments: [] });
+      touchConversation(convSaved);
       persistConversations();
     }
     if (streamStatus) streamStatus.textContent = 'Tạo ảnh chưa được cấu hình';
@@ -1950,6 +1963,7 @@
             attachments: []
           }
         ];
+        touchConversation(conv);
 
         persistConversations();
         renderSidebar();

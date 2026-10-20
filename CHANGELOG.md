@@ -1,5 +1,9 @@
 # LegendaryAI Changelog
 
+## 1.2.1 — Repository audit baseline
+- Added `docs/AUDIT_REPORT.md` with verified Phase 0 findings, current documentation drift, preliminary data map, and explicit follow-up verification items.
+- No production configuration, database migration, or runtime behavior changed in this documentation-only phase.
+
 ## 1.2.0 — Legendary Brain V12
 - Added bounded **Planner → Executor → Verifier → Finalizer** pipeline to Native Core.
 - Added an explicit native-tool allowlist for math, unit conversion, JSON formatting, extractive summary, code diagnostics and safe templates.

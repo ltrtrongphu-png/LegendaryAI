@@ -23,7 +23,13 @@ assert.match(chat, /MAX_ZIP_ATTACHMENT_BYTES/, "ZIP archives must have a compres
 assert.match(chat, /uncompressedSize/, "ZIP entries must be checked before decompression");
 assert.match(chat, /MAX_PENDING_ATTACHMENTS/, "number of pending attachments must be limited");
 assert.match(chat, /MAX_PENDING_ATTACHMENT_CHARS/, "aggregate attachment content must be bounded");
-assert.match(chat, /try \\{\\s*fitChatPayload\\(requestOptions\\);\\s*\\} catch \\(error\\) \\{[\\s\\S]{0,400}?setErrorBubble\\(typing/, "oversized chat payloads must be handled without an unhandled exception");
+const fitGuardIndex = chat.indexOf("try {\n      fitChatPayload(requestOptions);\n    } catch (error) {");
+assert.ok(
+  fitGuardIndex >= 0 &&
+    chat.indexOf("setErrorBubble(typing", fitGuardIndex) >= fitGuardIndex &&
+    chat.indexOf("setErrorBubble(typing", fitGuardIndex) < fitGuardIndex + 400,
+  "oversized chat payloads must be handled without an unhandled exception",
+);
 assert.match(chat, /function abortActiveResponse\(\)/, "chat requests must have a shared cancellation path");
 assert.match(chat, /if \(controller\.signal\.aborted\) return/, "aborted responses must not update the selected conversation");
 assert.match(chat, /if \(activeController !== controller\) return/, "stale requests must not unlock a newer request");

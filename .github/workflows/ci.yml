@@ -113,6 +113,8 @@ jobs:
         run: deno test --allow-read tests/brain-native-core.test.mjs tests/plan-capabilities.test.mjs
       - name: Model runtime contract
         run: deno test tests/model-runtime-contract.test.mjs
+      - name: Chat quota/cache and memory side-effect contract
+        run: node tests/chat-quota-contract.test.mjs
       - name: MoMo HMAC/signature canonicalization test vectors
         run: deno test tests/momo-signature.test.mjs
       - name: WebGL reduced-motion and cleanup regression

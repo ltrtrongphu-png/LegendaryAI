@@ -12,6 +12,9 @@ const createPayment = read("supabase/functions/momo-create-payment/index.ts");
 const ipn = read("supabase/functions/momo-ipn/index.ts");
 const image = read("supabase/functions/image-generate/index.ts");
 const accountData = read("supabase/functions/account-data/index.ts");
+const momoShared = read("supabase/functions/_shared/momo.ts");
+const momoCreate = read("supabase/functions/momo-create-payment/index.ts");
+const momoIpn = read("supabase/functions/momo-ipn/index.ts");
 
 assert.match(migration, /create or replace function public\.finalize_momo_payment\s*\(/i, "MoMo finalizer must exist in the forward migration");
 assert.match(migration, /for update/i, "MoMo finalizer must lock an order row");
@@ -44,6 +47,12 @@ assert.match(health, /Authorization: `Bearer \$\{gatewayToken\}`/, "health check
 assert.match(createPayment, /AbortController/, "MoMo provider call must time out");
 assert.match(createPayment, /LEGENDARY_LOCAL_AI_TOKEN/, "paid checkout must require the private model gateway secret");
 assert.match(createPayment, /\/api\/tags/, "paid checkout must verify live model gateway readiness");
+assert.match(momoShared, /momoCreateSignatureText/, "MoMo create signature must use shared canonicalization");
+assert.match(momoShared, /momoIpnSignatureText/, "MoMo IPN signature must use shared canonicalization");
+assert.match(momoShared, /timingSafeHexEqual/, "MoMo signature comparisons must use the constant-work helper");
+assert.match(momoCreate, /momoCreateSignatureText\(/, "payment creation must use tested canonical signature text");
+assert.match(momoIpn, /momoIpnSignatureText\(/, "IPN verification must use tested canonical signature text");
+assert.match(momoIpn, /timingSafeHexEqual\(/, "IPN verification must use timing-safe comparison");
 assert.match(createPayment, /PAYMENT_MODEL_UNAVAILABLE/, "paid checkout must fail closed when model is unavailable");
 assert.doesNotMatch(createPayment, /MOMO_ENDPOINT.*test-payment\.momo\.vn/, "payment endpoint must not silently default to MoMo sandbox");
 assert.match(ipn, /body\.requestId.*order\.provider_request_id|body\.requestId\) !== String\(order\.provider_request_id/, "IPN must bind requestId to persisted order");

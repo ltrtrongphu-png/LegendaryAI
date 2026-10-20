@@ -69,8 +69,12 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/schema.sql
       - name: Apply the latest hardening migration on PostgreSQL 17
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261020120000_legal_payment_retention_hardening.sql
+      - name: Apply shared rate-limit migration on PostgreSQL 17
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261020150000_global_rate_limit_hardening.sql
       - name: Exercise RLS, refund idempotency, and MoMo finalization
         run: psql -v ON_ERROR_STOP=1 -f tests/postgres/integration.sql
+      - name: Exercise database-backed rate limits
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/rate-limit.sql
       - name: Race two token reservations against one budget
         run: bash tests/postgres/token-concurrency.sh
 

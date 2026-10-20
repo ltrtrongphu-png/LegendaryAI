@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { buildModelSystemPrompt, createNativePlan, detectIntent, nativeAnswer } from "./brain-core.js";
 import { huggingFaceChat } from "./huggingface-space.ts";
-import { negotiateCapability, requestId } from "./model-runtime.ts";
+import { checkRateLimitBucket, negotiateCapability, planTokenReservation, requestId } from "./model-runtime.ts";
 
 const ORIGINS=new Set(["https://legendaryai.vercel.app","https://www.legendaryai.vercel.app","http://localhost:3000","http://127.0.0.1:3000"]);const configuredSiteUrl=(Deno.env.get("SITE_URL")||"").replace(/\/$/,"");if(configuredSiteUrl)ORIGINS.add(configuredSiteUrl);
 const MAX_MESSAGES=60,MAX_CONTEXT_CHARS=60000,SHIELD_WINDOW_MS=60000,SHIELD_MAX_REQUESTS=20,LOCAL_TIMEOUT_MS=12000;
@@ -17,7 +17,20 @@ const reasoningTier=(p:any)=>String(p?.reasoning_tier||"none");
 function allowed(p:any,r:string,t:string){if(r==="owner")return true;const tiers=Array.isArray(p?.model_tiers)?p.model_tiers:[];return tiers.includes(t)}
 function capAllowed(p:any,c:string){if(!c)return true;return Boolean(p?.capabilities&&p.capabilities[c])}
 function pruneBuckets(now:number){if(buckets.size<1000)return;for(const [k,v] of buckets){if(now-v.started>SHIELD_WINDOW_MS*2)buckets.delete(k)}if(buckets.size>1200){const first=buckets.keys().next().value;if(first)buckets.delete(first)}}
-function shield(req:Request,id:string,raw:string){const now=Date.now();pruneBuckets(now);const ip=(req.headers.get("x-forwarded-for")||req.headers.get("cf-connecting-ip")||"").split(",")[0].trim()||"unknown",key=`${id}:${ip}`,old=buckets.get(key);if(!old||now-old.started>=SHIELD_WINDOW_MS){buckets.set(key,{started:now,count:1,last:now});return{ok:true}}if(now-old.last<50)return{ok:false,code:"REQUEST_BURST",retryAfter:1};old.last=now;old.count++;if(old.count>SHIELD_MAX_REQUESTS)return{ok:false,code:"RATE_LIMITED",retryAfter:Math.max(1,Math.ceil((SHIELD_WINDOW_MS-(now-old.started))/1000))};return{ok:true}}
+function shield(req:Request,id:string,_raw:string){
+  const now=Date.now();
+  pruneBuckets(now);
+  // Prefer the edge-injected client IP header; the per-user bucket remains
+  // independently effective even if a caller can spoof a forwarding header.
+  const ip=(req.headers.get("cf-connecting-ip")||req.headers.get("x-forwarded-for")||"").split(",")[0].trim()||"unknown";
+  const userLimit=checkRateLimitBucket(buckets,"user:"+id,now,SHIELD_WINDOW_MS,SHIELD_MAX_REQUESTS,50);
+  if(!userLimit.ok)return userLimit;
+  if(ip!=="unknown"){
+    const ipLimit=checkRateLimitBucket(buckets,"ip:"+ip,now,SHIELD_WINDOW_MS,SHIELD_MAX_REQUESTS,50);
+    if(!ipLimit.ok)return ipLimit;
+  }
+  return {ok:true as const,code:"",retryAfter:0};
+}
 function normalize(ms:any[]){return(Array.isArray(ms)?ms:[]).filter((m:any)=>m&&(m.role==="user"||m.role==="assistant"||m.role==="ai")).slice(-MAX_MESSAGES).map((m:any)=>({role:m.role==="ai"?"assistant":m.role,content:textOf(m.content)}))}
 function compact(ms:any[],prompt:string){const all=normalize(ms),terms=new Set((prompt.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]).slice(0,24)),scored=all.map((m,i)=>{let score=i>=all.length-10?3:0;for(const t of terms)if(m.content.toLowerCase().includes(t))score++;return{m,i,score}}),picked=[...scored.filter(x=>x.i<all.length-10).sort((a,b)=>b.score-a.score||b.i-a.i).slice(0,14),...scored.slice(-10)],seen=new Set<number>(),outm:any[]=[];let total=0;for(const x of picked){if(seen.has(x.i))continue;const n=x.m.content.length;if(outm.length&&total+n>MAX_CONTEXT_CHARS)continue;seen.add(x.i);outm.push(x.m);total+=n}return outm}
 function budget(intent:string,n:number){const caps:Record<string,number>={greeting:512,math:1024,image:512,writing:4096,translate:4096,summarize:6144,code:12288,plan:8192,compare:8192,explain:8192,brainstorm:6144,general:8192};return Math.min(n,caps[intent]||8192)}
@@ -38,7 +51,10 @@ async function maybeSaveExplicitMemory(admin:any,userId:string,prompt:string,ena
   const match=String(prompt||'').match(/(?:hãy nhớ rằng|hãy ghi nhớ|ghi nhớ rằng|remember that|my preference is)[:\s]+(.{3,280})$/i);
   if(!match)return false;
   const memory=match[1].trim();
-  if(/mật khẩu|password|api[ _-]?key|secret|access token|refresh token|cccd|số thẻ|bank account/i.test(memory))return false;
+  if(/mật khẩu|password|api[ _-]?key|secret|access token|refresh token|cccd|số thẻ|bank account|one[- ]time password|otp/i.test(memory))return false;
+  const {data:existing,error:lookupError}=await admin.from("ai_memories").select("id").eq("user_id",userId).eq("memory",memory).limit(1);
+  if(lookupError)return false;
+  if(Array.isArray(existing)&&existing.length>0)return true;
   const {error}=await admin.from("ai_memories").insert({user_id:userId,memory,source:"explicit-user-memory",importance:8});
   if(!error)memoryCache.delete(userId);
   return !error;
@@ -78,11 +94,12 @@ const modeInstructions:Record<string,string>={
   analysis:"Analysis mode: separate facts, assumptions, and uncertainty; compare relevant alternatives; check internal consistency; surface important counterpoints; and give a clear evidence-based synthesis.",
   creative:"Creative mode: generate original ideas and usable drafts within the user constraints. Explore multiple directions when useful, avoid generic filler, and keep results practical."
 };
-system+="\nAssistant mode: "+mode+".\n"+(modeInstructions[mode]||modeInstructions.general);const memories=await relevantMemories(admin,authData.user.id,prompt,!isGuest&&Boolean(profile.memory_enabled));const memorySaved=await maybeSaveExplicitMemory(admin,authData.user.id,prompt,!isGuest&&Boolean(profile.memory_enabled));if(reasoning)system+=`\nReasoning mode ${rt}: analyze carefully, verify assumptions, compare alternatives when useful, then return only the final answer. Never reveal hidden reasoning.`;if(capability==="project")system+="\nProject Workspace: preserve project constraints, decisions, terminology, and continuity across this task.";if(capability==="agent")system+="\nAgent mode: follow the bounded V12 plan, use only explicitly available tools/actions, verify outputs before presenting them, and never claim an unavailable action was executed.";if(capability==="batch")system+="\nBatch mode: handle each item independently and clearly report each result.";if(capability==="multi-model")system+="\nMulti-model orchestration: use only configured model capabilities and never claim unavailable routing.";if(memories.length)system+="\nRelevant user memory (use only when directly applicable; do not invent beyond it):\n"+memories.map((m:string)=>"- "+m).join("\n");let max=budget(intent,Math.min(Math.max(Number(body?.max_tokens)||Number(model.max_output_tokens)||8192,256),Number(model.max_output_tokens)||8192));
+system+="\nAssistant mode: "+mode+".\n"+(modeInstructions[mode]||modeInstructions.general);const memories=await relevantMemories(admin,authData.user.id,prompt,!isGuest&&Boolean(profile.memory_enabled));let memorySaved=false;if(reasoning)system+=`\nReasoning mode ${rt}: analyze carefully, verify assumptions, compare alternatives when useful, then return only the final answer. Never reveal hidden reasoning.`;if(capability==="project")system+="\nProject Workspace: preserve project constraints, decisions, terminology, and continuity across this task.";if(capability==="agent")system+="\nAgent mode: follow the bounded V12 plan, use only explicitly available tools/actions, verify outputs before presenting them, and never claim an unavailable action was executed.";if(capability==="batch")system+="\nBatch mode: handle each item independently and clearly report each result.";if(capability==="multi-model")system+="\nMulti-model orchestration: use only configured model capabilities and never claim unavailable routing.";if(memories.length)system+="\nRelevant user memory (use only when directly applicable; do not invent beyond it):\n"+memories.map((m:string)=>"- "+m).join("\n");let max=budget(intent,Math.min(Math.max(Number(body?.max_tokens)||Number(model.max_output_tokens)||8192,256),Number(model.max_output_tokens)||8192));
 const gateway=Deno.env.get("LEGENDARY_LOCAL_AI_URL")||"";
 const local=Boolean(gateway&&model.provider==="ollama-compatible"&&model.model_id);
 const huggingface=Boolean(model.provider==="huggingface-space"&&model.model_id&&Deno.env.get("HF_SPACE_URL"));
 const cacheKey=await sha(JSON.stringify({
+  userId:authData.user.id,
   model:model.key,
   provider:model.provider,
   system,
@@ -97,7 +114,42 @@ const cacheHit=Boolean(cacheEntry);
 const started=Date.now();
 
 if(cacheHit){
+  const cachedInputTokens=approxTokens(selectedMessages.map(m=>m.content).join("\n"));
+  const cachedOutputTokens=approxTokens(cachedText);
+  const cachedReservation=cachedInputTokens+cachedOutputTokens;
+  const cachedReservationId=crypto.randomUUID();
+  let cachedReserveResult:any;
+  try{
+    cachedReserveResult=await admin.rpc("consume_tokens",{
+      p_amount:cachedReservation,
+      p_user_id:authData.user.id,
+      p_is_guest:isGuest
+    });
+  }catch{
+    return out(req,{error:"Không thể cập nhật hạn mức token.",code:"TOKEN_RPC_ERROR"},503);
+  }
+  if(cachedReserveResult.error){
+    console.error("consume_tokens failed for cache hit",cachedReserveResult.error.message);
+    return out(req,{error:"Không thể cập nhật hạn mức token.",code:"TOKEN_RPC_ERROR"},500);
+  }
+  if(!cachedReserveResult.data){
+    return out(req,{error:"Bạn đã chạm hạn mức token của gói hiện tại.",code:"TOKEN_LIMIT",tokenLimit:limitForProfile(profile,planData,isGuest),tokensUsed:Number(profile.tokens_used||0),tokenResetAt:profile.token_reset_at},429);
+  }
   const latestCached=await admin.from("profiles").select("token_limit,tokens_used,token_reset_at,plan_expires_at").eq("id",authData.user.id).maybeSingle();
+  const cachedLimit=Number(latestCached.data?.token_limit??limitForProfile(profile,planData,isGuest));
+  const cachedUsed=Number(latestCached.data?.tokens_used??(Number(profile.tokens_used||0)+cachedReservation));
+  const {error:cachedUsageError}=await admin.from("ai_usage_logs").insert({
+    user_id:authData.user.id,
+    model_key:model.key,
+    provider_model:model.model_id,
+    plan,
+    input_tokens:cachedInputTokens,
+    output_tokens:cachedOutputTokens,
+    reserved_tokens:cachedReservation,
+    request_ms:Date.now()-started,
+    status:"success"
+  });
+  if(cachedUsageError)console.error("usage log failed for cache hit",cachedUsageError.message);
   return out(req,{
     requestId:requestId(),
     model:model.key,
@@ -114,7 +166,7 @@ if(cacheHit){
     reasoning:{enabled:reasoning&&Boolean(cacheEntry?.local),tier:rt},
     brain:{version:"12.0-agent",intent,route:"cache",cacheHit:true,contextMessages:selectedMessages.length,rawContextMessages:ms.length,memoryRecall:cacheEntry?.local?memories.length:0,memorySaved:false,agent:agentPlan,selfCheck:true},
     performance:{latency_ms:Date.now()-started,cache_hit:true,context_compacted:ms.length!==selectedMessages.length},
-    usage:{input_tokens:0,output_tokens:0,total_tokens:0,tokens_used:Number(latestCached.data?.tokens_used??profile.tokens_used??0),token_limit:Number(latestCached.data?.token_limit??limitForProfile(profile,planData,isGuest)),remaining_tokens:Math.max(0,Number(latestCached.data?.token_limit??limitForProfile(profile,planData,isGuest))-Number(latestCached.data?.tokens_used??profile.tokens_used??0))}
+    usage:{input_tokens:cachedInputTokens,output_tokens:cachedOutputTokens,total_tokens:cachedReservation,tokens_used:cachedUsed,token_limit:cachedLimit,remaining_tokens:Math.max(0,cachedLimit-cachedUsed)}
   });
 }
 
@@ -131,25 +183,29 @@ function limitForProfile(p:any,planInfo:any,guest:boolean){
   return guest?1000:Number(planInfo?.token_limit||p?.token_limit||500000);
 }
 
+const limit=limitForProfile(profile,planData,isGuest);
+const remaining=Math.max(0,limit-Number(profile.tokens_used||0));
+const reservationPlan=planTokenReservation(inputTokens,max,remaining);
+if(!reservationPlan.ok){
+  return out(req,{error:"Hạn mức còn lại không đủ cho ngữ cảnh và đầu ra tối thiểu. Hãy giảm ngữ cảnh hoặc chờ reset.",code:"TOKEN_LIMIT",tokenLimit:limit,tokensUsed:Number(profile.tokens_used||0),tokenResetAt:profile.token_reset_at},429);
+}
+max=reservationPlan.outputTokens;
+let reserveResult:any;
 try{
-  if(local || huggingface){
-    const limit=limitForProfile(profile,planData,isGuest);
-    const remaining=Math.max(0,limit-Number(profile.tokens_used||0));
-    // Do not reserve less than the requested budget and then let inference exceed the quota.
-    // Require enough budget for input plus the minimum output; cap generation to the remaining balance.
-    if(remaining<inputTokens+256){
-      return out(req,{error:"Hạn mức còn lại không đủ cho ngữ cảnh và đầu ra tối thiểu. Hãy giảm ngữ cảnh hoặc chờ reset.",code:"TOKEN_LIMIT",tokenLimit:limit,tokensUsed:Number(profile.tokens_used||0),tokenResetAt:profile.token_reset_at},429);
-    }
-    max=Math.max(256,Math.min(max,remaining-inputTokens));
-    localReservation=inputTokens+max;
-    const {data:ok,error:te}=await admin.rpc("consume_tokens",{p_amount:localReservation,p_user_id:authData.user.id,p_is_guest:isGuest});
-    if(te){
-      console.error("consume_tokens failed",te.message);
-      return out(req,{error:"Không thể cập nhật hạn mức token.",code:"TOKEN_RPC_ERROR"},500);
-    }
-    if(!ok)return out(req,{error:"Bạn đã chạm hạn mức token của gói hiện tại.",code:"TOKEN_LIMIT",tokenLimit:limit,tokensUsed:Number(profile.tokens_used||0),tokenResetAt:profile.token_reset_at},429);
-  }
+  reserveResult=await admin.rpc("consume_tokens",{p_amount:reservationPlan.reservedTokens,p_user_id:authData.user.id,p_is_guest:isGuest});
+}catch{
+  return out(req,{error:"Không thể cập nhật hạn mức token.",code:"TOKEN_RPC_ERROR"},503);
+}
+if(reserveResult.error){
+  console.error("consume_tokens failed",reserveResult.error.message);
+  return out(req,{error:"Không thể cập nhật hạn mức token.",code:"TOKEN_RPC_ERROR"},500);
+}
+if(!reserveResult.data){
+  return out(req,{error:"Bạn đã chạm hạn mức token của gói hiện tại.",code:"TOKEN_LIMIT",tokenLimit:limit,tokensUsed:Number(profile.tokens_used||0),tokenResetAt:profile.token_reset_at},429);
+}
+localReservation=reservationPlan.reservedTokens;
 
+try{
   if(local || huggingface){
     try{
       const runtimeMessages=[{role:"system",content:buildModelSystemPrompt(system)},...selectedMessages];
@@ -175,9 +231,9 @@ try{
     route=fallback?"native-fallback":"native-core";
   }
 
-  if(text)cacheSet(cacheKey,text,servedLocal);
-  const outputTokens=servedLocal?approxTokens(text):0;
-  const actual=servedLocal?inputTokens+outputTokens:0;
+  if(!text)throw new Error("EMPTY_ENGINE_RESPONSE");
+  const outputTokens=approxTokens(text);
+  const actual=inputTokens+outputTokens;
 
   if(localReservation>0){
     const refundAmount=Math.max(0,localReservation-actual);
@@ -185,6 +241,15 @@ try{
       const {error:refundError}=await admin.rpc("refund_tokens",{p_amount:refundAmount,p_user_id:authData.user.id,p_request_id:reservationId,p_reserved:localReservation});
       if(refundError) console.error("refund_tokens failed",refundError.message);
     }
+  }
+
+  // Only persist explicit memory after an actual response was produced. A blocked,
+  // failed or over-quota request must not create a side effect in the user's account.
+  try{
+    memorySaved=await maybeSaveExplicitMemory(admin,authData.user.id,prompt,!isGuest&&Boolean(profile.memory_enabled));
+  }catch{
+    console.error("explicit memory save failed");
+    memorySaved=false;
   }
 
   const latency=Date.now()-started;
@@ -197,9 +262,9 @@ try{
     model_key:model.key,
     provider_model:model.model_id,
     plan,
-    input_tokens:servedLocal?inputTokens:0,
-    output_tokens:servedLocal?outputTokens:0,
-    reserved_tokens:servedLocal?localReservation:0,
+    input_tokens:inputTokens,
+    output_tokens:outputTokens,
+    reserved_tokens:localReservation,
     request_ms:latency,
     status:"success"
   };

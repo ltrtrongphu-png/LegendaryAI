@@ -222,13 +222,17 @@
     var localIds = Object.create(null);
     local.forEach(function (conv) {
       localIds[String(conv.id)] = true;
-      snapshots[conv.id] = fingerprint([conv]);
+      // Existing cloud IDs can be marked as compared. Local-only conversations
+      // deliberately stay unsnapshotted so the next sync retries their upload.
+      if (remoteById[String(conv.id)]) snapshots[conv.id] = fingerprint([conv]);
     });
     var cloudOnly = (remoteList || []).filter(function (conv) { return !localIds[String(conv.id)]; });
+    cloudOnly.forEach(function (conv) { snapshots[conv.id] = fingerprint([conv]); });
     var kept = local.concat(cloudOnly, backups);
+    var primary = kept.filter(function (conv) { return !conv.syncConflictBackup && !conv.draft; });
     mirrorToChatCache(userId, kept);
     writeJson(syncKey(userId), {
-      fingerprint: fingerprint(local),
+      fingerprint: fingerprint(primary),
       snapshots: snapshots,
       conflict: false,
       conflictIds: conflicts,
@@ -237,6 +241,9 @@
     window.dispatchEvent(new CustomEvent('legendary:sync-conflict', {
       detail: { userId: userId, count: conflicts.length }
     }));
+    // A fresh local-only conversation may not be part of the conflict itself.
+    // Queue a sync pass so it is not lost when the conflict state is cleared.
+    setTimeout(syncNow, 0);
     return kept;
   }
 
@@ -244,14 +251,21 @@
     var backups = (localList || []).filter(function (conv) { return !!conv.syncConflictBackup; });
     var sourceIds = Object.create(null);
     var localById = Object.create(null);
+    var remoteIds = Object.create(null);
     (localList || []).filter(function (conv) { return !conv.draft && !conv.syncConflictBackup; })
       .forEach(function (conv) { localById[String(conv.id)] = conv; });
     backups.forEach(function (conv) { sourceIds[String(conv.syncConflictSourceId)] = true; });
     var effectiveRemote = (remoteList || []).map(function (cloud) {
+      remoteIds[String(cloud.id)] = true;
       var local = localById[String(cloud.id)];
       return sourceIds[String(cloud.id)] && local ? local : cloud;
     });
-    return effectiveRemote.concat(backups);
+    // Do not drop local-only/offline conversations merely because the account's
+    // current cloud response did not include them.
+    var localOnly = (localList || []).filter(function (conv) {
+      return !conv.draft && !conv.syncConflictBackup && !remoteIds[String(conv.id)];
+    });
+    return effectiveRemote.concat(localOnly, backups);
   }
 
   async function loadCloud() {
@@ -272,7 +286,13 @@
 
     var local = localConversations(user.id);
     var syncState = readJson(syncKey(user.id), { fingerprint: '', snapshots: {} });
-    var localDirty = syncState.fingerprint && syncState.fingerprint !== fingerprint(local);
+    var snapshotsBeforeLoad = syncState.snapshots || {};
+    var hasUnsyncedLocal = local.some(function (conv) {
+      return !conv.draft && !conv.syncConflictBackup &&
+        snapshotsBeforeLoad[String(conv.id)] !== fingerprint([conv]);
+    });
+    var localDirty = !!syncState.conflict || hasUnsyncedLocal ||
+      (!!syncState.fingerprint && syncState.fingerprint !== fingerprint(local));
 
     var c = await sb.from('conversations').select('*').eq('user_id', user.id).order('updated_at', { ascending: false });
     if (sequence !== loadSequence) return;
@@ -333,8 +353,13 @@
     mirrorToChatCache(user.id, preservedRemote);
     var snapshots = {};
     remote.forEach(function (conv) { snapshots[conv.id] = fingerprint([conv]); });
+    // Keep offline-only revisions in the local aggregate baseline, but leave
+    // them unsnapshotted so loadCloud will retry them on a later pass.
+    var primaryConversations = preservedRemote.filter(function (conv) {
+      return !conv.syncConflictBackup && !conv.draft;
+    });
     writeJson(syncKey(user.id), {
-      fingerprint: fingerprint(remote),
+      fingerprint: fingerprint(primaryConversations),
       snapshots: snapshots,
       conflict: false,
       syncedAt: Date.now()
@@ -355,7 +380,8 @@
   }
 
   async function syncNow() {
-    var user = await getUser();
+    var user;
+    try { user = await getUser(); } catch (_) { return; }
     if (!user) return;
     var userKey = String(user.id);
     if (syncingUsers[userKey]) {

@@ -33,6 +33,14 @@ assert.ok(
 assert.match(chat, /function abortActiveResponse\(\)/, "chat requests must have a shared cancellation path");
 assert.match(chat, /if \(controller\.signal\.aborted\) return/, "aborted responses must not update the selected conversation");
 assert.match(chat, /if \(activeController !== controller\) return/, "stale requests must not unlock a newer request");
+
+assert.match(chat, /var activeTyping = null/, "the active typing bubble must be tracked independently");
+assert.match(chat, /function abortActiveResponse\(\)[\s\S]*activeController = null;[\s\S]*activeTyping = null;[\s\S]*setErrorBubble\(typing, .Đã dừng phản hồi\.\)/, "stop/navigation must release the typing bubble and controller");
+const stopStart = chat.indexOf("if (stopBtn)");
+const stopEnd = chat.indexOf("if (clearChatBtn)", stopStart);
+assert.ok(stopStart >= 0 && stopEnd > stopStart, "stop button handler must exist");
+assert.match(chat.slice(stopStart, stopEnd), /abortActiveResponse\(\)/, "stop button must clear activeController so sending can resume");
+assert.doesNotMatch(chat.slice(stopStart, stopEnd), /activeController\.abort\(\)/, "stop button must not leave the aborted controller latched");
 assert.match(chat, /window\.addEventListener\('popstate', function \(\) \{\s*abortActiveResponse\(\)/, "deep-link navigation must abort the active request");
 
 const account = readFileSync("js/account.js", "utf8");

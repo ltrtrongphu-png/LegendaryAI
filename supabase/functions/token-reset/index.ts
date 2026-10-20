@@ -1,6 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const configuredSiteUrl = (Deno.env.get("SITE_URL") || "").replace(/\/$/, "");
+const ORIGINS = new Set(["https://legendaryai.vercel.app", "https://www.legendaryai.vercel.app", "http://localhost:3000", "http://127.0.0.1:3000"]);
+if (configuredSiteUrl) ORIGINS.add(configuredSiteUrl);
 const baseCorsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -11,11 +13,7 @@ function corsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
   return {
     ...baseCorsHeaders,
-    ...(origin === "https://legendaryai.vercel.app" || origin === "https://www.legendaryai.vercel.app" || origin === "http://localhost:3000" || origin === "http://127.0.0.1:3000"
-      ? { "Access-Control-Allow-Origin": origin }
-      : configuredSiteUrl
-        ? { "Access-Control-Allow-Origin": configuredSiteUrl }
-        : {}),
+    ...(ORIGINS.has(origin) ? { "Access-Control-Allow-Origin": origin } : {}),
     "Vary": "Origin",
   };
 }
@@ -31,6 +29,8 @@ function json(body: unknown, status = 200, req?: Request) {
 }
 
 Deno.serve(async (req: Request) => {
+  const origin = req.headers.get("origin") || "";
+  if (origin && !ORIGINS.has(origin)) return new Response(JSON.stringify({ error: "Origin not allowed", code: "ORIGIN_NOT_ALLOWED" }), { status: 403, headers: { "Content-Type": "application/json; charset=utf-8", Vary: "Origin" } });
   const cors = corsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, req);

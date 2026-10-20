@@ -45,6 +45,8 @@ jobs:
         run: node tests/security-hardening.test.mjs
       - name: Chat rendering security and attachment bounds
         run: node tests/chat-security.test.mjs
+      - name: Cloud sync conflict/race regression
+        run: node tests/cloud-sync-runtime.test.mjs
       - name: Legal routes and consent regression
         run: node tests/legal-routes.test.mjs
       - name: Current-tree secret scan

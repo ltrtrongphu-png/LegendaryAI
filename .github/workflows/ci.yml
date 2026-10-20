@@ -46,6 +46,8 @@ jobs:
         run: deno check supabase/functions/local-model-health/index.ts
       - name: Type-check legacy ai-chat
         run: deno check supabase/functions/ai-chat/index.ts
+      - name: Type-check retired ai-chat-v9 route
+        run: deno check supabase/functions/ai-chat-v9/index.ts
       - name: Type-check MoMo create and IPN
         run: deno check supabase/functions/momo-create-payment/index.ts supabase/functions/momo-ipn/index.ts
       - name: Type-check account and support functions

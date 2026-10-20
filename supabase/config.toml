@@ -15,3 +15,20 @@ verify_jwt = true
 
 [functions.momo-ipn]
 verify_jwt = false
+[functions.ai-chat]
+verify_jwt = true
+
+[functions.local-model-health]
+verify_jwt = true
+
+[functions.owner-stats]
+verify_jwt = true
+
+[functions.account-data]
+verify_jwt = true
+
+[functions.support-request]
+verify_jwt = false
+
+[functions.data-retention-cleanup]
+verify_jwt = false

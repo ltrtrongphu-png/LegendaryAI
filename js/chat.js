@@ -1836,6 +1836,8 @@
     var x = String(text || '').trim();
     if (!x) return false;
 
+    // Vietnamese "hình thành" means form/become, not image intent.
+    if (/\bhình\s+thành\b/i.test(x)) return false;
     // Do not route diagrams/charts/code drawing requests to the paid image provider.
     if (/(?:^|\s)(?:vẽ|draw)(?:\s|$)/i.test(x)) {
       if (/(?:sơ đồ|diagram|mermaid|flowchart|biểu đồ|chart|graph|code|mã|architecture|kiến trúc)/i.test(x)) return false;
@@ -1848,57 +1850,19 @@
 
   function callImageProvider(conv) {
     var typing = addTypingBubble();
-    var controller = new AbortController();
-    activeController = controller;
-    toggleBusyUI(true);
-
-    if (streamStatus) streamStatus.textContent = 'Image Provider đang tạo ảnh…';
-
-    var prompt = getLastUserMessageText(conv);
-    window.LegendaryAIEngine.image({
-      prompt: prompt,
-      size: 'auto',
-      quality: 'auto',
-      background: 'auto',
-      signal: controller.signal
-    })
-      .then(function (result) {
-        var dataUrl = result && result.imageDataUrl;
-        if (!dataUrl) throw new Error('Image Provider không trả về dữ liệu ảnh.');
-
-        typing.bubble.classList.remove('typing');
-        typing.bubble.innerHTML =
-          '<div class="generated-image-wrap">' +
-          '<img class="generated-image" src="' + dataUrl + '" alt="' + escapeHtml(prompt) + '">' +
-          '<div class="generated-image-meta">GPT Image 2 · Image Provider</div>' +
-          '</div>';
-
-        var savedText = 'Đã tạo ảnh bằng GPT Image 2.\n\nPrompt: ' + prompt;
-        var convSaved = findConv(typing.convId) || getActiveConv();
-        convSaved.messages.push({
-          id: messageUid(),
-          role: 'ai',
-          text: savedText,
-          attachments: [{ kind: 'generated-image', dataUrl: dataUrl, name: 'legendary-image.png' }]
-        });
-        persistConversations();
-
-        if (streamStatus) streamStatus.textContent = '✓ GPT Image 2 · Image Provider';
-        if (chatModeLabel) chatModeLabel.textContent = 'Image Provider · GPT Image 2';
-        toggleBusyUI(false);
-      })
-      .catch(function (err) {
-        if (err && err.name === 'AbortError') {
-          setErrorBubble(typing, 'Đã dừng tạo ảnh.');
-        } else {
-          setErrorBubble(typing, 'Image Provider: ' + (err && err.message ? err.message : err));
-        }
-        toggleBusyUI(false);
-        if (streamStatus) streamStatus.textContent = '';
-      })
-      .finally(function () {
-        if (activeController === controller) activeController = null;
-      });
+    var unavailable = 'Tính năng tạo ảnh đang tạm tắt vì LegendaryAI chưa cấu hình dịch vụ tạo ảnh tự host. Prompt của bạn không được gửi tới nhà cung cấp AI bên ngoài.';
+    if (typing && typing.bubble) {
+      typing.bubble.classList.remove('typing');
+      typing.bubble.textContent = unavailable;
+    }
+    var convSaved = (typing && typing.convId && findConv(typing.convId)) || getActiveConv();
+    if (convSaved && Array.isArray(convSaved.messages)) {
+      convSaved.messages.push({ id: messageUid(), role: 'ai', text: unavailable, attachments: [] });
+      persistConversations();
+    }
+    if (streamStatus) streamStatus.textContent = 'Tạo ảnh chưa được cấu hình';
+    if (chatModeLabel) chatModeLabel.textContent = 'Native Core · tạo ảnh tạm tắt';
+    toggleBusyUI(false);
   }
 
   function triggerAssistantResponse() {

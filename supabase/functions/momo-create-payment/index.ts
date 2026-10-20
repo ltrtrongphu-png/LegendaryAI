@@ -15,6 +15,7 @@ const ORIGINS = new Set([
   "http://localhost:3000",
   "http://127.0.0.1:3000",
 ]);
+if (configuredSiteUrl) ORIGINS.add(configuredSiteUrl);
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -24,11 +25,7 @@ function getCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
   return {
     ...baseCorsHeaders,
-    ...(ORIGINS.has(origin)
-      ? { "Access-Control-Allow-Origin": origin }
-      : configuredSiteUrl
-        ? { "Access-Control-Allow-Origin": configuredSiteUrl }
-        : {}),
+    ...(ORIGINS.has(origin) ? { "Access-Control-Allow-Origin": origin } : {}),
     "Vary": "Origin",
   };
 }
@@ -41,16 +38,20 @@ function cors(body: unknown, status = 200, req?: Request): Response {
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get("origin") || "";
+  if (origin && !ORIGINS.has(origin)) return new Response(JSON.stringify({ error: "Origin not allowed", code: "ORIGIN_NOT_ALLOWED" }), { status: 403, headers: { "Content-Type": "application/json; charset=utf-8", Vary: "Origin" } });
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCorsHeaders(req) });
   if (req.method !== "POST") return cors({ error: "Method not allowed" }, 405, req);
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const partnerCode = Deno.env.get("MOMO_PARTNER_CODE")!;
-  const accessKey = Deno.env.get("MOMO_ACCESS_KEY")!;
-  const secretKey = Deno.env.get("MOMO_SECRET_KEY")!;
-  const siteUrl = Deno.env.get("SITE_URL")!;
-  const momoEndpoint = Deno.env.get("MOMO_ENDPOINT") || "https://test-payment.momo.vn/v2/gateway/api/create";
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const partnerCode = Deno.env.get("MOMO_PARTNER_CODE") || "";
+  const accessKey = Deno.env.get("MOMO_ACCESS_KEY") || "";
+  const secretKey = Deno.env.get("MOMO_SECRET_KEY") || "";
+  const siteUrl = Deno.env.get("SITE_URL") || "";
+  const momoEndpoint = Deno.env.get("MOMO_ENDPOINT") || "";
+
+  if (!supabaseUrl || !serviceKey || !partnerCode || !accessKey || !secretKey || !siteUrl || !momoEndpoint) return cors({ error: "MoMo payment is not configured.", code: "PAYMENT_CONFIG_MISSING" }, 503, req);
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return cors({ error: "Unauthorized" }, 401, req);
@@ -67,7 +68,7 @@ Deno.serve(async (req) => {
     .eq("key", planKey)
     .eq("enabled", true)
     .maybeSingle();
-  if (planError || !plan || Number(plan.price_vnd || 0) <= 0) {
+  if (planError || !plan || !["pro", "legendary"].includes(planKey) || Number(plan.price_vnd || 0) < 1000 || Number(plan.price_vnd || 0) > 50000000) {
     return cors({ error: "Gói không tồn tại, đang tắt hoặc không hỗ trợ thanh toán." }, 400, req);
   }
 
@@ -80,14 +81,41 @@ Deno.serve(async (req) => {
     .select("provider,model_id,enabled")
     .eq("key", String((plan as any).default_model_key || ""))
     .maybeSingle();
-  const localGateway = Deno.env.get("LEGENDARY_LOCAL_AI_URL") || "";
-  if (!modelForPlan || !modelForPlan.enabled ||
-      (modelForPlan.provider === "local" && !localGateway) ||
-      (modelForPlan.provider === "ollama-compatible" && !localGateway)) {
+  const localGateway = (Deno.env.get("LEGENDARY_LOCAL_AI_URL") || "").replace(/\/$/, "");
+  const localGatewayToken = Deno.env.get("LEGENDARY_LOCAL_AI_TOKEN") || "";
+  if (!modelForPlan || !modelForPlan.enabled) {
     return cors({
       error: "Thanh toán gói trả phí đang tạm đóng vì AI model production chưa được bật. Không thu tiền khi tính năng chưa sẵn sàng.",
       code: "PAYMENT_TEMPORARILY_DISABLED"
     }, 503, req);
+  }
+
+  if (modelForPlan.provider === "local" || modelForPlan.provider === "ollama-compatible") {
+    if (!localGateway || !localGatewayToken) {
+      return cors({ error: "Model tự host chưa được cấu hình đầy đủ; thanh toán đang tạm đóng.", code: "PAYMENT_MODEL_NOT_CONFIGURED" }, 503, req);
+    }
+    const healthController = new AbortController();
+    const healthTimer = setTimeout(() => healthController.abort(), 4000);
+    try {
+      const healthResponse = await fetch(localGateway + "/api/tags", {
+        headers: { Authorization: "Bearer " + localGatewayToken },
+        signal: healthController.signal
+      });
+      if (!healthResponse.ok) throw new Error("MODEL_GATEWAY_UNHEALTHY");
+      const payload: any = await healthResponse.json();
+      const models = Array.isArray(payload?.models) ? payload.models : [];
+      const desired = String(modelForPlan.model_id || "").trim();
+      const modelPresent = desired && models.some((item: any) => {
+        const name = String(item?.name || item?.model || "").trim();
+        return name === desired || name === desired + ":latest";
+      });
+      if (!modelPresent) throw new Error("MODEL_NOT_INSTALLED");
+    } catch {
+      console.error("momo-create-payment: selected model readiness check failed");
+      return cors({ error: "Model đang không sẵn sàng; chưa tạo đơn thanh toán. Vui lòng thử lại sau.", code: "PAYMENT_MODEL_UNAVAILABLE" }, 503, req);
+    } finally {
+      clearTimeout(healthTimer);
+    }
   }
 
   const { error: insertError } = await admin.from("orders").insert({
@@ -98,9 +126,9 @@ Deno.serve(async (req) => {
     provider_request_id: requestId,
     status: "pending",
   });
-  if (insertError) return cors({ error: insertError.message }, 500, req);
+  if (insertError) { console.error("momo-create-payment: order insert failed"); return cors({ error: "Không thể tạo đơn thanh toán.", code: "ORDER_CREATE_FAILED" }, 500, req); }
 
-  const redirectUrl = siteUrl + "/?payment=" + encodeURIComponent(orderId);
+  const redirectUrl = siteUrl.replace(/\/$/, "") + "/payment-result?payment=" + encodeURIComponent(orderId);
   const ipnUrl = supabaseUrl + "/functions/v1/momo-ipn";
 
   const signatureText =
@@ -132,12 +160,20 @@ Deno.serve(async (req) => {
     signature,
   };
 
-  const response = await fetch(momoEndpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const result = await response.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 35000);
+  let response: Response;
+  let result: any;
+  try {
+    response = await fetch(momoEndpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: controller.signal });
+    result = await response.json();
+  } catch (error) {
+    // The provider may have accepted the order even if its response timed out. Keep it pending for signed IPN/reconciliation.
+    console.error("momo-create-payment: provider request failed", error instanceof Error && error.name === "AbortError" ? "timeout" : "network");
+    return cors({ error: "MoMo chưa trả kết quả xác nhận. Đơn đang chờ đối soát; vui lòng kiểm tra trạng thái trước khi thanh toán lại.", code: error instanceof Error && error.name === "AbortError" ? "PAYMENT_PROVIDER_TIMEOUT" : "PAYMENT_PROVIDER_UNREACHABLE", orderId }, 504, req);
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok || result.resultCode !== 0) {
     await admin.from("orders").update({
@@ -145,7 +181,7 @@ Deno.serve(async (req) => {
       provider_result_code: result.resultCode ?? -1,
       provider_message: result.message ?? "MoMo request failed",
     }).eq("provider_order_id", orderId);
-    return cors({ error: result.message || "MoMo payment creation failed" }, 502, req);
+    return cors({ error: "MoMo không thể tạo giao dịch. Vui lòng thử lại sau.", code: "PAYMENT_PROVIDER_REJECTED" }, 502, req);
   }
 
   return cors({

@@ -1,93 +1,169 @@
-# LegendaryAI — Audit Report
+# LegendaryAI — Audit report (consolidated)
 
-- Repository: `ltrtrongphu-png/LegendaryAI`
-- Baseline branch: `main`
-- Audit date: 2026-10-20
-- Baseline declared by prompt: 1.2.0
-- Baseline `VERSION` observed on main: `1.1.3`
-- Status: Phase 0 preliminary report; full audit and runtime verification remain in progress.
+**Audit date:** 2026-10-20  
+**Release candidate:** 1.3.0  
+**Repository:** `ltrtrongphu-png/LegendaryAI`  
+**Status:** code and documentation hardening prepared in PR #19; production deployment, live secrets, hosted database migrations, MoMo sandbox, and live inference remain unverified. This report does not claim production readiness.
 
 ## 1. Executive summary
 
-The repository contains a vanilla HTML/CSS/JavaScript frontend, Supabase Auth/Postgres/Storage, Supabase Edge Functions, a model registry, and MoMo payment functions. The code includes a native deterministic engine and conditional routing toward a configured local inference gateway. The existence of model-routing branches does not prove that a production local model is reachable or enabled.
+This pass continued the earlier baseline audit, consolidated follow-up fixes into the open umbrella PR, and added regression checks, a database migration, policy drafts and operator procedures. Material code issues discovered and addressed include:
 
-No secret value is reproduced in this report. The browser Supabase publishable/anon key is present in `js/supabase-config.js`; this is intended to be public and must rely on RLS and least-privilege grants. Server-role and MoMo credentials must remain exclusively in server-side secrets.
+- CORS helpers on chat, payment, model-health and privileged endpoints emitted a production origin for callers whose `Origin` was not allowlisted. The affected handlers now reject a supplied non-allowlisted origin and only return `Access-Control-Allow-Origin` for configured origins.
+- The deprecated `ai-chat-v9` endpoint retained a weaker CORS implementation. It now returns HTTP 410 and does not invoke a model provider or mutate quota.
+- Local inference did not require a gateway bearer token and a caller selecting a local model could get a Native Core fallback under the wrong selected-model label. The new active route requires `LEGENDARY_LOCAL_AI_TOKEN`; an explicitly selected local model fails closed on unavailability. Paid checkout also checks the selected model’s authenticated `/api/tags` readiness before creating an order.
+- The MoMo IPN called a missing `finalize_momo_payment` RPC; that meant a signed callback could fail to transition an order to paid. A forward migration now defines a row-locked/idempotent finalizer and the missing order expiry column, binding the stored order to request ID, transaction ID and plan/user data.
+- Token refunds did not have request-scoped idempotency. The new migration adds a refund ledger and a service-role-only overload; the legacy chat settlement path also uses an explicit-user service-role RPC.
+- The schema contained email-based Owner bootstrap logic. New schema installs no longer grant Owner by matching an email; existing role assignments are preserved. Granting Owner must be an explicit trusted database administration action using a verified UUID.
+- The image flow used an external OpenAI image route, contrary to the product’s stated deployment invariant. Image generation is now explicitly disabled until a supported self-hosted provider is configured and tested.
+- Added policy consent persistence, account-data export/deletion endpoint, a support-ticket intake endpoint, a configurable retention cleanup function (disabled by default), policy pages/routes and operator-facing checklists.
 
-This report records findings supported by the inspected files. Items marked “verify” require full repository/runtime/CI inspection and are not represented as proven vulnerabilities.
+**Important limitation:** source-level checks and CI have been added, but the repository connector did not provide a confirmed green CI run for the latest PR head during this pass. A live Supabase environment, RLS adversarial tests with different database roles, MoMo sandbox, a real local model request and production deployment have not been verified. Do not merge or deploy until the latest PR checks are demonstrably green and the migration has been reviewed.
 
-## 2. Actual flow (confirmed / partially confirmed)
+## 2. Actual request / data flows
 
-1. **Authentication:** `js/account.js` initializes Supabase client from `js/supabase-config.js`, exposes session/user/profile helpers and calls Edge Functions for token reset, Owner actions and payments.
-2. **Chat request:** `js/ai-engine.js` obtains an access token and posts chat payloads to `/functions/v1/ai-chat-v10`. The matching implementation exists at `supabase/functions/ai-chat-v10/index.ts`. A separate legacy-looking implementation also exists at `supabase/functions/ai-chat/index.ts`; verify whether that function is deployed or referenced anywhere before removing it.
-3. **Routing:** `supabase/functions/ai-chat-v10/index.ts` loads the plan/model registry, routes to local or optional Hugging Face runtime, and has a Native Core path. `supabase/functions/local-model-health/index.ts` checks the configured Ollama-compatible gateway with a four-second timeout. Runtime availability remains unverified without the production secret and a live gateway test.
-4. **Quota:** `supabase/schema.sql` defines `public.consume_tokens(integer, uuid, boolean)`, performs a conditional update and grants execution to `service_role`. The RPC uses a row update for atomic quota reservation; the guest semantics, refund path, concurrency behavior and service-role call sites require adversarial tests.
-5. **Conversation sync:** `js/cloud-sync.js` on main uploads conversations, deletes message rows and inserts a replacement message set in separate requests. This is not atomic and can lose/temporarily remove cloud messages on interruption. PR #17 contains a different implementation using `sync_conversation` RPC and user-scoped local cache; review and test that change before merging.
-6. **Payments:** `supabase/functions/momo-create-payment/index.ts` loads plan price from the server-side `plans` table, inserts a pending order, signs a MoMo create request and calls the configured endpoint. `supabase/functions/momo-ipn/index.ts` validates the partner code, required fields, HMAC signature, order and amount, then calls `finalize_momo_payment`. RPC definition, transaction/idempotency guarantees and current MoMo protocol compliance still need verification.
-7. **Storage:** `supabase/schema.sql` creates a private `chat-attachments` bucket and user-folder policies. Retention/deletion jobs and export/account-deletion paths were not confirmed in the inspected snippets.
+### 2.1 Chat and quota
 
-## 3. Findings by severity
+1. Browser modules (`js/chat.js`, `js/account.js`, `js/supabase-config.js`) prepare the message and the current Supabase Auth access token.
+2. The active endpoint is `supabase/functions/ai-chat-v10/index.ts`; `js/chat.js` calls `/functions/v1/ai-chat-v10`. It checks origin, verifies the user, reads the user profile and plan, applies reset-window/plan rules, and reads the model registry.
+3. The token reserve is made via the server-side `consume_tokens` RPC using a service-role client. The active path calculates a request budget and caps local generation to the remaining budget.
+4. Routing can use Native Core (`supabase/functions/ai-chat-v10/brain-core.js` and `cognitive-core.js`), an Ollama-compatible private gateway, or the configured Hugging Face Space adapter (`huggingface-space.ts`, `model-runtime.ts`). Native Core is orchestration/logic and is not proof that a foundation LLM ran.
+5. For a caller who explicitly selected an Ollama-compatible model, gateway failures now fail closed and trigger request-scoped refund instead of being presented as a response from the selected model. General routing/fallback still must be verified by a live model/runtime contract test.
+6. Token usage and route/failure details are stored in the existing profile/usage structures. Request-scoped refund calls now use the new RPC overload and ledger in `20261020120000_legal_payment_retention_hardening.sql`.
+7. Cloud conversation sync uses the existing conversation sync RPC/migration and user ownership rules; local cache remains in the browser storage keys documented in `/cookies`.
 
-### High — must resolve before claiming production-ready
+The old `supabase/functions/ai-chat/index.ts` remains as a compatibility path but its quota finalization was changed to `finalize_tokens_for_user`, with explicit user ID and service-role-only execute privilege. The old `ai-chat-v9` endpoint returns 410.
 
-- **Local model availability is conditional, not established.** `supabase/functions/local-model-health/index.ts` exists and checks `/api/tags`, but production gateway reachability and required model presence have not been tested. The function returns model names and uses a fixed fallback CORS origin for disallowed origins. The chat runtime in `supabase/functions/ai-chat-v10/index.ts` can fall back to Native Core after a local runtime failure; for requests that explicitly require model generation, this risks returning a native answer that users may mistake for model output. Add/verify model-presence checks, explicit unavailable/fallback UI state, gateway authentication where supported, CORS rejection and tests. Never describe the model as active until a live authenticated request succeeds.
-- **Cloud sync can lose data during interruption or overlapping updates.** `js/cloud-sync.js` deletes a conversation's cloud messages and inserts the replacement set in separate requests. A failure between them can leave an incomplete conversation. Replace with a server-side atomic RPC or equivalent transaction and add concurrency/regression tests.
-- **Owner provisioning has a legacy hard-coded email migration path.** An early section of `supabase/schema.sql` promotes a matching email to Owner, but a later `handle_new_user()` definition replaces the trigger function and creates new profiles with role `user`. The later definition appears to supersede the email-based behavior for future signups, while the earlier one-time update remains in the migration text. Simplify this only after verifying the production Owner account and recovery path; do not lock out the legitimate Owner.
-- **CORS fallback may mask disallowed origins.** `supabase/functions/ai-chat/index.ts` responds with the production origin when a request Origin is not allowlisted rather than explicitly rejecting it. Browsers normally block the mismatched response, but explicit allowlist rejection is clearer and safer. Apply consistently across privileged Edge Functions and test configured `SITE_URL` behavior.
+### 2.2 MoMo payment
 
-### Medium — correctness, consistency, or audit gaps
+1. `momo-create-payment/index.ts` validates the caller, fetches the plan and amount from the server-side `plans` row, checks that the plan’s model is enabled, checks self-hosted gateway readiness where applicable, generates an order/request ID, and stores a pending order before calling MoMo.
+2. It requires an explicitly configured `MOMO_ENDPOINT`; it no longer silently falls back to the MoMo test endpoint. Provider calls have a timeout. A timeout keeps the order pending for reconciliation because the provider may have accepted the request.
+3. `momo-ipn/index.ts` validates HMAC-SHA256, partner/order/amount/request ID and binds a successful callback to the stored user/plan metadata and transaction ID.
+4. `finalize_momo_payment` in the new migration locks the order row, checks the request and transaction identifiers, handles duplicate callbacks idempotently, updates the order and plan/expiry in one database transaction, and is executable only by `service_role`.
+5. `/payment-result` does not trust URL parameters as proof of payment; it requires the user’s session and queries `account-data` for the order owned by that user. The page does not sign the user out.
 
-- **Version metadata is inconsistent.** `VERSION` on main is `1.1.3`, while `CHANGELOG.md` contains a `1.2.0` section. Reconcile versioning before publishing another release.
-- **Duplicate chat function implementations create deployment ambiguity.** `js/ai-engine.js` calls `ai-chat-v10`, and `supabase/functions/ai-chat-v10/index.ts` exists; a separate `supabase/functions/ai-chat/index.ts` also exists. Establish whether the latter is deployed or used, and keep documentation aligned without changing the active frontend contract.
-- **Plan limits are duplicated.** `supabase/schema.sql` has a default profile limit of 500,000 and a six-hour reset; `ai-chat/index.ts` declares Free 500,000/6h, Pro 2,000,000/12h and Legendary 6,000,000/18h. These values must be compared with the live `plans` table, Owner reset policy and UI catalog; there is no basis yet to silently replace the intended policy.
-- **MoMo timeout and network failure handling need hardening.** The inspected create-payment flow calls `fetch` without an explicit timeout/abort signal and parses the response as JSON. Add bounded timeout, safe upstream error handling and tests while preserving the documented MoMo signing contract.
-- **Policy and privacy artifacts were not confirmed.** The checked paths did not establish the existence of complete `/legal` pages, consent recording, data export/deletion or retention jobs. Search the full tree and add only features that are actually absent.
-- **Tests and CI coverage not yet verified.** The attempted path `tests/ai-chat.test.js` was not found. This does not prove there are no tests; enumerate the repository tree and workflow files before making that claim.
+The actual MoMo merchant account, live endpoint, callback URL reachability, signature test vectors, transaction reconciliation and production configuration still need operator verification.
 
-### Low / maintainability
+### 2.3 Auth, consent, export and deletion
 
-- Model marketing labels and plan feature flags are declared separately from the model registry and plan catalog. A single source of truth or contract tests would reduce drift.
-- CORS, error responses and upstream fetch behavior differ across functions; consolidate shared safe helpers where compatible.
-- Some client-side persistence operations catch and ignore sync errors. Preserve offline UX but surface sync status and avoid silent data-loss scenarios.
+- Email signup stores `legal_consent` metadata; a Supabase Auth trigger records terms/privacy policy versions in `user_consents`. OAuth flow stores a pending version in sessionStorage and writes consent after login.
+- `account-data` verifies the current Supabase user from the bearer token. It supports policy-consent writes, owner-scoped payment-status lookup, JSON export of core user data and private-attachment signed URLs, plus password-reauthenticated account deletion.
+- Deletion refuses while an order is pending, removes the Auth user, then attempts storage cleanup. A cleanup error is explicitly returned for manual follow-up. Orders/consent evidence can be retained without a direct user link only where the deployed schema/migration and law allow it.
+- `support-request` validates input and saves an inquiry to `support_requests`; it does **not** send an email. Rate limiting on this endpoint is in-memory and is not a distributed rate limiter.
 
-## 4. Documentation/code drift checklist
+## 3. Findings and disposition
 
-| Check | Evidence from inspected files | Status |
+Effort: S = small, M = medium, L = large. “Fixed in PR” means the code path was changed in this branch; it does not mean the change has been deployed to production.
+
+| Severity | Finding | Disposition | Effort |
+|---|---|---|---|
+| High | CORS fallback could return a fixed production `Access-Control-Allow-Origin` for unapproved origins. | Fixed across active/legacy chat, model health, Owner, token reset, payment create and image endpoint; supplied disallowed origins return 403. MoMo IPN is server-to-server and uses signature verification. | M |
+| High | Selected local model could be unavailable or unauthenticated while the route reported a fallback answer as though the selected model ran. | Active path now requires gateway bearer token, no retry on HTTP 429, fails closed for explicit local selection; payment creation checks gateway/model readiness. Live request still required. | M |
+| High | `momo-ipn` called a missing `finalize_momo_payment` database RPC, and finalizer required an `orders.expires_at` column that was absent from the schema snapshot. | Added idempotent/row-locked finalizer and idempotent `expires_at` column in forward migration; needs staging application and callback tests. | L |
+| High | Token refund RPC lacked request-scoped idempotency. The legacy `ai-chat` quota-finalization RPC relied on `auth.uid()` despite using a service-role client. | Added `token_refunds` ledger, service-role-only four-argument `refund_tokens`, and explicit-user `finalize_tokens_for_user`; updated Edge Functions. Needs concurrent tests on PostgreSQL. | L |
+| High | Owner bootstrap was based on a hard-coded email value in the schema. | Removed email-matching escalation from schema snapshot. Existing production roles are untouched; verify the intended Owner UUID before applying schema/migrations. | S |
+| High | External OpenAI image route contradicted the self-hosted/no-external-provider requirement. | Browser flow and `image-generate` endpoint fail closed with a clear disabled status until a self-hosted provider is approved/tested. | S |
+| Medium | No first-party user data export/deletion, versioned consent ledger, ticket intake or configurable retention mechanism was confirmed in the earlier baseline. | Added `account-data`, `user_consents`, `support_requests`, `retention_settings`, export/delete UI and cleanup function. Retention is disabled by default; scheduler is not configured. | L |
+| Medium | Policy claims could overstate current inference, image, web search, payment renewal or data retention. | README/policy drafts document current limitations and avoid claiming automatic renewal, automatic refunds, verified model readiness or active retention without proof. | M |
+| Medium | Legacy chat v9 could remain directly callable. | Endpoint retired with HTTP 410; its JWT config and Deno check are included. | S |
+| Medium | Repository instructions did not describe local environment setup, security reporting or contribution workflow. | Added `.env.example`, `.gitignore`, `SECURITY.md`, `CONTRIBUTING.md`, operational README sections and secret scanning CI. | M |
+| Medium | AI image intent incorrectly classified Vietnamese “hình thành” as image generation. | Fixed classifier and regression coverage in `js/chat.js` and `tests/image-intent.test.js`. | S |
+| Medium | RLS policy expressions could repeatedly evaluate `auth.uid()`; schema had overly broad Owner initialization behavior. | Converted ownership conditions to `(select auth.uid())` where updated and restated key RLS policies. Must still be verified under real anon/user A/user B/Owner/service_role sessions. | M |
+| Low | Local browser cache may contain conversation metadata and stale unsynced messages. | Documented storage keys and deletion behavior; existing sync/cache behavior still needs realistic multi-tab/offline conflict tests. | M |
+| Low | Support endpoint rate limiting is instance-local and there is no automated response email. | Clearly disclosed; use a distributed limiter/email provider only after an operator chooses and configures one. | M |
+| Low | Live streaming, comprehensive Playwright e2e and external service smoke tests are not provided by this change. | Recorded as outstanding; not claimed as implemented. | L |
+
+## 4. Documentation vs. code
+
+| Topic | Code/source of truth | Public wording in this branch |
 |---|---|---|
-| `ai-chat` vs `ai-chat-v10` | Frontend calls `ai-chat-v10`; both `supabase/functions/ai-chat-v10/index.ts` and `supabase/functions/ai-chat/index.ts` exist | Verify whether legacy function is deployed/used |
-| Version | `VERSION=1.1.3`; changelog includes 1.2.0 | Confirmed mismatch |
-| Free quota | schema default 500,000 / 6h; Edge Function Free 500,000 / 6h | Partially aligned |
-| Pro / Legendary windows | Edge Function declares 2M/12h and 6M/18h | Verify DB plans, UI and reset RPC |
-| Secret handling | frontend config contains a publishable/anon key; MoMo and service-role secrets referenced in Edge Functions | Verify git history and deployed secrets; no secret rotation performed |
-| Local model | `local-model-health` checks gateway `/api/tags`; chat can fall back to Native Core | Runtime readiness and fallback UX unverified |
-| Payment idempotency | IPN calls `finalize_momo_payment` RPC | Must inspect RPC implementation and constraints |
-| Policies / consent / deletion | not established by inspected files | Full-tree verification required |
+| Active chat function | `js/chat.js` → `ai-chat-v10`; `ai-chat` is legacy compatibility; `ai-chat-v9` returns 410. | README names all three statuses. |
+| Guest quota | Guest session handling in active chat and schema defaults; intended 1,000 tokens/session. | Token policy calls this a session quota rather than a six-hour user window. |
+| Free | Schema defaults to 500,000 tokens / 6h. | README and token policy use 500,000 / 6h. |
+| Pro | Schema defaults to 2,000,000 tokens / 12h; seeded price 149,000 VND/month. | Documented as seeded defaults; production `plans` row may differ. |
+| Legendary | Schema defaults to 6,000,000 tokens / 18h; seeded price 399,000 VND/month. | Documented as seeded defaults; production `plans` row may differ. |
+| Manual reset | RPC logic: Pro once/month; Legendary/Owner once/7 days. | Documented with that cadence. |
+| Inference provider | Native Core + configured self-hosted Ollama-compatible gateway and optional HF Space route. | Aliases disclose the likely origin model and expressly do not claim the provider is currently alive. |
+| Image generation | Not offered until a self-hosted provider is configured. | UI/endpoint/policy state that it is disabled and do not send prompt to the previous external image route. |
+| Web search | Must have a real provider and verified configuration before the feature can be claimed. | Not claimed as available without verification. |
+| Payments | Server-side price; MoMo one-time create/IPN; no renewal job or automatic refund API was confirmed. | No automatic renewal/automatic refund promise. Pending and failed orders require reconciliation. |
+| Data retention | New retention config is disabled with `retention_days = NULL`; no scheduler is deployed. | Privacy policy explicitly says retention period and scheduled cleanup are not active until configured. |
+| External secrets | Server-side Supabase/MoMo/gateway secrets are required, and the browser Supabase publishable key is not a service-role secret. | README/.env.example separates public browser config from server-only secrets. |
 
-## 5. Personal-data map (based on inspected code; retention/access must be verified)
+## 5. Personal data inventory
 
-| Data | Observed location / processing | Access and retention status |
-|---|---|---|
-| Email and auth identity | Supabase Auth; referenced by `profiles` trigger | Supabase Auth policies/configuration and retention not inspected |
-| Display name/avatar | `profiles`, sourced from auth metadata | User profile select policy exists; write permissions need full grant review |
-| Chat content and titles | `conversations`, `messages`; local browser storage in `js/cloud-sync.js` | User-scoped RLS policies exist; retention/deletion schedule not confirmed |
-| Attachment names/content | message JSON and private Supabase Storage bucket | Folder-based storage policies exist; size/retention/deletion needs verification |
-| Plan/token usage | `profiles`, plan catalog and token RPC | Service-role RPC path exists; usage log schema/retention needs verification |
-| Payment order metadata | `orders`, MoMo create/IPN flow | User can select own orders per inspected policy; audit/refund lifecycle needs verification |
-| IP / security logs | Not established by inspected snippets | Must inspect Edge Functions, Vercel/Supabase logs and retention settings |
-| Memory | profile feature flag exists; actual memory storage/processing not yet traced | Do not claim retention or training behavior until verified |
-| Third parties | Supabase; Vercel hosting; MoMo payment; Google/GitHub OAuth if enabled; optional self-hosted local inference gateway | Actual enabled providers and cross-border processing need configuration review |
+This matrix distinguishes confirmed application paths from hosting/provider details that must be verified in the provider dashboards and agreements.
 
-## 6. Immediate next steps
+| Category | Purpose | Where stored/processed | Access | Retention known? | Third parties / notes |
+|---|---|---|---|---|---|
+| Email, Auth user ID, signup/OAuth metadata | Authentication, account recovery, profile | Supabase Auth; `profiles` | User via auth; privileged service role | Not fully specified by this repository | Supabase; Google/GitHub only if enabled by deployment |
+| Password | Auth credential | Supabase Auth (not application tables) | Auth service; application code does not need plaintext password except one-time re-auth request for account deletion | Governed by Supabase account policy; verify provider | Supabase; never log it |
+| Conversation titles/messages | Chat, history, sync | Browser localStorage/cache; Supabase `conversations`/`messages` | User-owned records via RLS and authorized Edge Functions | No app-level chat retention schedule enabled | Supabase; prompt/context can be sent to configured inference provider |
+| Image/file attachments | Vision/chat feature | Private `chat-attachments` Storage and message metadata | Owner path policy/service role; signed URLs expire after 5 minutes on export | No cleanup schedule enabled by default | Supabase Storage; contents may be sent to configured inference provider when feature is used |
+| Memory | User-personalized responses | Supabase `ai_memories` and/or configured client path | User ownership policy and server functions | No retention period configured | Supabase; check deployed capability configuration |
+| Token balance/usage/route logs | Quota, billing integrity, diagnostics | `profiles`, `ai_usage_logs`, refund ledger | User may read allowed own usage fields; mutations are server-side | No usage-log retention period configured | Supabase; keep logs free of prompt content/PII |
+| Payment/order data | Purchase, reconciliation, plan lifecycle | `orders`/profile; MoMo receives transaction fields | User can read own order; service role and merchant process callbacks | Transaction retention period not decided here | MoMo and Supabase; IPN must not log keys |
+| Consent evidence | Evidence of policy/version acceptance | `user_consents` | Service role only in database; user can request export | Retention duration requires legal/operator decision | No raw IP is collected by this new consent flow; `ip_hash` is null |
+| Support/privacy/abuse ticket | Respond to user request | `support_requests` | Service role/Owner operations only; form returns ticket ID | Cleanup configurable but off by default | Supabase; email reply not configured |
+| IP and connection metadata | Platform operations/security, if collected by provider | HTTP/CDN/hosting/edge logs depending on deployment | Provider/operator according to service settings | Not knowable from repo; verify dashboards/contracts | Vercel, Supabase and possibly other infrastructure |
+| Model prompts/context | Generate an answer | Sent to the provider selected by backend route | Backend and inference provider | Gateway/Space logging settings are not verified | Ollama-compatible self-hosted gateway, HF Space if enabled; do not promise non-retention without checking their configuration |
+| Browser settings/cache | UI preferences, active chat, local history and sync state | localStorage/sessionStorage; Supabase Auth SDK session storage depends on SDK configuration | Local device/browser profile | Until site data/session cleared or browser evicts it | No separate app analytics/advertising cookie was verified in the code inspected; external SDK/platform behavior still needs provider review |
 
-1. Inspect the open PR #17 diff, CI results and migration/RPC changes before deciding whether to merge.
-2. Enumerate all repository files and workflows; trace the full chat, quota/refund, payment and account lifecycle.
-3. Add tests for token race/refund idempotency, MoMo signature/idempotency, RLS isolation, local-model health/fallback and atomic conversation sync.
-4. Inspect current Vietnamese personal-data, consumer-protection, e-commerce and MoMo requirements from primary sources before drafting final legal language.
-5. Produce a final `docs/AUDIT_REPORT.md` with verified line numbers, completed fixes, test results and manual actions after the audit and implementation phases.
+## 6. Security/configuration properties
 
-## 7. Manual actions not performed
+- RLS is enabled in the schema snapshot for `profiles`, `conversations`, `messages`, `orders`, `ai_models`, `ai_memories`, `ai_usage_logs` and `plans`. New policy/ledger tables in the migration also enable RLS and revoke client-table grants.
+- The `ai_models` registry exposes enabled rows to regular callers, and Owner-write policy checks the role in the database. Edge Function Owner checks also need role tests.
+- `consume_tokens`, new request-scoped `refund_tokens`, MoMo finalization, consent data and the new legacy settlement RPC are intended for service role only. The old non-idempotent `refund_tokens(integer, uuid)` overload is disabled in the forward migration.
+- `SITE_URL` is added as an explicit origin. A wildcard or default origin is not emitted for a non-allowlisted request.
+- `.env.example` contains blanks only; `.gitignore` excludes local environment files. The secret scanner covers high-confidence common patterns in the worktree and supports scanning fetched Git history with `--history`.
+- `vercel.json` and existing headers/CSP should still be reviewed in a real browser for script/connect policy compatibility.
+- The image endpoint returns 503 and the deprecated chat v9 endpoint returns 410.
+- Do not enable retention cleanup until days and legal basis are approved. Configure a protected scheduler separately; code in Git does not create that scheduler.
 
-- No production secrets were changed or rotated.
-- No database migration was applied to the production Supabase project by this report.
-- No claim is made that a local model gateway is online.
-- No legal placeholder (operator identity, tax/business number, address, support email or hotline) was invented.
-- No force-push or history rewrite was performed.
+## 7. Verification status
+
+### Added checks in CI
+- Existing routing, image-intent, cognitive core, Native Core, model runtime contract tests.
+- New CORS, security-hardening, legal routes/consent and secret-scan tests.
+- Deno type checks for active/legacy chat, model health, MoMo, Owner/token reset, account data, support, retention cleanup and disabled image endpoint.
+
+### Not yet proven
+- **Latest PR CI green status:** not confirmed in the available run results. Do not merge until GitHub shows all required checks green for the exact latest head SHA.
+- **Database:** migration not applied to hosted Supabase; SQL has not been executed against a clean local/staging PostgreSQL instance in this pass.
+- **RLS adversarial tests:** no live tests using anon, user A, user B, Owner and service_role sessions.
+- **Tokens:** no concurrent reserve/settle/refund load test to empirically prove no negative balances/double spend.
+- **MoMo:** no live/sandbox transaction with valid/invalid HMAC, duplicate IPN, request/amount mismatch, delayed callback, or reconciliation was run.
+- **Inference:** no confirmed live `LEGENDARY_LOCAL_AI_URL` / `LEGENDARY_LOCAL_AI_TOKEN`, `/api/tags` check, and real authenticated completion. No claim is made that the local model is active.
+- **Frontend UX/a11y/performance:** no Playwright run, keyboard/mobile regression, Lighthouse score or reduced-motion/WebGL device test was completed here.
+- **Secret history scan:** CI is configured to run it; no successful output for the latest branch head has been confirmed here.
+- **Policy approval:** pages are drafts pending legal review and completion of operator details.
+
+## 8. Rollback and deployment safeguards
+
+1. Review the migration carefully in version control; back up the database and apply it to staging first.
+2. The migration changes the token refund contract and disables the legacy two-argument refund RPC. To roll back app behavior, deploy compatible Edge Function code before any database rollback. Do not drop consent, transaction or audit tables as a shortcut; preserve their data.
+3. Confirm the existing Owner account by verified Auth UUID and preserve its current assignment; the removed email bootstrap does not automatically elevate a new user.
+4. Run SQL checks for all policies and grants under each test role before production.
+5. Test MoMo end-to-end in the merchant sandbox and verify transaction reconciliation. Keep payment checkout disabled if the default model/gateway is not ready.
+6. Install `SITE_URL`, Supabase server secrets, explicit MoMo endpoint/merchant secrets and (if using local inference) gateway URL/token through the provider dashboard. Rotate any key found exposed by a secret-history scan; do not force-push/rewrite history without a separately approved incident plan.
+7. Approve retention periods, set `retention_settings`, then configure and test a protected scheduler before enabling deletion rules.
+8. Fill in operator identity/tax/address/contact/SLA placeholders and obtain qualified legal review before publishing policies or collecting paid subscriptions.
+
+## 9. Legal/source notes (checked 2026-10-20)
+
+- Vietnam Law No. 91/2025/QH15 on Personal Data Protection, official Government legal database: https://vanban.chinhphu.vn/?classid=1&docid=214590&pageid=27160&typegroup= . The official record lists the law as effective 2026-01-01. Counsel should check implementing texts and transitional provisions.
+- Ministry of Industry and Trade publication on the Law on E-Commerce and Government Decree No. 248/2026/ND-CP: https://moit.gov.vn/en/news/ministry-of-industry-and-trade-disseminates-the-law-on-e-commerce-and-government-decree-no.-248-2026-nd-cp.html . Applicability to this particular service/payment model must be determined by counsel.
+- MoMo Developers: “Initiate Transaction” and “One-Time Payments”: https://developers.momo.vn/v3/vi/docs/payment/api/payment-api/init/ and https://developers.momo.vn/v3/vi/docs/payment/api/wallet/onetime/ . These cover the initiation request, request ID, amount bounds and HMAC signing; confirm the exact merchant environment/contract before production.
+
+## 10. Remaining operator actions
+
+- [ ] Review and merge PR #19 only after all checks pass for the latest head SHA.
+- [ ] Apply the forward migration to staging; run the SQL/RLS/token/payment adversarial test set, review rollback and then schedule production application.
+- [ ] Set/verify Supabase and Vercel secrets; confirm that no actual credentials remain exposed in Git history. Rotate any exposed real secret found by the scan.
+- [ ] Confirm Owner by Auth UUID.
+- [ ] Configure and test a live local-model gateway before enabling any paid model profile.
+- [ ] Confirm MoMo merchant setup, production callback URL and refund/reconciliation operations.
+- [ ] Decide retention windows and any model-improvement/training use; do not infer consent for secondary uses.
+- [ ] Fill all legal placeholders and approve policies with qualified counsel.
+- [ ] Configure monitored support response workflow, retention scheduler and post-deploy smoke checks.
+

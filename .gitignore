@@ -1,0 +1,19 @@
+# Local secrets (only commit .env.example)
+.env
+.env.*
+!.env.example
+*.local
+
+# Supabase local state and logs
+.supabase/
+supabase/.temp/
+*.log
+
+# Node / editor / OS
+node_modules/
+dist/
+coverage/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -178,3 +178,15 @@ The consolidated PR #20 is already merged to `main`; the historical checklist ab
 - `tests/e2e-smoke.mjs` adds Chromium/Playwright smoke coverage for the app shell, `/new`, `/chat/:slug`, and all policy routes using a local rewrite-compatible test server. The new `browser-smoke` workflow job must pass on this branch before it can be merged.
 
 Still not proven in this pass: migration execution on a clean Supabase/PostgreSQL instance, adversarial RLS tests for anon/user A/user B/Owner/service_role, concurrent token reservation/settlement/refund, duplicate and delayed MoMo IPNs against a test database, hosted secrets and model health, mobile keyboard/accessibility/Lighthouse metrics, and production retention scheduling. These require local Docker/Postgres/Supabase or operator-owned provider credentials and must not be represented as completed based only on static tests.
+
+
+## 12. Frontend and sync follow-up (2026-10-20)
+
+The follow-up PR also hardens user-controlled content and local/cloud synchronization:
+- Shared HTML escaping now covers both quote characters; image attachment sources are limited to raster base64 data URLs and HTTPS URLs without embedded credentials.
+- Attachment size/count/aggregate payload budgets are checked before and during reading, and ZIP entry declared expansion size is checked before decompression. The payload-size exception is displayed without leaving the send controls locked.
+- Chat requests are aborted on conversation navigation, clear/delete and authentication changes; late results/errors from an older request cannot update the active view or unlock a newer request.
+- Conversation updatedAt is advanced for ordinary message changes, AI completion, title rename, regeneration and clear. Cloud reads have a sequence guard; per-user sync uses a queued single-flight lock, and conflicting local/cloud conversation bodies are retained as separately labeled local-only copies instead of silently discarding one side.
+- CI tests cover the core contracts in tests/chat-security.test.mjs and tests/cloud-sync-runtime.test.mjs; the Playwright smoke test covers application-shell/deep-link/policy-route rendering only.
+
+Remaining limitation: these sync/browser checks are contract/static regressions, not multi-tab stress tests or authenticated tests against a staged database. Provider, database, legal-operator and retention actions in section 10 remain open and require the operator environment.

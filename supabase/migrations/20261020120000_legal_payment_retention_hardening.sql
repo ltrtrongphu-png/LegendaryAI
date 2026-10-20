@@ -10,6 +10,7 @@ alter table public.orders add constraint orders_user_id_fkey
   foreign key (user_id) references auth.users(id) on delete set null;
 
 alter table public.orders add column if not exists provider_transaction_id text;
+alter table public.orders add column if not exists expires_at timestamptz;
 create unique index if not exists orders_provider_transaction_id_uidx
   on public.orders(provider_transaction_id)
   where provider_transaction_id is not null;
@@ -352,3 +353,46 @@ revoke all on function public.refund_tokens(integer, uuid) from public, anon, au
 revoke all on function public.finalize_tokens(integer, integer) from public, anon, authenticated, service_role;
 
 -- Never bootstrap Owner based on a matching email. Existing roles are preserved.
+
+
+-- Legacy ai-chat uses a service-role Supabase client, where auth.uid() is NULL.
+-- Accept the target user explicitly only in this service-role-only RPC.
+create or replace function public.finalize_tokens_for_user(
+  p_user_id uuid,
+  p_reserved integer,
+  p_actual integer
+)
+returns table (
+  tokens_used integer,
+  tokens_remaining integer,
+  token_limit integer,
+  token_reset_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := p_user_id;
+  reserved integer := greatest(coalesce(p_reserved, 0), 0);
+  actual integer := greatest(coalesce(p_actual, 0), 0);
+begin
+  if uid is null or p_reserved is null or p_actual is null or p_reserved < 0 or p_actual < 0 then
+    return;
+  end if;
+  perform 1 from public.profiles p where p.id = uid for update;
+  if not found then return; end if;
+  actual := least(actual, reserved);
+  return query
+  update public.profiles p
+     set tokens_used = greatest(p.tokens_used + (actual - reserved), 0),
+         updated_at = now()
+   where p.id = uid
+  returning p.tokens_used,
+            greatest(p.token_limit - p.tokens_used, 0),
+            p.token_limit,
+            p.token_reset_at;
+end;
+$$;
+revoke all on function public.finalize_tokens_for_user(uuid, integer, integer) from public, anon, authenticated;
+grant execute on function public.finalize_tokens_for_user(uuid, integer, integer) to service_role;
